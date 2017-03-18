@@ -22,6 +22,8 @@ import com.facebook.presto.orc.memory.AggregatedMemoryContext;
 import com.facebook.presto.orc.metadata.DwrfMetadataReader;
 import com.facebook.presto.orc.metadata.MetadataReader;
 import com.facebook.presto.orc.metadata.OrcMetadataReader;
+import com.facebook.presto.orc.metadata.OrcType;
+import com.facebook.presto.orc.metadata.OrcType.OrcTypeKind;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.StandardTypes;
@@ -29,7 +31,9 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
-import com.facebook.presto.type.TypeRegistry;
+import com.facebook.presto.type.ArrayType;
+import com.facebook.presto.type.MapType;
+import com.facebook.presto.type.RowType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Longs;
@@ -51,8 +55,11 @@ import org.joda.time.DateTimeZone;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.IntStream;
 
-import static com.facebook.presto.spi.StandardErrorCode.GENERIC_EXTERNAL;
+import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
@@ -66,9 +73,10 @@ import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TinyintType.TINYINT;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
+import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
-import static com.facebook.presto.util.Types.checkType;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Verify.verify;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static java.lang.String.format;
@@ -85,21 +93,14 @@ public final class OrcFileChecksum
     public static void main(String... args)
             throws Exception
     {
-        String hiveTypes = args[0];
-        Path path = new Path(args[1]);
+        Path path = new Path(args[0]);
 
-        checksumHdfsOrcFile(hiveTypes, path, false);
+        checksumHdfsOrcFile(path, false);
     }
 
-    private static void checksumHdfsOrcFile(String hiveTypes, Path path, boolean isDwrf)
+    private static void checksumHdfsOrcFile(Path path, boolean isDwrf)
             throws IOException
     {
-        // this line requires a dependency on presto-main
-        // todo add a simplified type manager for this
-        TypeManager typeManager = new TypeRegistry();
-
-        List<Type> types = toHiveTypes(hiveTypes, typeManager);
-
         FileSystem fileSystem = path.getFileSystem(new Configuration());
 
         FileStatus fileStatus = fileSystem.getFileStatus(path);
@@ -112,7 +113,7 @@ public final class OrcFileChecksum
                 new DataSize(8, MEGABYTE),
                 fsDataInputStream);
 
-        OrcFileChecksum orcFileChecksum = new OrcFileChecksum(orcDataSource, types, isDwrf);
+        OrcFileChecksum orcFileChecksum = new OrcFileChecksum(orcDataSource, isDwrf);
         System.out.println();
         System.out.println("rows: " + orcFileChecksum.getRowCount());
         List<Long> checksums = orcFileChecksum.getChecksums();
@@ -121,15 +122,9 @@ public final class OrcFileChecksum
         }
     }
 
-    public OrcFileChecksum(OrcDataSource orcDataSource, List<Type> types, boolean isDwrf)
+    public OrcFileChecksum(OrcDataSource orcDataSource, boolean isDwrf)
             throws IOException
     {
-        ImmutableMap.Builder<Integer, Type> includedColumnsBuilder = ImmutableMap.builder();
-        for (int i = 0; i < types.size(); i++) {
-            includedColumnsBuilder.put(i, types.get(i));
-        }
-        ImmutableMap<Integer, Type> includedColumns = includedColumnsBuilder.build();
-
         MetadataReader metadataReader;
         if (isDwrf) {
             metadataReader = new DwrfMetadataReader();
@@ -138,6 +133,15 @@ public final class OrcFileChecksum
             metadataReader = new OrcMetadataReader();
         }
         OrcReader orcReader = new OrcReader(orcDataSource, metadataReader, new DataSize(1, MEGABYTE), new DataSize(8, MEGABYTE));
+
+        List<Type> types = toPrestoTypes(orcReader.getFooter().getTypes());
+        
+        ImmutableMap.Builder<Integer, Type> includedColumnsBuilder = ImmutableMap.builder();
+        for (int i = 0; i < types.size(); i++) {
+            includedColumnsBuilder.put(i, types.get(i));
+        }
+        Map<Integer, Type> includedColumns = includedColumnsBuilder.build();
+
         OrcRecordReader recordReader = orcReader.createRecordReader(includedColumns, OrcPredicate.TRUE, DateTimeZone.getDefault(), new AggregatedMemoryContext());
 
         long rowCount = 0;
@@ -148,6 +152,67 @@ public final class OrcFileChecksum
         }
         this.rowCount = rowCount;
         this.checksums = ImmutableList.copyOf(Longs.asList(checksums));
+    }
+
+    private static List<Type> toPrestoTypes(List<OrcType> orcTypes)
+    {
+        OrcType tableType = orcTypes.get(0);
+        checkArgument(tableType.getOrcTypeKind() == OrcTypeKind.STRUCT);
+        ImmutableList.Builder<Type> types = ImmutableList.builder();
+        for (int i = 0; i < tableType.getFieldCount(); i++) {
+            types.add(toPrestoType(orcTypes.get(tableType.getFieldTypeIndex(i)), orcTypes));
+        }
+        return types.build();
+    }
+
+    private static Type toPrestoType(OrcType orcType, List<OrcType> orcTypes)
+    {
+        switch (orcType.getOrcTypeKind()) {
+            case BOOLEAN:
+                return BOOLEAN;
+            case BYTE:
+                return TINYINT;
+            case SHORT:
+                return SMALLINT;
+            case INT:
+                return INTEGER;
+            case LONG:
+                return BIGINT;
+            case DECIMAL:
+                return createDecimalType(orcType.getPrecision().get(), orcType.getScale().get());
+            case FLOAT:
+                return REAL;
+            case DOUBLE:
+                return DOUBLE;
+            case STRING:
+            case VARCHAR:
+            case CHAR:
+                return VARCHAR;
+            case BINARY:
+                return VARBINARY;
+            case DATE:
+                return DATE;
+            case TIMESTAMP:
+                return TIMESTAMP;
+            case LIST:
+                return new ArrayType(toPrestoType(orcTypes.get(orcType.getFieldTypeIndex(0)), orcTypes));
+            case MAP:
+                return new MapType(
+                        toPrestoType(orcTypes.get(orcType.getFieldTypeIndex(0)), orcTypes),
+                        toPrestoType(orcTypes.get(orcType.getFieldTypeIndex(1)), orcTypes));
+            case STRUCT:
+                return new RowType(
+                        IntStream.range(0, orcType.getFieldCount())
+                                .map(orcType::getFieldTypeIndex)
+                                .mapToObj(orcTypes::get)
+                                .map(fieldType -> toPrestoType(fieldType, orcTypes))
+                                .collect(toList()),
+                        Optional.of(IntStream.range(0, orcType.getFieldCount())
+                                .mapToObj(orcType::getFieldName)
+                                .collect(toList())));
+            default:
+                throw new IllegalArgumentException("Unsupported type kind: " + orcType.getOrcTypeKind());
+        }
     }
 
     public long getRowCount()
@@ -208,20 +273,20 @@ public final class OrcFileChecksum
                 }
                 return primitiveType.getTypeSignature();
             case MAP:
-                MapTypeInfo mapTypeInfo = checkType(typeInfo, MapTypeInfo.class, "fieldInspector");
+                MapTypeInfo mapTypeInfo = (MapTypeInfo) typeInfo;
                 TypeSignature keyType = getTypeSignature(mapTypeInfo.getMapKeyTypeInfo());
                 TypeSignature valueType = getTypeSignature(mapTypeInfo.getMapValueTypeInfo());
                 return new TypeSignature(
                         StandardTypes.MAP,
                         ImmutableList.of(TypeSignatureParameter.of(keyType), TypeSignatureParameter.of(valueType)));
             case LIST:
-                ListTypeInfo listTypeInfo = checkType(typeInfo, ListTypeInfo.class, "fieldInspector");
+                ListTypeInfo listTypeInfo = (ListTypeInfo) typeInfo;
                 TypeSignature elementType = getTypeSignature(listTypeInfo.getListElementTypeInfo());
                 return new TypeSignature(
                         StandardTypes.ARRAY,
                         ImmutableList.of(TypeSignatureParameter.of(elementType)));
             case STRUCT:
-                StructTypeInfo structTypeInfo = checkType(typeInfo, StructTypeInfo.class, "fieldInspector");
+                StructTypeInfo structTypeInfo = (StructTypeInfo) typeInfo;
                 List<TypeSignature> fieldTypes = structTypeInfo.getAllStructFieldTypeInfos()
                         .stream()
                         .map(OrcFileChecksum::getTypeSignature)
@@ -300,9 +365,9 @@ public final class OrcFileChecksum
             catch (Exception e) {
                 String message = format("HDFS error reading from %s at position %s", this, position);
                 if (e.getClass().getSimpleName().equals("BlockMissingException")) {
-                    throw new PrestoException(GENERIC_EXTERNAL, message, e);
+                    throw new PrestoException(GENERIC_INTERNAL_ERROR, message, e);
                 }
-                throw new PrestoException(GENERIC_EXTERNAL, message, e);
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, message, e);
             }
         }
     }
