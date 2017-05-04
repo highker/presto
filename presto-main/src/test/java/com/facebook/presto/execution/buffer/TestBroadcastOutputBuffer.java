@@ -35,18 +35,22 @@ import static com.facebook.presto.OutputBuffers.createInitialEmptyOutputBuffers;
 import static com.facebook.presto.execution.buffer.BufferResult.emptyResults;
 import static com.facebook.presto.execution.buffer.BufferState.OPEN;
 import static com.facebook.presto.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
+import static com.facebook.presto.execution.buffer.BufferSummary.emptySummary;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.MAX_WAIT;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.NO_WAIT;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.addPage;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.assertBufferResultEquals;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.assertBufferSummaryEquals;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.assertFinished;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.assertFutureIsDone;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.assertQueueClosed;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.assertQueueState;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.createBufferResult;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.createBufferSummary;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.createPage;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.enqueuePage;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.getBufferResult;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.getBufferSummary;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.getFuture;
 import static com.facebook.presto.execution.buffer.BufferTestUtils.sizeOfPagesInBytes;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
@@ -122,12 +126,13 @@ public class TestBroadcastOutputBuffer
         assertQueueState(buffer, FIRST, 3, 0);
 
         // get the three elements
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(10), NO_WAIT), bufferResult(0, createPage(0), createPage(1), createPage(2)));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 0, sizeOfPagesInBytes(10), NO_WAIT), bufferSummary(0, createPage(0), createPage(1), createPage(2)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(10)), bufferResult(0, createPage(0), createPage(1), createPage(2)));
         // pages not acknowledged yet so state is the same
         assertQueueState(buffer, FIRST, 3, 0);
 
         // acknowledge first three pages
-        buffer.get(FIRST, 3, sizeOfPagesInBytes(10)).cancel(true);
+        buffer.getSummary(FIRST, 3, sizeOfPagesInBytes(10)).cancel(true);
         // pages now acknowledged
         assertQueueState(buffer, FIRST, 0, 3);
 
@@ -143,7 +148,8 @@ public class TestBroadcastOutputBuffer
         assertQueueState(buffer, FIRST, 8, 3);
 
         // remove a page
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 3, sizeOfPagesInBytes(1), NO_WAIT), bufferResult(3, createPage(3)));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 3, sizeOfPagesInBytes(1), NO_WAIT), bufferSummary(3, createPage(3)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 3, sizeOfPagesInBytes(1)), bufferResult(3, createPage(3)));
         // page not acknowledged yet so sent count is the same
         assertQueueState(buffer, FIRST, 8, 3);
 
@@ -155,7 +161,17 @@ public class TestBroadcastOutputBuffer
         outputBuffers = outputBuffers.withBuffer(SECOND, BROADCAST_PARTITION_ID);
         buffer.setOutputBuffers(outputBuffers);
         assertQueueState(buffer, SECOND, 11, 0);
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 0, sizeOfPagesInBytes(10), NO_WAIT), bufferResult(0, createPage(0),
+        assertBufferSummaryEquals(getBufferSummary(buffer, SECOND, 0, sizeOfPagesInBytes(10), NO_WAIT), bufferSummary(0, createPage(0),
+                createPage(1),
+                createPage(2),
+                createPage(3),
+                createPage(4),
+                createPage(5),
+                createPage(6),
+                createPage(7),
+                createPage(8),
+                createPage(9)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 0, sizeOfPagesInBytes(10)), bufferResult(0, createPage(0),
                 createPage(1),
                 createPage(2),
                 createPage(3),
@@ -168,7 +184,7 @@ public class TestBroadcastOutputBuffer
         // page not acknowledged yet so sent count is still zero
         assertQueueState(buffer, SECOND, 11, 0);
         // acknowledge the 10 pages
-        buffer.get(SECOND, 10, sizeOfPagesInBytes(10)).cancel(true);
+        buffer.getSummary(SECOND, 10, sizeOfPagesInBytes(10)).cancel(true);
         assertQueueState(buffer, SECOND, 1, 10);
 
         //
@@ -191,7 +207,8 @@ public class TestBroadcastOutputBuffer
         assertQueueState(buffer, SECOND, 4, 10);
 
         // acknowledge the receipt of the 3rd page and try to remove the 4th page from the first queue
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 4, sizeOfPagesInBytes(1), NO_WAIT), bufferResult(4, createPage(4)));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 4, sizeOfPagesInBytes(1), NO_WAIT), bufferSummary(4, createPage(4)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 4, sizeOfPagesInBytes(1)), bufferResult(4, createPage(4)));
 
         // the blocked page future above should be done
         assertFutureIsDone(future);
@@ -209,13 +226,15 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // remove a page, not finished
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 5, sizeOfPagesInBytes(1), NO_WAIT), bufferResult(5, createPage(5)));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 5, sizeOfPagesInBytes(1), NO_WAIT), bufferSummary(5, createPage(5)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 5, sizeOfPagesInBytes(1)), bufferResult(5, createPage(5)));
         assertQueueState(buffer, FIRST, 9, 5);
         assertQueueState(buffer, SECOND, 4, 10);
         assertFalse(buffer.isFinished());
 
         // remove all remaining pages from first queue, should not be finished
-        BufferResult x = getBufferResult(buffer, FIRST, 6, sizeOfPagesInBytes(10), NO_WAIT);
+        getBufferSummary(buffer, FIRST, 6, sizeOfPagesInBytes(10), NO_WAIT);
+        BufferResult x = getBufferResult(buffer, FIRST, 6, sizeOfPagesInBytes(10));
         assertBufferResultEquals(TYPES, x, bufferResult(6, createPage(6),
                 createPage(7),
                 createPage(8),
@@ -225,7 +244,7 @@ public class TestBroadcastOutputBuffer
                 createPage(12),
                 createPage(13)));
         assertQueueState(buffer, FIRST, 8, 6);
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 14, sizeOfPagesInBytes(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 14, sizeOfPagesInBytes(10), NO_WAIT), emptySummary(TASK_INSTANCE_ID, 14, true));
 
         // finish first queue
         buffer.abort(FIRST);
@@ -234,19 +253,23 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // remove all remaining pages from second queue, should be finished
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 10, sizeOfPagesInBytes(10), NO_WAIT), bufferResult(10, createPage(10),
+        assertBufferSummaryEquals(getBufferSummary(buffer, SECOND, 10, sizeOfPagesInBytes(10), NO_WAIT), bufferSummary(10, createPage(10),
+                createPage(11),
+                createPage(12),
+                createPage(13)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 10, sizeOfPagesInBytes(10)), bufferResult(10, createPage(10),
                 createPage(11),
                 createPage(12),
                 createPage(13)));
         assertQueueState(buffer, SECOND, 4, 10);
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 14, sizeOfPagesInBytes(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
+        assertBufferSummaryEquals(getBufferSummary(buffer, SECOND, 14, sizeOfPagesInBytes(10), NO_WAIT), emptySummary(TASK_INSTANCE_ID, 14, true));
         buffer.abort(SECOND);
         assertQueueClosed(buffer, FIRST, 14);
         assertQueueClosed(buffer, SECOND, 14);
         assertFinished(buffer);
 
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 14, sizeOfPagesInBytes(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, SECOND, 14, sizeOfPagesInBytes(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 14, true));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 14, sizeOfPagesInBytes(10), NO_WAIT), emptySummary(TASK_INSTANCE_ID, 14, true));
+        assertBufferSummaryEquals(getBufferSummary(buffer, SECOND, 14, sizeOfPagesInBytes(10), NO_WAIT), emptySummary(TASK_INSTANCE_ID, 14, true));
     }
 
     @Test
@@ -282,20 +305,25 @@ public class TestBroadcastOutputBuffer
         assertQueueState(buffer, FIRST, 3, 0);
 
         // get the three elements
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(10), NO_WAIT), bufferResult(0, createPage(0), createPage(1), createPage(2)));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 0, sizeOfPagesInBytes(10), NO_WAIT), bufferSummary(0, createPage(0), createPage(1), createPage(2)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(10)), bufferResult(0, createPage(0), createPage(1), createPage(2)));
         // pages not acknowledged yet so state is the same
         assertQueueState(buffer, FIRST, 3, 0);
 
+        // peek the three elements again
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 0, sizeOfPagesInBytes(10), NO_WAIT), bufferSummary(0, createPage(0), createPage(1), createPage(2)));
+        // pages not acknowledged yet so state is the same
+        assertQueueState(buffer, FIRST, 3, 0);
         // get the three elements again
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(10), NO_WAIT), bufferResult(0, createPage(0), createPage(1), createPage(2)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(10)), bufferResult(0, createPage(0), createPage(1), createPage(2)));
         // pages not acknowledged yet so state is the same
         assertQueueState(buffer, FIRST, 3, 0);
 
         // acknowledge the pages
-        buffer.get(FIRST, 3, sizeOfPagesInBytes(10)).cancel(true);
+        buffer.getSummary(FIRST, 3, sizeOfPagesInBytes(10)).cancel(true);
 
         // attempt to get the three elements again
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, false));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(10)), emptyResults(TASK_INSTANCE_ID, 0, false));
         // pages not acknowledged yet so state is the same
         assertQueueState(buffer, FIRST, 0, 3);
     }
@@ -392,13 +420,13 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // get a page from a buffer that doesn't exist yet
-        ListenableFuture<BufferResult> future = buffer.get(FIRST, (long) 0, sizeOfPagesInBytes(1));
+        ListenableFuture<BufferSummary> future = buffer.getSummary(FIRST, (long) 0, sizeOfPagesInBytes(1));
         assertFalse(future.isDone());
 
         // add a page and verify the future is complete
         addPage(buffer, createPage(33));
         assertTrue(future.isDone());
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), bufferResult(0, createPage(33)));
+        assertBufferSummaryEquals(getFuture(future, NO_WAIT), bufferSummary(0, createPage(33)));
     }
 
     @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = ".*does not contain.*\\[0\\]")
@@ -409,7 +437,7 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // get a page from a buffer that doesn't exist yet
-        ListenableFuture<BufferResult> future = buffer.get(FIRST, (long) 0, sizeOfPagesInBytes(1));
+        ListenableFuture<BufferSummary> future = buffer.getSummary(FIRST, (long) 0, sizeOfPagesInBytes(1));
         assertFalse(future.isDone());
 
         // add a page and set no more pages
@@ -418,10 +446,11 @@ public class TestBroadcastOutputBuffer
 
         // read the page
         assertTrue(future.isDone());
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), bufferResult(0, createPage(33)));
+        assertBufferSummaryEquals(getFuture(future, NO_WAIT), bufferSummary(0, createPage(33)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(1)), bufferResult(0, createPage(33)));
 
         // acknowledge the page and verify we are finished
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPagesInBytes(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, true));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 1, sizeOfPagesInBytes(10), NO_WAIT), emptySummary(TASK_INSTANCE_ID, 1, true));
         buffer.abort(FIRST);
 
         // set final buffers to a set that does not contain the buffer, which will fail
@@ -440,7 +469,7 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // get a page from a buffer that was not declared, which will fail
-        buffer.get(SECOND, (long) 0, sizeOfPagesInBytes(1));
+        buffer.getData(SECOND, (long) 0, sizeOfPagesInBytes(1));
     }
 
     @Test
@@ -451,13 +480,13 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // get a page from a buffer that doesn't exist yet
-        ListenableFuture<BufferResult> future = buffer.get(FIRST, 0, sizeOfPagesInBytes(1));
+        ListenableFuture<BufferSummary> future = buffer.getSummary(FIRST, 0, sizeOfPagesInBytes(1));
         assertFalse(future.isDone());
 
         // abort that buffer, and verify the future is complete and buffer is finished
         buffer.abort(FIRST);
         assertTrue(future.isDone());
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(10), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 0, sizeOfPagesInBytes(10), NO_WAIT), emptySummary(TASK_INSTANCE_ID, 0, true));
     }
 
     @Test
@@ -504,11 +533,11 @@ public class TestBroadcastOutputBuffer
         assertQueueState(buffer, SECOND, 3, 0);
 
         // acknowledge pages for first buffer, no space is freed
-        buffer.get(FIRST, 2, sizeOfPagesInBytes(10)).cancel(true);
+        buffer.getSummary(FIRST, 2, sizeOfPagesInBytes(10)).cancel(true);
         assertFalse(future.isDone());
 
         // acknowledge pages for second buffer, which makes space in the buffer
-        buffer.get(SECOND, 2, sizeOfPagesInBytes(10)).cancel(true);
+        buffer.getSummary(SECOND, 2, sizeOfPagesInBytes(10)).cancel(true);
 
         // writer should not be blocked
         assertFutureIsDone(future);
@@ -532,16 +561,18 @@ public class TestBroadcastOutputBuffer
         }
         bufferedBuffer.setNoMorePages();
 
-        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, FIRST, 0, sizeOfPagesInBytes(1), NO_WAIT), bufferResult(0, createPage(0)));
+        assertBufferSummaryEquals(getBufferSummary(bufferedBuffer, FIRST, 0, sizeOfPagesInBytes(1), NO_WAIT), bufferSummary(0, createPage(0)));
+        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, FIRST, 0, sizeOfPagesInBytes(1)), bufferResult(0, createPage(0)));
         bufferedBuffer.abort(FIRST);
         assertQueueClosed(bufferedBuffer, FIRST, 0);
-        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, FIRST, 1, sizeOfPagesInBytes(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferSummaryEquals(getBufferSummary(bufferedBuffer, FIRST, 1, sizeOfPagesInBytes(1), NO_WAIT), emptySummary(TASK_INSTANCE_ID, 0, true));
 
-        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, SECOND, 0, sizeOfPagesInBytes(1), NO_WAIT), bufferResult(0, createPage(0)));
+        assertBufferSummaryEquals(getBufferSummary(bufferedBuffer, SECOND, 0, sizeOfPagesInBytes(1), NO_WAIT), bufferSummary(0, createPage(0)));
+        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, SECOND, 0, sizeOfPagesInBytes(1)), bufferResult(0, createPage(0)));
         bufferedBuffer.abort(SECOND);
         assertQueueClosed(bufferedBuffer, SECOND, 0);
         assertFinished(bufferedBuffer);
-        assertBufferResultEquals(TYPES, getBufferResult(bufferedBuffer, SECOND, 1, sizeOfPagesInBytes(1), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 0, true));
+        assertBufferSummaryEquals(getBufferSummary(bufferedBuffer, SECOND, 1, sizeOfPagesInBytes(1), NO_WAIT), emptySummary(TASK_INSTANCE_ID, 0, true));
     }
 
     @Test
@@ -581,7 +612,7 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // attempt to get a page
-        ListenableFuture<BufferResult> future = buffer.get(FIRST, 0, sizeOfPagesInBytes(10));
+        ListenableFuture<BufferSummary> future = buffer.getSummary(FIRST, 0, sizeOfPagesInBytes(10));
 
         // verify we are waiting for a page
         assertFalse(future.isDone());
@@ -591,10 +622,11 @@ public class TestBroadcastOutputBuffer
         assertTrue(future.isDone());
 
         // verify we got one page
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), bufferResult(0, createPage(0)));
+        assertBufferSummaryEquals(getFuture(future, NO_WAIT), bufferSummary(0, createPage(0)));
+        assertBufferResultEquals(TYPES, buffer.getData(FIRST, 0, sizeOfPagesInBytes(10)), bufferResult(0, createPage(0)));
 
         // attempt to get another page, and verify we are blocked
-        future = buffer.get(FIRST, 1, sizeOfPagesInBytes(10));
+        future = buffer.getSummary(FIRST, 1, sizeOfPagesInBytes(10));
         assertFalse(future.isDone());
 
         // abort the buffer
@@ -602,7 +634,7 @@ public class TestBroadcastOutputBuffer
 
         // verify the future completed
         // broadcast buffer does not return a "complete" result in this case, but it doesn't mapper
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferSummaryEquals(getFuture(future, NO_WAIT), emptySummary(TASK_INSTANCE_ID, 1, false));
 
         // further requests will see a completed result
         assertQueueClosed(buffer, FIRST, 1);
@@ -620,7 +652,7 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // attempt to get a page
-        ListenableFuture<BufferResult> future = buffer.get(FIRST, 0, sizeOfPagesInBytes(10));
+        ListenableFuture<BufferSummary> future = buffer.getSummary(FIRST, 0, sizeOfPagesInBytes(10));
 
         // verify we are waiting for a page
         assertFalse(future.isDone());
@@ -629,10 +661,11 @@ public class TestBroadcastOutputBuffer
         addPage(buffer, createPage(0));
 
         // verify we got one page
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), bufferResult(0, createPage(0)));
+        assertBufferSummaryEquals(getFuture(future, NO_WAIT), bufferSummary(0, createPage(0)));
+        assertBufferResultEquals(TYPES, buffer.getData(FIRST, 0, sizeOfPagesInBytes(10)), bufferResult(0, createPage(0)));
 
         // attempt to get another page, and verify we are blocked
-        future = buffer.get(FIRST, 1, sizeOfPagesInBytes(10));
+        future = buffer.getSummary(FIRST, 1, sizeOfPagesInBytes(10));
         assertFalse(future.isDone());
 
         // finish the buffer
@@ -640,7 +673,7 @@ public class TestBroadcastOutputBuffer
         assertQueueState(buffer, FIRST, 0, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, true));
+        assertBufferSummaryEquals(getFuture(future, NO_WAIT), emptySummary(TASK_INSTANCE_ID, 1, true));
     }
 
     @Test
@@ -664,8 +697,9 @@ public class TestBroadcastOutputBuffer
         ListenableFuture<?> secondEnqueuePage = enqueuePage(buffer, createPage(6));
 
         // get and acknowledge one page
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(1), MAX_WAIT), bufferResult(0, createPage(0)));
-        buffer.get(FIRST, 1, sizeOfPagesInBytes(1)).cancel(true);
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 0, sizeOfPagesInBytes(1), MAX_WAIT), bufferSummary(0, createPage(0)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(1)), bufferResult(0, createPage(0)));
+        buffer.getSummary(FIRST, 1, sizeOfPagesInBytes(1)).cancel(true);
 
         // verify we are still blocked because the buffer is full
         assertFalse(firstEnqueuePage.isDone());
@@ -680,9 +714,11 @@ public class TestBroadcastOutputBuffer
         assertFutureIsDone(secondEnqueuePage);
 
         // get and acknowledge the last 6 pages
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPagesInBytes(100), NO_WAIT),
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 1, sizeOfPagesInBytes(100), NO_WAIT),
+                bufferSummary(1, createPage(1), createPage(2), createPage(3), createPage(4), createPage(5), createPage(6)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 1, sizeOfPagesInBytes(100)),
                 bufferResult(1, createPage(1), createPage(2), createPage(3), createPage(4), createPage(5), createPage(6)));
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 7, sizeOfPagesInBytes(100), NO_WAIT), emptyResults(TASK_INSTANCE_ID, 7, true));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 7, sizeOfPagesInBytes(100), NO_WAIT), emptySummary(TASK_INSTANCE_ID, 7, true));
 
         buffer.abort(FIRST);
 
@@ -702,7 +738,7 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // attempt to get a page
-        ListenableFuture<BufferResult> future = buffer.get(FIRST, 0, sizeOfPagesInBytes(10));
+        ListenableFuture<BufferSummary> future = buffer.getSummary(FIRST, 0, sizeOfPagesInBytes(10));
 
         // verify we are waiting for a page
         assertFalse(future.isDone());
@@ -711,10 +747,11 @@ public class TestBroadcastOutputBuffer
         addPage(buffer, createPage(0));
 
         // verify we got one page
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), bufferResult(0, createPage(0)));
+        assertBufferSummaryEquals(getFuture(future, NO_WAIT), bufferSummary(0, createPage(0)));
+        assertBufferResultEquals(TYPES, buffer.getData(FIRST, 0, sizeOfPagesInBytes(10)), bufferResult(0, createPage(0)));
 
         // attempt to get another page, and verify we are blocked
-        future = buffer.get(FIRST, 1, sizeOfPagesInBytes(10));
+        future = buffer.getSummary(FIRST, 1, sizeOfPagesInBytes(10));
         assertFalse(future.isDone());
 
         // destroy the buffer
@@ -722,7 +759,7 @@ public class TestBroadcastOutputBuffer
         assertQueueClosed(buffer, FIRST, 1);
 
         // verify the future completed
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), emptyResults(TASK_INSTANCE_ID, 1, false));
+        assertBufferSummaryEquals(getFuture(future, NO_WAIT), emptySummary(TASK_INSTANCE_ID, 1, false));
     }
 
     @Test
@@ -746,8 +783,9 @@ public class TestBroadcastOutputBuffer
         ListenableFuture<?> secondEnqueuePage = enqueuePage(buffer, createPage(6));
 
         // get and acknowledge one page
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(1), MAX_WAIT), bufferResult(0, createPage(0)));
-        buffer.get(FIRST, 1, sizeOfPagesInBytes(1)).cancel(true);
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 0, sizeOfPagesInBytes(1), MAX_WAIT), bufferSummary(0, createPage(0)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(1)), bufferResult(0, createPage(0)));
+        buffer.getSummary(FIRST, 1, sizeOfPagesInBytes(1)).cancel(true);
 
         // verify we are still blocked because the buffer is full
         assertFalse(firstEnqueuePage.isDone());
@@ -774,7 +812,7 @@ public class TestBroadcastOutputBuffer
         assertFalse(buffer.isFinished());
 
         // attempt to get a page
-        ListenableFuture<BufferResult> future = buffer.get(FIRST, 0, sizeOfPagesInBytes(10));
+        ListenableFuture<BufferSummary> future = buffer.getSummary(FIRST, 0, sizeOfPagesInBytes(10));
 
         // verify we are waiting for a page
         assertFalse(future.isDone());
@@ -783,10 +821,11 @@ public class TestBroadcastOutputBuffer
         addPage(buffer, createPage(0));
 
         // verify we got one page
-        assertBufferResultEquals(TYPES, getFuture(future, NO_WAIT), bufferResult(0, createPage(0)));
+        assertBufferSummaryEquals(getFuture(future, NO_WAIT), bufferSummary(0, createPage(0)));
+        assertBufferResultEquals(TYPES, buffer.getData(FIRST, 0, sizeOfPagesInBytes(10)), bufferResult(0, createPage(0)));
 
         // attempt to get another page, and verify we are blocked
-        future = buffer.get(FIRST, 1, sizeOfPagesInBytes(10));
+        future = buffer.getSummary(FIRST, 1, sizeOfPagesInBytes(10));
         assertFalse(future.isDone());
 
         // fail the buffer
@@ -796,7 +835,7 @@ public class TestBroadcastOutputBuffer
         assertFalse(future.isDone());
 
         // attempt to get another page, and verify we are blocked
-        future = buffer.get(FIRST, 1, sizeOfPagesInBytes(10));
+        future = buffer.getSummary(FIRST, 1, sizeOfPagesInBytes(10));
         assertFalse(future.isDone());
     }
 
@@ -821,8 +860,9 @@ public class TestBroadcastOutputBuffer
         ListenableFuture<?> secondEnqueuePage = enqueuePage(buffer, createPage(6));
 
         // get and acknowledge one page
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(1), MAX_WAIT), bufferResult(0, createPage(0)));
-        buffer.get(FIRST, 1, sizeOfPagesInBytes(1)).cancel(true);
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 0, sizeOfPagesInBytes(1), MAX_WAIT), bufferSummary(0, createPage(0)));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(1)), bufferResult(0, createPage(0)));
+        buffer.getSummary(FIRST, 1, sizeOfPagesInBytes(1)).cancel(true);
 
         // verify we are still blocked because the buffer is full
         assertFalse(firstEnqueuePage.isDone());
@@ -860,7 +900,8 @@ public class TestBroadcastOutputBuffer
         buffer.setNoMorePages();
 
         // get and acknowledge 5 pages
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(5), MAX_WAIT), createBufferResult(TASK_INSTANCE_ID, 0, pages));
+        assertBufferSummaryEquals(getBufferSummary(buffer, FIRST, 0, sizeOfPagesInBytes(5), MAX_WAIT), createBufferSummary(TASK_INSTANCE_ID, 0, pages));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPagesInBytes(5)), createBufferResult(TASK_INSTANCE_ID, 0, pages));
 
         // buffer is not finished
         assertFalse(buffer.isFinished());
@@ -885,6 +926,12 @@ public class TestBroadcastOutputBuffer
                 stateNotificationExecutor);
         buffer.setOutputBuffers(outputBuffers);
         return buffer;
+    }
+
+    private static BufferSummary bufferSummary(long token, Page firstPage, Page... otherPages)
+    {
+        List<Page> pages = ImmutableList.<Page>builder().add(firstPage).add(otherPages).build();
+        return createBufferSummary(TASK_INSTANCE_ID, token, pages);
     }
 
     private static BufferResult bufferResult(long token, Page firstPage, Page... otherPages)
