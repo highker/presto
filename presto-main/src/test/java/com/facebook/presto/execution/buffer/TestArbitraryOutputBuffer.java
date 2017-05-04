@@ -15,25 +15,19 @@ package com.facebook.presto.execution.buffer;
 
 import com.facebook.presto.OutputBuffers;
 import com.facebook.presto.OutputBuffers.OutputBufferId;
-import com.facebook.presto.block.BlockAssertions;
 import com.facebook.presto.execution.StateMachine;
-import com.facebook.presto.operator.PageAssertions;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.type.BigintType;
-import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
-import io.airlift.units.Duration;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.stream.Collectors;
 
 import static com.facebook.presto.OutputBuffers.BROADCAST_PARTITION_ID;
 import static com.facebook.presto.OutputBuffers.BufferType.ARBITRARY;
@@ -41,15 +35,24 @@ import static com.facebook.presto.OutputBuffers.createInitialEmptyOutputBuffers;
 import static com.facebook.presto.execution.buffer.BufferResult.emptyResults;
 import static com.facebook.presto.execution.buffer.BufferState.OPEN;
 import static com.facebook.presto.execution.buffer.BufferState.TERMINAL_BUFFER_STATES;
-import static com.facebook.presto.execution.buffer.TestingPagesSerdeFactory.testingPagesSerde;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.MAX_WAIT;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.NO_WAIT;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.addPage;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.assertBufferResultEquals;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.assertFinished;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.assertFutureIsDone;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.assertQueueClosed;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.assertQueueState;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.createBufferResult;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.createPage;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.enqueuePage;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.getBufferResult;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.getFuture;
+import static com.facebook.presto.execution.buffer.BufferTestUtils.sizeOfPages;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
-import static com.google.common.base.Preconditions.checkArgument;
-import static io.airlift.concurrent.MoreFutures.tryGetFutureValue;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -57,11 +60,6 @@ import static org.testng.Assert.fail;
 
 public class TestArbitraryOutputBuffer
 {
-    private static final PagesSerde PAGES_SERDE = testingPagesSerde();
-
-    private static final Duration NO_WAIT = new Duration(0, MILLISECONDS);
-    private static final Duration MAX_WAIT = new Duration(1, SECONDS);
-    private static final DataSize BUFFERED_PAGE_SIZE = new DataSize(PAGES_SERDE.serialize(createPage(42)).getRetainedSizeInBytes(), BYTE);
     private static final String TASK_INSTANCE_ID = "task-instance-id";
 
     private static final ImmutableList<BigintType> TYPES = ImmutableList.of(BIGINT);
@@ -791,7 +789,7 @@ public class TestArbitraryOutputBuffer
         buffer.setNoMorePages();
 
         // get and acknowledge 5 pages
-        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(5), MAX_WAIT), bufferResult(0, pages));
+        assertBufferResultEquals(TYPES, getBufferResult(buffer, FIRST, 0, sizeOfPages(5), MAX_WAIT), createBufferResult(TASK_INSTANCE_ID, 0, pages));
 
         // buffer is not finished
         assertFalse(buffer.isFinished());
@@ -804,86 +802,6 @@ public class TestArbitraryOutputBuffer
 
         // verify that the buffer is finished
         assertTrue(buffer.isFinished());
-    }
-
-    private static BufferResult getBufferResult(OutputBuffer buffer, OutputBufferId bufferId, long sequenceId, DataSize maxSize, Duration maxWait)
-    {
-        ListenableFuture<BufferResult> future = buffer.get(bufferId, sequenceId, maxSize);
-        return getFuture(future, maxWait);
-    }
-
-    private static BufferResult getFuture(ListenableFuture<BufferResult> future, Duration maxWait)
-    {
-        return tryGetFutureValue(future, (int) maxWait.toMillis(), MILLISECONDS).get();
-    }
-
-    private static ListenableFuture<?> enqueuePage(OutputBuffer buffer, Page page)
-    {
-        ListenableFuture<?> future = buffer.enqueue(ImmutableList.of(PAGES_SERDE.serialize(page)));
-        assertFalse(future.isDone());
-        return future;
-    }
-
-    private static void addPage(OutputBuffer buffer, Page page)
-    {
-        assertTrue(buffer.enqueue(ImmutableList.of(PAGES_SERDE.serialize(page))).isDone(), "Expected add page to not block");
-    }
-
-    private static void assertQueueState(
-            OutputBuffer buffer,
-            int unassignedPages,
-            OutputBufferId bufferId,
-            int bufferedPages,
-            int pagesSent)
-    {
-        OutputBufferInfo outputBufferInfo = buffer.getInfo();
-
-        long assignedPages = outputBufferInfo.getBuffers().stream().mapToInt(BufferInfo::getBufferedPages).sum();
-
-        assertEquals(
-                outputBufferInfo.getTotalBufferedPages() - assignedPages,
-                unassignedPages,
-                "unassignedPages");
-
-        BufferInfo bufferInfo = outputBufferInfo.getBuffers().stream()
-                .filter(info -> info.getBufferId().equals(bufferId))
-                .findAny()
-                .orElse(null);
-
-        assertEquals(
-                bufferInfo,
-                new BufferInfo(
-                        bufferId,
-                        false,
-                        bufferedPages,
-                        pagesSent,
-                        new PageBufferInfo(
-                                bufferId.getId(),
-                                bufferedPages,
-                                sizeOfPages(bufferedPages).toBytes(),
-                                bufferedPages + pagesSent, // every page has one row
-                                bufferedPages + pagesSent)));
-    }
-
-    @SuppressWarnings("ConstantConditions")
-    private static void assertQueueClosed(OutputBuffer buffer, int unassignedPages, OutputBufferId bufferId, int pagesSent)
-    {
-        OutputBufferInfo outputBufferInfo = buffer.getInfo();
-
-        long assignedPages = outputBufferInfo.getBuffers().stream().mapToInt(BufferInfo::getBufferedPages).sum();
-        assertEquals(
-                outputBufferInfo.getTotalBufferedPages() - assignedPages,
-                unassignedPages,
-                "unassignedPages");
-
-        BufferInfo bufferInfo = outputBufferInfo.getBuffers().stream()
-                .filter(info -> info.getBufferId().equals(bufferId))
-                .findAny()
-                .orElse(null);
-
-        assertEquals(bufferInfo.getBufferedPages(), 0);
-        assertEquals(bufferInfo.getPagesSent(), pagesSent);
-        assertEquals(bufferInfo.isFinished(), true);
     }
 
     private ArbitraryOutputBuffer createArbitraryBuffer(OutputBuffers buffers, DataSize dataSize)
@@ -899,61 +817,9 @@ public class TestArbitraryOutputBuffer
         return buffer;
     }
 
-    private static void assertFinished(OutputBuffer buffer)
-            throws Exception
-    {
-        assertTrue(buffer.isFinished());
-        for (BufferInfo bufferInfo : buffer.getInfo().getBuffers()) {
-            assertTrue(bufferInfo.isFinished());
-            assertEquals(bufferInfo.getBufferedPages(), 0);
-        }
-    }
-
-    private static void assertBufferResultEquals(List<? extends Type> types, BufferResult actual, BufferResult expected)
-    {
-        assertEquals(actual.getSerializedPages().size(), expected.getSerializedPages().size(), "page count");
-        assertEquals(actual.getToken(), expected.getToken(), "token");
-        for (int i = 0; i < actual.getSerializedPages().size(); i++) {
-            Page actualPage = PAGES_SERDE.deserialize(actual.getSerializedPages().get(i));
-            Page expectedPage = PAGES_SERDE.deserialize(expected.getSerializedPages().get(i));
-            assertEquals(actualPage.getChannelCount(), expectedPage.getChannelCount());
-            PageAssertions.assertPageEquals(types, actualPage, expectedPage);
-        }
-        assertEquals(actual.isBufferComplete(), expected.isBufferComplete(), "buffer complete");
-    }
-
-    private static void assertFutureIsDone(Future<?> future)
-    {
-        tryGetFutureValue(future, 5, SECONDS);
-        assertTrue(future.isDone());
-    }
-
     private static BufferResult bufferResult(long token, Page firstPage, Page... otherPages)
     {
         List<Page> pages = ImmutableList.<Page>builder().add(firstPage).add(otherPages).build();
-        return bufferResult(token, pages);
-    }
-
-    private static BufferResult bufferResult(long token, List<Page> pages)
-    {
-        checkArgument(!pages.isEmpty(), "pages is empty");
-        return new BufferResult(
-                TASK_INSTANCE_ID,
-                token,
-                token + pages.size(),
-                false,
-                pages.stream()
-                        .map(PAGES_SERDE::serialize)
-                        .collect(Collectors.toList()));
-    }
-
-    private static Page createPage(int id)
-    {
-        return new Page(BlockAssertions.createLongsBlock(id));
-    }
-
-    private static DataSize sizeOfPages(int count)
-    {
-        return new DataSize(BUFFERED_PAGE_SIZE.toBytes() * count, BYTE);
+        return createBufferResult(TASK_INSTANCE_ID, token, pages);
     }
 }
