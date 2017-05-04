@@ -19,7 +19,6 @@ import com.facebook.presto.execution.StateMachine;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.execution.SystemMemoryUsageListener;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 
@@ -28,7 +27,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.facebook.presto.OutputBuffers.BufferType.PARTITIONED;
-import static com.facebook.presto.execution.buffer.BufferResult.emptyResults;
 import static com.facebook.presto.execution.buffer.BufferState.FAILED;
 import static com.facebook.presto.execution.buffer.BufferState.FINISHED;
 import static com.facebook.presto.execution.buffer.BufferState.FLUSHING;
@@ -192,22 +190,21 @@ public class PartitionedOutputBuffer
     }
 
     @Override
-    public ListenableFuture<BufferResult> get(OutputBufferId outputBufferId, long startingSequenceId, long maxBytes)
+    public ListenableFuture<BufferSummary> getSummary(OutputBufferId outputBufferId, long startingSequenceId, long maxBytes)
     {
         requireNonNull(outputBufferId, "outputBufferId is null");
         checkArgument(maxBytes > 0, "maxSize must be at least 1 byte");
 
-        return Futures.transform(
-                partitions.get(outputBufferId.getId()).getSummary(startingSequenceId, maxBytes),
-                result -> {
-                    if (result.isBufferComplete()) {
-                        return emptyResults(result.getTaskInstanceId(), result.getToken(), true);
-                    }
-                    if (result.getPageSizesInBytes().isEmpty()) {
-                        return emptyResults(result.getTaskInstanceId(), result.getToken(), false);
-                    }
-                    return partitions.get(outputBufferId.getId()).getData(startingSequenceId, result.getPageSizesInBytes().stream().mapToLong(Long::longValue).sum());
-                });
+        return partitions.get(outputBufferId.getId()).getSummary(startingSequenceId, maxBytes);
+    }
+
+    @Override
+    public BufferResult getData(OutputBufferId outputBufferId, long startingSequenceId, long maxBytes)
+    {
+        requireNonNull(outputBufferId, "outputBufferId is null");
+        checkArgument(maxBytes > 0, "maxBytes must be at least 1 byte");
+
+        return partitions.get(outputBufferId.getId()).getData(startingSequenceId, maxBytes);
     }
 
     @Override
