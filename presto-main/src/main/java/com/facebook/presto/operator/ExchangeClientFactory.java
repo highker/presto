@@ -14,7 +14,9 @@
 package com.facebook.presto.operator;
 
 import com.facebook.presto.execution.SystemMemoryUsageListener;
+import com.facebook.presto.execution.buffer.BufferSummary;
 import io.airlift.http.client.HttpClient;
+import io.airlift.json.JsonCodec;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 
@@ -36,12 +38,14 @@ public class ExchangeClientFactory
     private final HttpClient httpClient;
     private final DataSize maxResponseSize;
     private final ScheduledExecutorService executor;
+    private final JsonCodec<BufferSummary> bufferSummaryCodec;
 
     @Inject
     public ExchangeClientFactory(
             ExchangeClientConfig config,
             @ForExchange HttpClient httpClient,
-            @ForExchange ScheduledExecutorService executor)
+            @ForExchange ScheduledExecutorService executor,
+            JsonCodec<BufferSummary> bufferSummaryCodec)
     {
         this(
                 config.getMaxBufferSize(),
@@ -50,7 +54,8 @@ public class ExchangeClientFactory
                 config.getMinErrorDuration(),
                 config.getMaxErrorDuration(),
                 httpClient,
-                executor);
+                executor,
+                bufferSummaryCodec);
     }
 
     public ExchangeClientFactory(
@@ -60,7 +65,8 @@ public class ExchangeClientFactory
             Duration minErrorDuration,
             Duration maxErrorDuration,
             HttpClient httpClient,
-            ScheduledExecutorService executor)
+            ScheduledExecutorService executor,
+            JsonCodec<BufferSummary> bufferSummaryCodec)
     {
         this.maxBufferedBytes = requireNonNull(maxBufferedBytes, "maxBufferedBytes is null");
         this.concurrentRequestMultiplier = concurrentRequestMultiplier;
@@ -75,8 +81,9 @@ public class ExchangeClientFactory
         this.maxResponseSize = new DataSize(maxResponseSizeBytes, BYTE);
 
         this.executor = requireNonNull(executor, "executor is null");
+        this.bufferSummaryCodec = requireNonNull(bufferSummaryCodec, "bufferSummaryCodec is null");
 
-        checkArgument(maxBufferedBytes.toBytes() > 0, "maxBufferSize must be at least 1 byte: %s", maxBufferedBytes);
+        checkArgument(maxBufferedBytes.toBytes() > 0, "maxBufferSummary must be at least 1 byte: %s", maxBufferedBytes);
         checkArgument(maxResponseSize.toBytes() > 0, "maxResponseSize must be at least 1 byte: %s", maxResponseSize);
         checkArgument(concurrentRequestMultiplier > 0, "concurrentRequestMultiplier must be at least 1: %s", concurrentRequestMultiplier);
     }
@@ -92,6 +99,7 @@ public class ExchangeClientFactory
                 maxErrorDuration,
                 httpClient,
                 executor,
-                systemMemoryUsageListener);
+                systemMemoryUsageListener,
+                bufferSummaryCodec);
     }
 }
