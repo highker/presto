@@ -558,7 +558,7 @@ public class StatementResource
                         continue;
                     }
                     OutputBufferId bufferId = new OutputBufferId(0);
-                    URI uri = uriBuilderFrom(taskInfo.getTaskStatus().getSelf()).appendPath("results").appendPath(bufferId.toString()).build();
+                    URI uri = uriBuilderFrom(taskInfo.getTaskStatus().getSelf()).appendPath("buffer").appendPath(bufferId.toString()).build();
                     exchangeClient.addLocation(uri);
                 }
             }
