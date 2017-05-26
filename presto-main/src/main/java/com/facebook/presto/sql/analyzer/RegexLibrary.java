@@ -16,5 +16,6 @@ package com.facebook.presto.sql.analyzer;
 public enum RegexLibrary
 {
     JONI,
-    RE2J
+    RE2J,
+    AUTO
 }

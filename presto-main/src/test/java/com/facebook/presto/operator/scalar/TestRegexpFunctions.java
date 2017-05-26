@@ -33,6 +33,7 @@ import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMEN
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
+import static com.facebook.presto.sql.analyzer.RegexLibrary.AUTO;
 import static com.facebook.presto.sql.analyzer.RegexLibrary.JONI;
 import static com.facebook.presto.sql.analyzer.RegexLibrary.RE2J;
 
@@ -44,6 +45,9 @@ public class TestRegexpFunctions
 
     private static final FeaturesConfig RE2J_FEATURES_CONFIG = new FeaturesConfig()
             .setRegexLibrary(RE2J);
+
+    private static final FeaturesConfig AUTO_FEATURES_CONFIG = new FeaturesConfig()
+            .setRegexLibrary(AUTO);
 
     @Factory(dataProvider = "featuresConfig")
     public TestRegexpFunctions(FeaturesConfig featuresConfig)
@@ -60,7 +64,7 @@ public class TestRegexpFunctions
     @DataProvider(name = "featuresConfig")
     public static Object[][] featuresConfigProvider()
     {
-        return new Object[][] {new Object[] {JONI_FEATURES_CONFIG}, new Object[] {RE2J_FEATURES_CONFIG}};
+        return new Object[][] {new Object[] {JONI_FEATURES_CONFIG}, new Object[] {RE2J_FEATURES_CONFIG}, new Object[] {AUTO_FEATURES_CONFIG}};
     }
 
     @ScalarFunction(deterministic = false) // if not non-deterministic, constant folding code accidentally fix invalid characters

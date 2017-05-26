@@ -21,6 +21,7 @@ import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.sql.analyzer.RegexLibrary;
 import com.facebook.presto.type.AbstractRegexp;
 import com.facebook.presto.type.JoniRegexp;
+import com.facebook.presto.type.LazyRegexp;
 import com.facebook.presto.type.Re2JRegexp;
 import com.facebook.presto.type.RegexpType;
 import com.google.common.collect.ImmutableList;
@@ -42,6 +43,7 @@ public class CastToRegexpFunction
 {
     private static final MethodHandle JONI_METHOD_HANDLE = methodHandle(CastToRegexpFunction.class, "castToJoniRegexp", boolean.class, long.class, Slice.class);
     private static final MethodHandle RE2J_METHOD_HANDLE = methodHandle(CastToRegexpFunction.class, "castToRe2JRegexp", int.class, int.class, boolean.class, long.class, Slice.class);
+    private static final MethodHandle AUTO_METHOD_HANDLE = methodHandle(CastToRegexpFunction.class, "castToLazyRegexp", int.class, int.class, boolean.class, long.class, Slice.class);
 
     private final int dfaStatesLimit;
     private final int dfaRetries;
@@ -79,6 +81,10 @@ public class CastToRegexpFunction
                 return new ScalarFunctionImplementation(
                         false, ImmutableList.of(false),
                         insertArguments(RE2J_METHOD_HANDLE, 0, dfaStatesLimit, dfaRetries, padSpaces, boundVariables.getLongVariable("x")), true);
+            case AUTO:
+                return new ScalarFunctionImplementation(
+                        false, ImmutableList.of(false),
+                        insertArguments(AUTO_METHOD_HANDLE, 0, dfaStatesLimit, dfaRetries, padSpaces, boundVariables.getLongVariable("x")), true);
             default:
                 throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Invalid regular expression library");
         }
@@ -105,6 +111,19 @@ public class CastToRegexpFunction
         }
         try {
             return new Re2JRegexp(dfaStatesLimit, dfaRetries, pattern);
+        }
+        catch (Exception e) {
+            throw new PrestoException(INVALID_FUNCTION_ARGUMENT, e);
+        }
+    }
+
+    public static AbstractRegexp castToLazyRegexp(int dfaStatesLimit, int dfaRetries, boolean padSpaces, long typeLength, Slice pattern)
+    {
+        if (padSpaces) {
+            pattern = padSpaces(pattern, (int) typeLength);
+        }
+        try {
+            return new LazyRegexp(new Re2JRegexp(dfaStatesLimit, dfaRetries, pattern), new JoniRegexp(pattern));
         }
         catch (Exception e) {
             throw new PrestoException(INVALID_FUNCTION_ARGUMENT, e);
