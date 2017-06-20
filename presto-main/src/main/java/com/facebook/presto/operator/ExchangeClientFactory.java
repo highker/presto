@@ -32,7 +32,6 @@ public class ExchangeClientFactory
         implements ExchangeClientSupplier
 {
     private final DataSize maxBufferedBytes;
-    private final int concurrentRequestMultiplier;
     private final Duration minErrorDuration;
     private final Duration maxErrorDuration;
     private final HttpClient httpClient;
@@ -50,7 +49,6 @@ public class ExchangeClientFactory
         this(
                 config.getMaxBufferSize(),
                 config.getMaxResponseSize(),
-                config.getConcurrentRequestMultiplier(),
                 config.getMinErrorDuration(),
                 config.getMaxErrorDuration(),
                 httpClient,
@@ -61,7 +59,6 @@ public class ExchangeClientFactory
     public ExchangeClientFactory(
             DataSize maxBufferedBytes,
             DataSize maxResponseSize,
-            int concurrentRequestMultiplier,
             Duration minErrorDuration,
             Duration maxErrorDuration,
             HttpClient httpClient,
@@ -69,7 +66,6 @@ public class ExchangeClientFactory
             JsonCodec<BufferSummary> bufferSummaryCodec)
     {
         this.maxBufferedBytes = requireNonNull(maxBufferedBytes, "maxBufferedBytes is null");
-        this.concurrentRequestMultiplier = concurrentRequestMultiplier;
         this.minErrorDuration = requireNonNull(minErrorDuration, "minErrorDuration is null");
         this.maxErrorDuration = requireNonNull(maxErrorDuration, "maxErrorDuration is null");
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
@@ -85,7 +81,6 @@ public class ExchangeClientFactory
 
         checkArgument(maxBufferedBytes.toBytes() > 0, "maxBufferSummary must be at least 1 byte: %s", maxBufferedBytes);
         checkArgument(maxResponseSize.toBytes() > 0, "maxResponseSize must be at least 1 byte: %s", maxResponseSize);
-        checkArgument(concurrentRequestMultiplier > 0, "concurrentRequestMultiplier must be at least 1: %s", concurrentRequestMultiplier);
     }
 
     @Override
@@ -94,7 +89,6 @@ public class ExchangeClientFactory
         return new ExchangeClient(
                 maxBufferedBytes,
                 maxResponseSize,
-                concurrentRequestMultiplier,
                 minErrorDuration,
                 maxErrorDuration,
                 httpClient,
