@@ -35,6 +35,7 @@ import java.io.Closeable;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
@@ -44,6 +45,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.facebook.presto.execution.buffer.PageCompression.UNCOMPRESSED;
@@ -60,7 +62,6 @@ public class ExchangeClient
 
     private final long bufferCapacity;
     private final DataSize maxResponseSize;
-    private final int concurrentRequestMultiplier;
     private final Duration minErrorDuration;
     private final Duration maxErrorDuration;
     private final HttpClient httpClient;
@@ -87,8 +88,7 @@ public class ExchangeClient
     private long maxBufferBytes;
     @GuardedBy("this")
     private long successfulRequests;
-    @GuardedBy("this")
-    private long averageBytesPerRequest;
+    private final AtomicLong reservedBytes = new AtomicLong();
 
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicReference<Throwable> failure = new AtomicReference<>();
@@ -100,7 +100,6 @@ public class ExchangeClient
     public ExchangeClient(
             DataSize bufferCapacity,
             DataSize maxResponseSize,
-            int concurrentRequestMultiplier,
             Duration minErrorDuration,
             Duration maxErrorDuration,
             HttpClient httpClient,
@@ -110,7 +109,6 @@ public class ExchangeClient
     {
         this.bufferCapacity = bufferCapacity.toBytes();
         this.maxResponseSize = maxResponseSize;
-        this.concurrentRequestMultiplier = concurrentRequestMultiplier;
         this.minErrorDuration = minErrorDuration;
         this.maxErrorDuration = maxErrorDuration;
         this.httpClient = httpClient;
@@ -131,7 +129,7 @@ public class ExchangeClient
         for (HttpPageBufferClient client : allClients.values()) {
             exchangeStatus.add(client.getStatus());
         }
-        return new ExchangeClientStatus(bufferBytes, maxBufferBytes, averageBytesPerRequest, successfulRequests, bufferedPages, noMoreLocations, exchangeStatus.build());
+        return new ExchangeClientStatus(bufferBytes, maxBufferBytes, reservedBytes.get(), successfulRequests, bufferedPages, noMoreLocations, exchangeStatus.build());
     }
 
     public synchronized void addLocation(URI location)
@@ -290,24 +288,29 @@ public class ExchangeClient
             return;
         }
 
-        long neededBytes = bufferCapacity - bufferBytes;
-        if (neededBytes <= 0) {
-            return;
-        }
-
-        int clientCount = (int) ((1.0 * neededBytes / averageBytesPerRequest) * concurrentRequestMultiplier);
-        clientCount = Math.max(clientCount, 1);
-
-        int pendingClients = allClients.size() - queuedClients.size() - completedClients.size();
-        clientCount -= pendingClients;
-
-        for (int i = 0; i < clientCount; i++) {
+        long availableBytes = bufferCapacity - bufferBytes;
+        while (reservedBytes.get() < availableBytes) {
             HttpPageBufferClient client = queuedClients.poll();
             if (client == null) {
                 // no more clients available
                 return;
             }
-            client.scheduleRequest();
+            // reservedBytes cannot be greater than availableBytes as this is the only place to bump up reservedBytes
+            long maxBytes = Math.min(client.getTotalPendingSize(), availableBytes - reservedBytes.get());
+            reservedBytes.addAndGet(maxBytes);
+            client.scheduleRequest(maxBytes);
+        }
+
+        // the queue at this point can contain some clients with pending pages and some not
+        // if a client is at the end of the queue without a pending page, it could be blocked by a previous client with a pending page
+        // it is better to just let those clients to ask for pages
+        Iterator<HttpPageBufferClient> iterator = queuedClients.iterator();
+        while (iterator.hasNext()) {
+            HttpPageBufferClient client = iterator.next();
+            if (client.getTotalPendingSize() == 0) {
+                iterator.remove();
+                client.scheduleRequest(0);
+            }
         }
     }
 
@@ -342,12 +345,6 @@ public class ExchangeClient
         maxBufferBytes = Math.max(maxBufferBytes, bufferBytes);
         systemMemoryUsageListener.updateSystemMemoryUsage(memorySize);
         successfulRequests++;
-
-        long responseSize = pages.stream()
-                .mapToLong(SerializedPage::getSizeInBytes)
-                .sum();
-        // AVG_n = AVG_(n-1) * (n-1)/n + VALUE_n / n
-        averageBytesPerRequest = (long) (1.0 * averageBytesPerRequest * (successfulRequests - 1) / successfulRequests + responseSize / successfulRequests);
 
         return true;
     }
@@ -384,6 +381,11 @@ public class ExchangeClient
             failure.compareAndSet(null, cause);
             notifyBlockedCallers();
         }
+    }
+
+    private void releaseQuota(long bytes)
+    {
+        reservedBytes.addAndGet(-bytes);
     }
 
     private boolean isFailed()
@@ -429,6 +431,12 @@ public class ExchangeClient
             requireNonNull(client, "client is null");
             requireNonNull(cause, "cause is null");
             ExchangeClient.this.clientFailed(cause);
+        }
+
+        @Override
+        public void releaseQuota(long quotaInBytes)
+        {
+            ExchangeClient.this.releaseQuota(quotaInBytes);
         }
     }
 

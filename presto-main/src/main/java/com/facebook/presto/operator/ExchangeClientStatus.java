@@ -27,7 +27,7 @@ public class ExchangeClientStatus
 {
     private final long bufferedBytes;
     private final long maxBufferedBytes;
-    private final long averageBytesPerRequest;
+    private final long reservedBytes;
     private final long successfulRequestsCount;
     private final int bufferedPages;
     private final boolean noMoreLocations;
@@ -37,7 +37,7 @@ public class ExchangeClientStatus
     public ExchangeClientStatus(
             @JsonProperty("bufferedBytes") long bufferedBytes,
             @JsonProperty("maxBufferedBytes") long maxBufferedBytes,
-            @JsonProperty("averageBytesPerRequest") long averageBytesPerRequest,
+            @JsonProperty("reservedBytes") long reservedBytes,
             @JsonProperty("successfulRequestsCount") long successFullRequestsCount,
             @JsonProperty("bufferedPages") int bufferedPages,
             @JsonProperty("noMoreLocations") boolean noMoreLocations,
@@ -45,7 +45,7 @@ public class ExchangeClientStatus
     {
         this.bufferedBytes = bufferedBytes;
         this.maxBufferedBytes = maxBufferedBytes;
-        this.averageBytesPerRequest = averageBytesPerRequest;
+        this.reservedBytes = reservedBytes;
         this.successfulRequestsCount = successFullRequestsCount;
         this.bufferedPages = bufferedPages;
         this.noMoreLocations = noMoreLocations;
@@ -65,9 +65,9 @@ public class ExchangeClientStatus
     }
 
     @JsonProperty
-    public long getAverageBytesPerRequest()
+    public long getReservedBytes()
     {
-        return averageBytesPerRequest;
+        return reservedBytes;
     }
 
     @JsonProperty
@@ -101,7 +101,7 @@ public class ExchangeClientStatus
         return toStringHelper(this)
                 .add("bufferBytes", bufferedBytes)
                 .add("maxBufferBytes", maxBufferedBytes)
-                .add("averageBytesPerRequest", averageBytesPerRequest)
+                .add("reservedBytes", reservedBytes)
                 .add("successfulRequestsCount", successfulRequestsCount)
                 .add("bufferedPages", bufferedPages)
                 .add("noMoreLocations", noMoreLocations)
@@ -115,22 +115,10 @@ public class ExchangeClientStatus
         return new ExchangeClientStatus(
                 (bufferedBytes + other.bufferedBytes) / 2, // this is correct as long as all clients have the same buffer size (capacity)
                 Math.max(maxBufferedBytes, other.maxBufferedBytes),
-                mergeAvgs(averageBytesPerRequest, successfulRequestsCount, other.averageBytesPerRequest, other.successfulRequestsCount),
+                reservedBytes + other.reservedBytes,
                 successfulRequestsCount + other.successfulRequestsCount,
                 bufferedPages + other.bufferedPages,
                 noMoreLocations && other.noMoreLocations, // if at least one has some locations, mergee has some too
                 ImmutableList.of()); // pageBufferClientStatuses may be long, so we don't want to combine the lists
-    }
-
-    private static long mergeAvgs(long value1, long count1, long value2, long count2)
-    {
-        if (count1 == 0) {
-            return value2;
-        }
-        if (count2 == 0) {
-            return value1;
-        }
-        // AVG_n+m = AVG_n * n / (n + m) + AVG_m * m / (n + m)
-        return (value1 * count1 / (count1 + count2)) + (value2 * count2 / (count1 + count2));
     }
 }
