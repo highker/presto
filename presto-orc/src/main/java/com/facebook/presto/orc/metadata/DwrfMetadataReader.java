@@ -197,8 +197,37 @@ public class DwrfMetadataReader
 
     private static ColumnStatistics toColumnStatistics(HiveWriterVersion hiveWriterVersion, DwrfProto.ColumnStatistics statistics, boolean isRowGroup)
     {
+        // starting with one byte to denote if null
+        long minAverageValueBytes = Byte.BYTES;
+
+        if (statistics.hasBucketStatistics()) {
+            minAverageValueBytes += 1L;
+        }
+        else if (statistics.hasIntStatistics()) {
+            // integer here is actually of a long type
+            minAverageValueBytes += Long.BYTES;
+        }
+        else if (statistics.hasDoubleStatistics()) {
+            minAverageValueBytes += Double.BYTES;
+        }
+        else if (statistics.hasStringStatistics()) {
+            // offset and value length
+            minAverageValueBytes += Integer.BYTES;
+            if (statistics.hasNumberOfValues() && statistics.getNumberOfValues() > 0) {
+                minAverageValueBytes += statistics.getStringStatistics().getSum() / statistics.getNumberOfValues();
+            }
+        }
+        else if (statistics.hasBinaryStatistics()) {
+            // offset and value length
+            minAverageValueBytes += Integer.BYTES;
+            if (statistics.hasNumberOfValues() && statistics.getNumberOfValues() > 0) {
+                minAverageValueBytes += statistics.getBinaryStatistics().getSum() / statistics.getNumberOfValues();
+            }
+        }
+
         return new ColumnStatistics(
                 statistics.getNumberOfValues(),
+                minAverageValueBytes,
                 toBooleanStatistics(statistics.getBucketStatistics()),
                 toIntegerStatistics(statistics.getIntStatistics()),
                 toDoubleStatistics(statistics.getDoubleStatistics()),
@@ -259,8 +288,9 @@ public class DwrfMetadataReader
 
         Slice minimum = stringStatistics.hasMinimum() ? getMinSlice(stringStatistics.getMinimum()) : null;
         Slice maximum = stringStatistics.hasMaximum() ? getMaxSlice(stringStatistics.getMaximum()) : null;
+        long sum = stringStatistics.hasSum() ? stringStatistics.getSum() : 0;
 
-        return new StringStatistics(minimum, maximum);
+        return new StringStatistics(minimum, maximum, sum);
     }
 
     private static BinaryStatistics toBinaryStatistics(DwrfProto.BinaryStatistics binaryStatistics)
