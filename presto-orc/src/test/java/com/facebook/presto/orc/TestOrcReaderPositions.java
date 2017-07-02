@@ -43,14 +43,18 @@ import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.Map;
 
+import static com.facebook.presto.orc.OrcReader.MAX_BATCH_SIZE;
 import static com.facebook.presto.orc.OrcTester.Format.ORC_12;
+import static com.facebook.presto.orc.OrcTester.MAX_BLOCK_SIZE;
 import static com.facebook.presto.orc.OrcTester.createCustomOrcRecordReader;
 import static com.facebook.presto.orc.OrcTester.createOrcRecordWriter;
 import static com.facebook.presto.orc.OrcTester.createSettableStructObjectInspector;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
+import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hive.ql.io.orc.CompressionKind.SNAPPY;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 public class TestOrcReaderPositions
 {
@@ -172,6 +176,55 @@ public class TestOrcReaderPositions
     }
 
     @Test
+    public void testBatchSizes()
+            throws Exception
+    {
+        try (TempFile tempFile = new TempFile()) {
+            // create single strip file with multiple row groups
+            int rowsInRowGroup = 10_000;
+            int rowGroupCounts = 10;
+            int baseStringBytes = 300;
+            int rowCount = rowsInRowGroup * rowGroupCounts;
+            createGrowingSequentialFile(tempFile.getFile(), rowCount, rowsInRowGroup, baseStringBytes);
+
+            try (OrcRecordReader reader = createCustomOrcRecordReader(tempFile, new OrcMetadataReader(), OrcPredicate.TRUE, VARCHAR)) {
+                assertEquals(reader.getFileRowCount(), rowCount);
+                assertEquals(reader.getReaderRowCount(), rowCount);
+                assertEquals(reader.getFilePosition(), 0);
+                assertEquals(reader.getReaderPosition(), 0);
+
+                int currentStringBytes = baseStringBytes;
+                int rowCountsInCurrentRowGroup = 0;
+                while (true) {
+                    int batchSize = reader.nextBatch();
+                    if (batchSize == -1) {
+                        break;
+                    }
+                    rowCountsInCurrentRowGroup += batchSize;
+
+                    Block block = reader.readBlock(VARCHAR, 0);
+                    if (MAX_BATCH_SIZE * currentStringBytes <= MAX_BLOCK_SIZE.toBytes()) {
+                        // either we are bounded by 1024 rows per batch, or it is the last batch in the row group
+                        assertTrue(block.getPositionCount() == MAX_BATCH_SIZE || rowCountsInCurrentRowGroup == rowsInRowGroup);
+                    }
+                    else {
+                        // either we are bounded by 1MB per batch, or it is the last batch in the row group
+                        assertTrue(block.getPositionCount() == MAX_BLOCK_SIZE.toBytes() / currentStringBytes || rowCountsInCurrentRowGroup == rowsInRowGroup);
+                    }
+
+                    if (rowCountsInCurrentRowGroup == rowsInRowGroup) {
+                        rowCountsInCurrentRowGroup = 0;
+                        currentStringBytes += baseStringBytes;
+                    }
+                    else if (rowCountsInCurrentRowGroup > rowsInRowGroup) {
+                        assertTrue(false, "read more rows in the current row group");
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     public void testReadUserMetadata()
             throws Exception
     {
@@ -260,6 +313,37 @@ public class TestOrcReaderPositions
 
         for (int i = 0; i < count; i++) {
             objectInspector.setStructFieldData(row, field, (long) i);
+            Writable record = serde.serialize(row, objectInspector);
+            writer.write(record);
+        }
+
+        writer.close(false);
+    }
+
+    private static void createGrowingSequentialFile(File file, int count, int step, int initialLength)
+            throws IOException, ReflectiveOperationException, SerDeException
+    {
+        FileSinkOperator.RecordWriter writer = createOrcRecordWriter(file, ORC_12, OrcTester.Compression.NONE, VARCHAR);
+
+        @SuppressWarnings("deprecation") Serializer serde = new OrcSerde();
+        SettableStructObjectInspector objectInspector = createSettableStructObjectInspector("test", VARCHAR);
+        Object row = objectInspector.create();
+        StructField field = objectInspector.getAllStructFieldRefs().get(0);
+
+        StringBuilder builder = new StringBuilder();
+        for (int j = 0; j < initialLength; j++) {
+            builder.append("0");
+        }
+        String seedString = builder.toString();
+
+        // gradually grow the length of a cell
+        int previousLength = initialLength;
+        for (int i = 0; i < count; i++) {
+            if ((i / step + 1) * initialLength > previousLength) {
+                previousLength = (i / step + 1) * initialLength;
+                builder.append(seedString);
+            }
+            objectInspector.setStructFieldData(row, field, builder.toString());
             Writable record = serde.serialize(row, objectInspector);
             writer.write(record);
         }

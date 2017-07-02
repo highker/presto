@@ -240,7 +240,7 @@ public class TestTupleDomainOrcPredicate
 
     private static ColumnStatistics stringColumnStats(Long numberOfValues, String minimum, String maximum)
     {
-        return new ColumnStatistics(numberOfValues, null, null, null, new StringStatistics(getMinSlice(minimum), getMaxSlice(maximum)), null, null, null, null);
+        return new ColumnStatistics(numberOfValues, null, null, null, new StringStatistics(getMinSlice(minimum), getMaxSlice(maximum), 100L), null, null, null, null);
     }
 
     @Test

@@ -259,8 +259,9 @@ public class DwrfMetadataReader
 
         Slice minimum = stringStatistics.hasMinimum() ? getMinSlice(stringStatistics.getMinimum()) : null;
         Slice maximum = stringStatistics.hasMaximum() ? getMaxSlice(stringStatistics.getMaximum()) : null;
+        long sum = stringStatistics.hasSum() ? stringStatistics.getSum() : 0;
 
-        return new StringStatistics(minimum, maximum);
+        return new StringStatistics(minimum, maximum, sum);
     }
 
     private static BinaryStatistics toBinaryStatistics(DwrfProto.BinaryStatistics binaryStatistics)

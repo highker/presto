@@ -22,11 +22,13 @@ public class StringStatistics
 {
     private final Slice minimum;
     private final Slice maximum;
+    private final long sum;
 
-    public StringStatistics(Slice minimum, Slice maximum)
+    public StringStatistics(Slice minimum, Slice maximum, long sum)
     {
         this.minimum = minimum;
         this.maximum = maximum;
+        this.sum = sum;
     }
 
     @Override
@@ -41,12 +43,18 @@ public class StringStatistics
         return maximum;
     }
 
+    public long getSum()
+    {
+        return sum;
+    }
+
     @Override
     public String toString()
     {
         return toStringHelper(this)
                 .add("min", minimum)
                 .add("max", maximum)
+                .add("sum", sum)
                 .toString();
     }
 }

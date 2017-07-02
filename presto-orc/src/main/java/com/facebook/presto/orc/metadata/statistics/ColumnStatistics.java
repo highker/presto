@@ -57,6 +57,46 @@ public class ColumnStatistics
         return numberOfValues == null ? 0 : numberOfValues;
     }
 
+    public boolean hasMinAverageValueSizeInBytes()
+    {
+        return hasNumberOfValues() && numberOfValues > 0;
+    }
+
+    /**
+     * The minimum average value sizes.
+     * The actual average value size is no less than the return value.
+     * It provides a lower bound of the size of data to be loaded
+     */
+    public long getMinAverageValueSizeInBytes()
+    {
+        if (!hasMinAverageValueSizeInBytes()) {
+            return 0L;
+        }
+        if (booleanStatistics != null) {
+            return 1L;
+        }
+        if (integerStatistics != null) {
+            return Integer.BYTES;
+        }
+        if (doubleStatistics != null) {
+            return Double.BYTES;
+        }
+        if (stringStatistics != null) {
+            return stringStatistics.getSum() / numberOfValues;
+        }
+        if (dateStatistics != null) {
+            return Integer.BYTES;
+        }
+        if (decimalStatistics != null) {
+            // could be 8 or 16; return the min given it is a min average
+            return 8L;
+        }
+        if (binaryStatistics != null) {
+            return binaryStatistics.getSum() / numberOfValues;
+        }
+        return 0L;
+    }
+
     public BooleanStatistics getBooleanStatistics()
     {
         return booleanStatistics;
