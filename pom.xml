@@ -343,7 +343,7 @@
             <dependency>
                 <groupId>com.facebook.presto.orc</groupId>
                 <artifactId>orc-protobuf</artifactId>
-                <version>3</version>
+                <version>5-SNAPSHOT</version>
             </dependency>
 
             <dependency>
