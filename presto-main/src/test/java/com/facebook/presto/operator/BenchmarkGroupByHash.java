@@ -54,7 +54,7 @@ import static it.unimi.dsi.fastutil.HashCommon.arraySize;
 @SuppressWarnings("MethodMayBeStatic")
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Fork(2)
+@Fork(4)
 @Warmup(iterations = 10, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 10, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 @BenchmarkMode(Mode.AverageTime)
@@ -87,7 +87,6 @@ public class BenchmarkGroupByHash
         return pageBuilder.build();
     }
 
-    @Benchmark
     @OperationsPerInvocation(POSITIONS)
     public Object addPagePreCompute(BenchmarkData data)
     {
@@ -108,7 +107,6 @@ public class BenchmarkGroupByHash
         return pageBuilder.build();
     }
 
-    @Benchmark
     @OperationsPerInvocation(POSITIONS)
     public Object bigintGroupByHash(SingleChannelBenchmarkData data)
     {
@@ -129,7 +127,6 @@ public class BenchmarkGroupByHash
         return pageBuilder.build();
     }
 
-    @Benchmark
     @OperationsPerInvocation(POSITIONS)
     public long baseline(BaselinePagesData data)
     {
@@ -158,7 +155,6 @@ public class BenchmarkGroupByHash
         return groupIds;
     }
 
-    @Benchmark
     @OperationsPerInvocation(POSITIONS)
     public long baselineBigArray(BaselinePagesData data)
     {
@@ -290,14 +286,14 @@ public class BenchmarkGroupByHash
     @State(Scope.Thread)
     public static class BenchmarkData
     {
-        @Param({"1", "5", "10", "15", "20"})
+        @Param({"1", "2", "4", "8", "16"})
         private int channelCount = 1;
 
         // todo add more group counts when JMH support programmatic ability to set OperationsPerInvocation
-        @Param(GROUP_COUNT_STRING)
+        @Param({"1", "10", "100", "1000", "10000", "100000", "100000", "1000000", "10000000"})
         private int groupCount = GROUP_COUNT;
 
-        @Param({"true", "false"})
+        @Param({"true"})
         private boolean hashEnabled;
 
         private List<Page> pages;
