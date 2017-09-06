@@ -35,6 +35,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
+import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
@@ -286,11 +287,11 @@ public class BenchmarkGroupByHash
     @State(Scope.Thread)
     public static class BenchmarkData
     {
-        @Param({"1", "2", "4", "8", "16"})
+        @Param({"1"})
         private int channelCount = 1;
 
         // todo add more group counts when JMH support programmatic ability to set OperationsPerInvocation
-        @Param({"1", "10", "100", "1000", "10000", "100000", "100000", "1000000", "10000000"})
+        @Param(GROUP_COUNT_STRING)
         private int groupCount = GROUP_COUNT;
 
         @Param({"true"})
@@ -348,8 +349,10 @@ public class BenchmarkGroupByHash
         new BenchmarkGroupByHash().bigintGroupByHash(singleChannelBenchmarkData);
 
         Options options = new OptionsBuilder()
+                .jvmArgs("-XX:+UseG1GC", "-mx4G")
                 .verbosity(VerboseMode.NORMAL)
                 .include(".*" + BenchmarkGroupByHash.class.getSimpleName() + ".*")
+                .addProfiler(GCProfiler.class)
                 .build();
         new Runner(options).run();
     }
