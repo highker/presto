@@ -15,6 +15,7 @@ package com.facebook.presto.orc.checksum;
 
 import com.facebook.presto.orc.AbstractOrcDataSource;
 import com.facebook.presto.orc.OrcDataSource;
+import com.facebook.presto.orc.OrcDataSourceId;
 import com.facebook.presto.orc.OrcPredicate;
 import com.facebook.presto.orc.OrcReader;
 import com.facebook.presto.orc.OrcRecordReader;
@@ -26,14 +27,13 @@ import com.facebook.presto.orc.metadata.OrcType;
 import com.facebook.presto.orc.metadata.OrcType.OrcTypeKind;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.type.ArrayType;
+import com.facebook.presto.spi.type.RowType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
-import com.facebook.presto.type.ArrayType;
-import com.facebook.presto.type.MapType;
-import com.facebook.presto.type.RowType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Longs;
@@ -59,6 +59,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
+import static com.facebook.presto.orc.OrcTester.mapType;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
@@ -132,10 +133,9 @@ public final class OrcFileChecksum
         else {
             metadataReader = new OrcMetadataReader();
         }
-        OrcReader orcReader = new OrcReader(orcDataSource, metadataReader, new DataSize(1, MEGABYTE), new DataSize(8, MEGABYTE));
+        OrcReader orcReader = new OrcReader(orcDataSource, metadataReader, new DataSize(1, MEGABYTE), new DataSize(8, MEGABYTE), new DataSize(16, MEGABYTE));
 
         List<Type> types = toPrestoTypes(orcReader.getFooter().getTypes());
-        
         ImmutableMap.Builder<Integer, Type> includedColumnsBuilder = ImmutableMap.builder();
         for (int i = 0; i < types.size(); i++) {
             includedColumnsBuilder.put(i, types.get(i));
@@ -197,7 +197,7 @@ public final class OrcFileChecksum
             case LIST:
                 return new ArrayType(toPrestoType(orcTypes.get(orcType.getFieldTypeIndex(0)), orcTypes));
             case MAP:
-                return new MapType(
+                return mapType(
                         toPrestoType(orcTypes.get(orcType.getFieldTypeIndex(0)), orcTypes),
                         toPrestoType(orcTypes.get(orcType.getFieldTypeIndex(1)), orcTypes));
             case STRUCT:
@@ -340,7 +340,7 @@ public final class OrcFileChecksum
 
         public HdfsOrcDataSource(String name, long size, DataSize maxMergeDistance, DataSize maxReadSize, DataSize streamBufferSize, FSDataInputStream inputStream)
         {
-            super(name, size, maxMergeDistance, maxReadSize, streamBufferSize);
+            super(new OrcDataSourceId(name), size, maxMergeDistance, maxReadSize, streamBufferSize);
             this.inputStream = inputStream;
         }
 
