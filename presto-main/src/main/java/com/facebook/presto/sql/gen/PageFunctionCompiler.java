@@ -243,8 +243,6 @@ public class PageFunctionCompiler
 
         FieldDefinition blockBuilderField = classDefinition.declareField(a(PRIVATE), "blockBuilder", BlockBuilder.class);
 
-        CachedInstanceBinder cachedInstanceBinder = new CachedInstanceBinder(classDefinition, callSiteBinder);
-
         // project
         generatePageProjectMethod(classDefinition, blockBuilderField, pageProjectionOutputClass);
 
@@ -287,7 +285,6 @@ public class PageFunctionCompiler
                         blockBuilderField,
                         type.invoke("createBlockBuilder", BlockBuilder.class, newInstance(BlockBuilderStatus.class), constantInt(1))));
 
-        cachedInstanceBinder.generateInitializations(thisVariable, body);
         body.ret();
 
         return classDefinition;
@@ -332,7 +329,6 @@ public class PageFunctionCompiler
                 type(PageProjectionOutput.class));
 
         FieldDefinition blockBuilderField = classDefinition.declareField(a(PRIVATE), "blockBuilder", BlockBuilder.class);
-        FieldDefinition sessionField = classDefinition.declareField(a(PRIVATE), "session", ConnectorSession.class);
         FieldDefinition yieldSignalField = classDefinition.declareField(a(PRIVATE), "yieldSignal", DriverYieldSignal.class);
         FieldDefinition pageField = classDefinition.declareField(a(PRIVATE), "page", Page.class);
         FieldDefinition selectedPositionsField = classDefinition.declareField(a(PRIVATE), "selectedPositions", SelectedPositions.class);
@@ -341,7 +337,7 @@ public class PageFunctionCompiler
         CachedInstanceBinder cachedInstanceBinder = new CachedInstanceBinder(classDefinition, callSiteBinder);
 
         // compute
-        generateComputeMethod(classDefinition, blockBuilderField, sessionField, yieldSignalField, pageField, selectedPositionsField, nextIndexOrPositionField);
+        generateComputeMethod(classDefinition, blockBuilderField, yieldSignalField, pageField, selectedPositionsField, nextIndexOrPositionField);
 
         // project
         PreGeneratedExpressions preGeneratedExpressions = generateMethodsForLambdaAndTry(classDefinition, callSiteBinder, cachedInstanceBinder, projection);
@@ -363,7 +359,6 @@ public class PageFunctionCompiler
                 .append(thisVariable)
                 .invokeConstructor(Object.class)
                 .append(thisVariable.setField(blockBuilderField, blockBuilder))
-                .append(thisVariable.setField(sessionField, session))
                 .append(thisVariable.setField(yieldSignalField, yieldSignal))
                 .append(thisVariable.setField(pageField, page))
                 .append(thisVariable.setField(selectedPositionsField, selectedPositions))
@@ -381,7 +376,6 @@ public class PageFunctionCompiler
     private static MethodDefinition generateComputeMethod(
             ClassDefinition classDefinition,
             FieldDefinition blockBuilder,
-            FieldDefinition session,
             FieldDefinition yieldSignal,
             FieldDefinition page,
             FieldDefinition selectedPositions,
@@ -409,7 +403,7 @@ public class PageFunctionCompiler
                         .condition(lessThan(index, to))
                         .update(index.increment())
                         .body(new BytecodeBlock()
-                                .append(thisVariable.invoke("project", void.class, thisVariable.getField(session), thisVariable.getField(page), positions.getElement(index)))
+                                .append(thisVariable.invoke("project", void.class, thisVariable.getField(page), positions.getElement(index)))
                                 .append(generateCheckYieldBlock(thisVariable, index, yieldSignal, nextIndexOrPosition)))));
 
         ifStatement.ifFalse(new ForLoop("range based loop")
@@ -417,7 +411,7 @@ public class PageFunctionCompiler
                 .condition(lessThan(index, to))
                 .update(index.increment())
                 .body(new BytecodeBlock()
-                        .append(thisVariable.invoke("project", void.class, thisVariable.getField(session), thisVariable.getField(page), index))
+                        .append(thisVariable.invoke("project", void.class, thisVariable.getField(page), index))
                         .append(generateCheckYieldBlock(thisVariable, index, yieldSignal, nextIndexOrPosition))));
 
         body.comment("return Optional.of(this.blockBuilder.build());")
@@ -452,16 +446,14 @@ public class PageFunctionCompiler
             RowExpression projection,
             FieldDefinition blockBuilder)
     {
-        Parameter session = arg("session", ConnectorSession.class);
         Parameter page = arg("page", Page.class);
         Parameter position = arg("position", int.class);
 
         MethodDefinition method = classDefinition.declareMethod(
-                a(PUBLIC),
+                a(PRIVATE),
                 "project",
                 type(void.class),
                 ImmutableList.<Parameter>builder()
-                        .add(session)
                         .add(page)
                         .add(position)
                         .build());
