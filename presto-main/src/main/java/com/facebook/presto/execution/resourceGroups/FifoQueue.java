@@ -13,71 +13,120 @@
  */
 package com.facebook.presto.execution.resourceGroups;
 
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import javax.annotation.concurrent.GuardedBy;
+import javax.annotation.concurrent.ThreadSafe;
 
-// A queue with constant time contains(E) and remove(E)
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.Iterators.transform;
+
+// A queue with constant time contains(E) and log time remove(E)
+@ThreadSafe
 final class FifoQueue<E>
         implements UpdateablePriorityQueue<E>
 {
-    private final Set<E> delegate = new LinkedHashSet<>();
+    private final Map<E, Entry<E>> map = new ConcurrentHashMap<>();
+    private final Set<Entry<E>> queue = new ConcurrentSkipListSet<>(Comparator.comparingLong(Entry::getSequence));
+
+    @GuardedBy("this")
+    private long sequence;
 
     @Override
-    public boolean addOrUpdate(E element, long priority)
+    public synchronized boolean addOrUpdate(E element, long priority)
     {
-        return delegate.add(element);
+        if (contains(element)) {
+            return false;
+        }
+        Entry<E> entry = new Entry<>(element, sequence);
+        sequence++;
+        map.put(element, entry);
+        checkState(queue.add(entry), "Current queue already contains the element");
+        return true;
     }
 
     @Override
     public boolean contains(E element)
     {
-        return delegate.contains(element);
+        return map.containsKey(element);
     }
 
     @Override
-    public boolean remove(E element)
+    public synchronized boolean remove(E element)
     {
-        return delegate.remove(element);
+        Entry entry = map.remove(element);
+        if (entry == null) {
+            return false;
+        }
+        checkState(queue.remove(entry), "Current queue does not contain the element");
+        return true;
     }
 
     @Override
-    public E poll()
+    public synchronized E poll()
     {
-        Iterator<E> iterator = delegate.iterator();
+        Iterator<Entry<E>> iterator = queue.iterator();
         if (!iterator.hasNext()) {
             return null;
         }
-        E element = iterator.next();
+        E element = iterator.next().getValue();
         iterator.remove();
+        checkState(map.remove(element) != null, "Failed to remove entry from the queue");
         return element;
     }
 
     @Override
     public E peek()
     {
-        Iterator<E> iterator = delegate.iterator();
+        Iterator<Entry<E>> iterator = queue.iterator();
         if (!iterator.hasNext()) {
             return null;
         }
-        return iterator.next();
+        return iterator.next().getValue();
     }
 
     @Override
     public int size()
     {
-        return delegate.size();
+        return map.size();
     }
 
     @Override
     public boolean isEmpty()
     {
-        return delegate.isEmpty();
+        return map.isEmpty();
     }
 
     @Override
     public Iterator<E> iterator()
     {
-        return delegate.iterator();
+        return transform(queue.iterator(), Entry::getValue);
+    }
+
+    private static final class Entry<E>
+    {
+        private final E value;
+        private final long sequence;
+
+        Entry(E value, long sequence)
+        {
+            this.value = value;
+            this.sequence = sequence;
+        }
+
+        public E getValue()
+        {
+            return value;
+        }
+
+        long getSequence()
+        {
+            return sequence;
+        }
     }
 }

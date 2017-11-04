@@ -13,26 +13,31 @@
  */
 package com.facebook.presto.execution.resourceGroups;
 
-import java.util.HashMap;
+import javax.annotation.concurrent.GuardedBy;
+import javax.annotation.concurrent.ThreadSafe;
+
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
+@ThreadSafe
 final class StochasticPriorityQueue<E>
         implements UpdateablePriorityQueue<E>
 {
-    private final Map<E, Node<E>> index = new HashMap<>();
+    private final Map<E, Node<E>> index = new ConcurrentHashMap<>();
 
     // This is a Fenwick tree, where each node has weight equal to the sum of its weight
     // and all its children's weights
+    @GuardedBy("this")
     private Node<E> root;
 
     @Override
-    public boolean addOrUpdate(E element, long priority)
+    public synchronized boolean addOrUpdate(E element, long priority)
     {
         checkArgument(priority > 0, "priority must be positive");
         if (root == null) {
@@ -59,7 +64,7 @@ final class StochasticPriorityQueue<E>
     }
 
     @Override
-    public boolean remove(E element)
+    public synchronized boolean remove(E element)
     {
         Node<E> node = index.remove(element);
         if (node == null) {
@@ -85,7 +90,7 @@ final class StochasticPriorityQueue<E>
     }
 
     @Override
-    public E poll()
+    public synchronized E poll()
     {
         if (root == null) {
             return null;

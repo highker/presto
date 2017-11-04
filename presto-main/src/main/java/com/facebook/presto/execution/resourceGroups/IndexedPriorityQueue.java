@@ -13,11 +13,14 @@
  */
 package com.facebook.presto.execution.resourceGroups;
 
-import java.util.HashMap;
+import javax.annotation.concurrent.GuardedBy;
+import javax.annotation.concurrent.ThreadSafe;
+
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterators.transform;
@@ -27,11 +30,12 @@ import static java.util.Objects.requireNonNull;
  * A priority queue with constant time contains(E) and log time remove(E)
  * Ties are broken by insertion order
  */
+@ThreadSafe
 final class IndexedPriorityQueue<E>
         implements UpdateablePriorityQueue<E>
 {
-    private final Map<E, Entry<E>> index = new HashMap<>();
-    private final Set<Entry<E>> queue = new TreeSet<>((entry1, entry2) -> {
+    private final Map<E, Entry<E>> index = new ConcurrentHashMap<>();
+    private final Set<Entry<E>> queue = new ConcurrentSkipListSet<>((entry1, entry2) -> {
         int priorityComparison = Long.compare(entry2.getPriority(), entry1.getPriority());
         if (priorityComparison != 0) {
             return priorityComparison;
@@ -39,10 +43,11 @@ final class IndexedPriorityQueue<E>
         return Long.compare(entry1.getGeneration(), entry2.getGeneration());
     });
 
+    @GuardedBy("this")
     private long generation;
 
     @Override
-    public boolean addOrUpdate(E element, long priority)
+    public synchronized boolean addOrUpdate(E element, long priority)
     {
         Entry<E> entry = index.get(element);
         if (entry != null) {
@@ -66,7 +71,7 @@ final class IndexedPriorityQueue<E>
     }
 
     @Override
-    public boolean remove(E element)
+    public synchronized boolean remove(E element)
     {
         Entry<E> entry = index.remove(element);
         if (entry != null) {
@@ -77,7 +82,7 @@ final class IndexedPriorityQueue<E>
     }
 
     @Override
-    public E poll()
+    public synchronized E poll()
     {
         Iterator<Entry<E>> iterator = queue.iterator();
         if (!iterator.hasNext()) {

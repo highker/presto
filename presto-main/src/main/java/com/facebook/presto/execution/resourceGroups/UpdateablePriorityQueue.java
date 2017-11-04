@@ -13,6 +13,9 @@
  */
 package com.facebook.presto.execution.resourceGroups;
 
+import javax.annotation.concurrent.ThreadSafe;
+
+@ThreadSafe
 interface UpdateablePriorityQueue<E>
         extends Queue<E>
 {
