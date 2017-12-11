@@ -18,8 +18,11 @@ import io.airlift.slice.Slices;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 import static com.facebook.presto.spi.block.BlockUtil.checkValidPositions;
@@ -227,17 +230,26 @@ public class DictionaryBlock
             return getSizeInBytes();
         }
 
+        if (length == 1) {
+            int position = getId(positionOffset);
+            if (dictionary.isNull(getId(position))) {
+                return 0;
+            }
+            return dictionary.getRegionSizeInBytes(position, 1);
+        }
+
         long sizeInBytes = 0;
-        boolean[] seen = new boolean[dictionary.getPositionCount()];
+        BitSet seen = new BitSet(dictionary.getPositionCount());
         for (int i = positionOffset; i < positionOffset + length; i++) {
             int position = getId(i);
-            if (!seen[position]) {
+            if (!seen.get(position)) {
                 if (!dictionary.isNull(position)) {
                     sizeInBytes += dictionary.getRegionSizeInBytes(position, 1);
                 }
-                seen[position] = true;
+                seen.set(position);
             }
         }
+
         sizeInBytes += Integer.BYTES * (long) length;
         return sizeInBytes;
     }
