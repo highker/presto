@@ -26,6 +26,7 @@ import static java.lang.Math.toIntExact;
 public class LongArrayBlock
         implements Block
 {
+    private static final LongArrayBlock EMPTY_LONG_ARRAY_BLOCK = new LongArrayBlock(0, new boolean[0], new long[0]);
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(LongArrayBlock.class).instanceSize();
 
     private final int arrayOffset;
@@ -36,12 +37,20 @@ public class LongArrayBlock
     private final long sizeInBytes;
     private final long retainedSizeInBytes;
 
-    public LongArrayBlock(int positionCount, boolean[] valueIsNull, long[] values)
+    private LongArrayBlock(int positionCount, boolean[] valueIsNull, long[] values)
     {
         this(0, positionCount, valueIsNull, values);
     }
 
-    LongArrayBlock(int arrayOffset, int positionCount, boolean[] valueIsNull, long[] values)
+    public static LongArrayBlock create(int positionCount, boolean[] valueIsNull, long[] values)
+    {
+        if (positionCount == 0) {
+            return EMPTY_LONG_ARRAY_BLOCK;
+        }
+        return new LongArrayBlock(positionCount, valueIsNull, values);
+    }
+
+    private LongArrayBlock(int arrayOffset, int positionCount, boolean[] valueIsNull, long[] values)
     {
         if (arrayOffset < 0) {
             throw new IllegalArgumentException("arrayOffset is negative");
@@ -64,6 +73,14 @@ public class LongArrayBlock
 
         sizeInBytes = (Long.BYTES + Byte.BYTES) * (long) positionCount;
         retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + sizeOf(values);
+    }
+
+    static LongArrayBlock create(int arrayOffset, int positionCount, boolean[] valueIsNull, long[] values)
+    {
+        if (positionCount == 0) {
+            return EMPTY_LONG_ARRAY_BLOCK;
+        }
+        return new LongArrayBlock(arrayOffset, positionCount, valueIsNull, values);
     }
 
     @Override

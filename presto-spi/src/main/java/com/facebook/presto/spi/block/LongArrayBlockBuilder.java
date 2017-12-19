@@ -23,6 +23,7 @@ import java.util.function.BiConsumer;
 import static com.facebook.presto.spi.block.BlockUtil.calculateBlockResetSize;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidPositionsArray;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
+import static com.facebook.presto.spi.block.LongArrayBlock.create;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static java.lang.Math.max;
 import static java.lang.Math.toIntExact;
@@ -94,7 +95,7 @@ public class LongArrayBlockBuilder
     @Override
     public Block build()
     {
-        return new LongArrayBlock(positionCount, valueIsNull, values);
+        return create(positionCount, valueIsNull, values);
     }
 
     @Override
@@ -233,7 +234,7 @@ public class LongArrayBlockBuilder
     public Block getSingleValueBlock(int position)
     {
         checkReadablePosition(position);
-        return new LongArrayBlock(
+        return create(
                 1,
                 new boolean[] {valueIsNull[position]},
                 new long[] {values[position]});
@@ -252,7 +253,7 @@ public class LongArrayBlockBuilder
             newValueIsNull[i] = valueIsNull[position];
             newValues[i] = values[position];
         }
-        return new LongArrayBlock(length, newValueIsNull, newValues);
+        return create(length, newValueIsNull, newValues);
     }
 
     @Override
@@ -260,7 +261,7 @@ public class LongArrayBlockBuilder
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
 
-        return new LongArrayBlock(positionOffset, length, valueIsNull, values);
+        return create(positionOffset, length, valueIsNull, values);
     }
 
     @Override
@@ -270,7 +271,7 @@ public class LongArrayBlockBuilder
 
         boolean[] newValueIsNull = Arrays.copyOfRange(valueIsNull, positionOffset, positionOffset + length);
         long[] newValues = Arrays.copyOfRange(values, positionOffset, positionOffset + length);
-        return new LongArrayBlock(length, newValueIsNull, newValues);
+        return create(length, newValueIsNull, newValues);
     }
 
     @Override

@@ -22,6 +22,7 @@ import org.testng.annotations.Test;
 
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 
 public class TestLongArrayBlock
@@ -62,6 +63,15 @@ public class TestLongArrayBlock
         blockBuilder = blockBuilder.newBlockBuilderLike(new BlockBuilderStatus());
         assertEquals(blockBuilder.getSizeInBytes(), emptyBlockBuilder.getSizeInBytes());
         assertEquals(blockBuilder.getRetainedSizeInBytes(), emptyBlockBuilder.getRetainedSizeInBytes());
+    }
+
+    @Test
+    public void testIdenticalEmtpyBlock()
+            throws Exception
+    {
+        BlockBuilder blockBuilder = createBlockBuilderWithValues(createTestValue(17));
+        assertNotEquals(blockBuilder.copyRegion(1, 1), blockBuilder.copyRegion(1, 1));
+        assertEquals(blockBuilder.copyRegion(1, 0), blockBuilder.copyRegion(1, 0));
     }
 
     private void assertFixedWithValues(Slice[] expectedValues)

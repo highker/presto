@@ -41,6 +41,7 @@ import static io.airlift.slice.SizeOf.SIZE_OF_SHORT;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
+import static java.lang.reflect.Modifier.isStatic;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -78,7 +79,7 @@ public abstract class AbstractTestBlock
         try {
             for (Field field : fields) {
                 Class<?> type = field.getType();
-                if (type.isPrimitive()) {
+                if (type.isPrimitive() || isStatic(field.getModifiers())) {
                     continue;
                 }
 

@@ -16,7 +16,6 @@ package com.facebook.presto.connector.thrift.api.datatypes;
 import com.facebook.presto.connector.thrift.api.PrestoThriftBlock;
 import com.facebook.presto.spi.RecordSet;
 import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.block.LongArrayBlock;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.swift.codec.ThriftConstructor;
 import com.facebook.swift.codec.ThriftField;
@@ -30,6 +29,7 @@ import java.util.Objects;
 import static com.facebook.presto.connector.thrift.api.PrestoThriftBlock.bigintData;
 import static com.facebook.presto.connector.thrift.api.datatypes.PrestoThriftTypeUtils.fromLongBasedBlock;
 import static com.facebook.presto.connector.thrift.api.datatypes.PrestoThriftTypeUtils.fromLongBasedColumn;
+import static com.facebook.presto.spi.block.LongArrayBlock.create;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.swift.codec.ThriftField.Requiredness.OPTIONAL;
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -75,7 +75,7 @@ public final class PrestoThriftBigint
     {
         checkArgument(BIGINT.equals(desiredType), "type doesn't match: %s", desiredType);
         int numberOfRecords = numberOfRecords();
-        return new LongArrayBlock(
+        return create(
                 numberOfRecords,
                 nulls == null ? new boolean[numberOfRecords] : nulls,
                 longs == null ? new long[numberOfRecords] : longs);

@@ -17,7 +17,6 @@ import com.facebook.presto.connector.thrift.api.PrestoThriftBlock;
 import com.facebook.presto.spi.block.AbstractArrayBlock;
 import com.facebook.presto.spi.block.ArrayBlock;
 import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.block.LongArrayBlock;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.swift.codec.ThriftConstructor;
 import com.facebook.swift.codec.ThriftField;
@@ -32,6 +31,7 @@ import static com.facebook.presto.connector.thrift.api.PrestoThriftBlock.bigintA
 import static com.facebook.presto.connector.thrift.api.datatypes.PrestoThriftTypeUtils.calculateOffsets;
 import static com.facebook.presto.connector.thrift.api.datatypes.PrestoThriftTypeUtils.sameSizeIfPresent;
 import static com.facebook.presto.connector.thrift.api.datatypes.PrestoThriftTypeUtils.totalSize;
+import static com.facebook.presto.spi.block.LongArrayBlock.create;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.swift.codec.ThriftField.Requiredness.OPTIONAL;
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -97,7 +97,7 @@ public final class PrestoThriftBigintArray
                 numberOfRecords,
                 nulls == null ? new boolean[numberOfRecords] : nulls,
                 calculateOffsets(sizes, nulls, numberOfRecords),
-                values != null ? values.toBlock(BIGINT) : new LongArrayBlock(0, new boolean[] {}, new long[] {}));
+                values != null ? values.toBlock(BIGINT) : create(0, new boolean[] {}, new long[] {}));
     }
 
     @Override

@@ -19,6 +19,7 @@ import io.airlift.slice.SliceOutput;
 
 import static com.facebook.presto.spi.block.EncoderUtil.decodeNullBits;
 import static com.facebook.presto.spi.block.EncoderUtil.encodeNullsAsBits;
+import static com.facebook.presto.spi.block.LongArrayBlock.create;
 
 public class LongArrayBlockEncoding
         implements BlockEncoding
@@ -61,7 +62,7 @@ public class LongArrayBlockEncoding
             }
         }
 
-        return new LongArrayBlock(positionCount, valueIsNull, values);
+        return create(positionCount, valueIsNull, values);
     }
 
     @Override
