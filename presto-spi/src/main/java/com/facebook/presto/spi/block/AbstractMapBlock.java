@@ -23,6 +23,7 @@ import static com.facebook.presto.spi.block.BlockUtil.checkArrayRange;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
 import static com.facebook.presto.spi.block.BlockUtil.compactArray;
 import static com.facebook.presto.spi.block.BlockUtil.compactOffsets;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 import static java.util.Objects.requireNonNull;
 
 public abstract class AbstractMapBlock
@@ -80,6 +81,10 @@ public abstract class AbstractMapBlock
     {
         checkArrayRange(positions, offset, length);
 
+        if (offset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         int[] newOffsets = new int[length + 1];
         boolean[] newMapIsNull = new boolean[length];
 
@@ -133,6 +138,10 @@ public abstract class AbstractMapBlock
             return this;
         }
 
+        if (position == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         return new MapBlock(
                 position + getOffsetBase(),
                 length,
@@ -166,6 +175,10 @@ public abstract class AbstractMapBlock
     {
         int positionCount = getPositionCount();
         checkValidRegion(positionCount, position, length);
+
+        if (position == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
 
         int startValueOffset = getOffset(position);
         int endValueOffset = getOffset(position + length);

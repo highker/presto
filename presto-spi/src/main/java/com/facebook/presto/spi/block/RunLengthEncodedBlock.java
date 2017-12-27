@@ -23,6 +23,7 @@ import java.util.function.BiConsumer;
 import static com.facebook.presto.spi.block.BlockUtil.checkArrayRange;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidPosition;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -33,6 +34,9 @@ public class RunLengthEncodedBlock
 
     public static Block create(Type type, Object value, int positionCount)
     {
+        if (positionCount == 0) {
+            return EMPTY_BLOCK;
+        }
         Block block = Utils.nativeValueToBlock(type, value);
         return new RunLengthEncodedBlock(block, positionCount);
     }
@@ -103,6 +107,10 @@ public class RunLengthEncodedBlock
         for (int i = offset; i < offset + length; i++) {
             checkValidPosition(positions[i], positionCount);
         }
+
+        if (offset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
         return new RunLengthEncodedBlock(value.copyRegion(0, 1), length);
     }
 
@@ -110,6 +118,11 @@ public class RunLengthEncodedBlock
     public Block getRegion(int positionOffset, int length)
     {
         checkValidRegion(positionCount, positionOffset, length);
+
+        if (positionOffset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         return new RunLengthEncodedBlock(value, length);
     }
 
@@ -123,6 +136,11 @@ public class RunLengthEncodedBlock
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(positionCount, positionOffset, length);
+
+        if (positionOffset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         return new RunLengthEncodedBlock(value.copyRegion(0, 1), length);
     }
 

@@ -28,6 +28,7 @@ import static com.facebook.presto.spi.block.BlockUtil.calculateBlockResetSize;
 import static com.facebook.presto.spi.block.BlockUtil.checkArrayRange;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidPosition;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 import static io.airlift.slice.SizeOf.SIZE_OF_BYTE;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
@@ -113,6 +114,10 @@ public class FixedWidthBlockBuilder
     public Block copyPositions(int[] positions, int offset, int length)
     {
         checkArrayRange(positions, offset, length);
+
+        if (offset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
 
         SliceOutput newSlice = Slices.allocate(length * fixedSize).getOutput();
         SliceOutput newValueIsNull = Slices.allocate(length).getOutput();
@@ -248,6 +253,10 @@ public class FixedWidthBlockBuilder
         int positionCount = getPositionCount();
         checkValidRegion(positionCount, positionOffset, length);
 
+        if (positionOffset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         Slice newSlice = sliceOutput.slice().slice(positionOffset * fixedSize, length * fixedSize);
         Slice newValueIsNull = valueIsNull.slice().slice(positionOffset, length);
         return new FixedWidthBlock(fixedSize, length, newSlice, newValueIsNull);
@@ -259,6 +268,10 @@ public class FixedWidthBlockBuilder
         int positionCount = getPositionCount();
         checkValidRegion(positionCount, positionOffset, length);
 
+        if (positionOffset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         Slice newSlice = Slices.copyOf(sliceOutput.getUnderlyingSlice(), positionOffset * fixedSize, length * fixedSize);
         Slice newValueIsNull = Slices.copyOf(valueIsNull.getUnderlyingSlice(), positionOffset, length);
         return new FixedWidthBlock(fixedSize, length, newSlice, newValueIsNull);
@@ -269,6 +282,9 @@ public class FixedWidthBlockBuilder
     {
         if (currentEntrySize > 0) {
             throw new IllegalStateException("Current entry must be closed before the block can be built");
+        }
+        if (positionCount == 0) {
+            return EMPTY_BLOCK;
         }
         return new FixedWidthBlock(fixedSize, positionCount, sliceOutput.slice(), valueIsNull.slice());
     }

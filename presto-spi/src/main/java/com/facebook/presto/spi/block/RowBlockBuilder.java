@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.function.BiConsumer;
 
 import static com.facebook.presto.spi.block.BlockUtil.calculateBlockResetSize;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -197,6 +198,11 @@ public class RowBlockBuilder
         if (currentEntryOpened) {
             throw new IllegalStateException("Current entry must be closed before the block can be built");
         }
+
+        if (positionCount == 0) {
+            return EMPTY_BLOCK;
+        }
+
         Block[] fieldBlocks = new Block[numFields];
         for (int i = 0; i < numFields; i++) {
             fieldBlocks[i] = fieldBlockBuilders[i].build();

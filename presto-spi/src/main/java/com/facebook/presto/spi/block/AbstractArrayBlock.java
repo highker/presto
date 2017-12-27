@@ -17,6 +17,7 @@ import static com.facebook.presto.spi.block.BlockUtil.checkArrayRange;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
 import static com.facebook.presto.spi.block.BlockUtil.compactArray;
 import static com.facebook.presto.spi.block.BlockUtil.compactOffsets;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 
 public abstract class AbstractArrayBlock
         implements Block
@@ -44,6 +45,10 @@ public abstract class AbstractArrayBlock
     public Block copyPositions(int[] positions, int offset, int length)
     {
         checkArrayRange(positions, offset, length);
+
+        if (offset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
 
         int[] newOffsets = new int[length + 1];
         boolean[] newValueIsNull = new boolean[length];
@@ -83,6 +88,10 @@ public abstract class AbstractArrayBlock
             return this;
         }
 
+        if (position == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         return new ArrayBlock(
                 position + getOffsetBase(),
                 length,
@@ -108,6 +117,10 @@ public abstract class AbstractArrayBlock
     {
         int positionCount = getPositionCount();
         checkValidRegion(positionCount, position, length);
+
+        if (position == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
 
         int startValueOffset = getOffset(position);
         int endValueOffset = getOffset(position + length);

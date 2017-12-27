@@ -23,6 +23,7 @@ import java.util.function.BiConsumer;
 import static com.facebook.presto.spi.block.BlockUtil.calculateBlockResetSize;
 import static com.facebook.presto.spi.block.BlockUtil.checkArrayRange;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static java.lang.Math.max;
 
@@ -93,6 +94,9 @@ public class IntArrayBlockBuilder
     @Override
     public Block build()
     {
+        if (positionCount == 0) {
+            return EMPTY_BLOCK;
+        }
         return new IntArrayBlock(positionCount, valueIsNull, values);
     }
 
@@ -197,6 +201,10 @@ public class IntArrayBlockBuilder
     {
         checkArrayRange(positions, offset, length);
 
+        if (offset == 0) {
+            return EMPTY_BLOCK;
+        }
+
         boolean[] newValueIsNull = new boolean[length];
         int[] newValues = new int[length];
         for (int i = 0; i < length; i++) {
@@ -213,6 +221,10 @@ public class IntArrayBlockBuilder
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
 
+        if (positionOffset == 0) {
+            return EMPTY_BLOCK;
+        }
+
         return new IntArrayBlock(positionOffset, length, valueIsNull, values);
     }
 
@@ -220,6 +232,10 @@ public class IntArrayBlockBuilder
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
+
+        if (positionOffset == 0) {
+            return EMPTY_BLOCK;
+        }
 
         boolean[] newValueIsNull = Arrays.copyOfRange(valueIsNull, positionOffset, positionOffset + length);
         int[] newValues = Arrays.copyOfRange(values, positionOffset, positionOffset + length);

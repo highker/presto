@@ -24,6 +24,7 @@ import static com.facebook.presto.spi.block.BlockUtil.checkArrayRange;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidPosition;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
 import static com.facebook.presto.spi.block.BlockUtil.compactSlice;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 import static java.util.Objects.requireNonNull;
 
 public class FixedWidthBlock
@@ -98,6 +99,10 @@ public class FixedWidthBlock
     {
         checkArrayRange(positions, offset, length);
 
+        if (offset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         SliceOutput newSlice = Slices.allocate(length * fixedSize).getOutput();
         SliceOutput newValueIsNull = Slices.allocate(length).getOutput();
 
@@ -115,6 +120,10 @@ public class FixedWidthBlock
     {
         checkValidRegion(positionCount, positionOffset, length);
 
+        if (positionOffset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         Slice newSlice = slice.slice(positionOffset * fixedSize, length * fixedSize);
         Slice newValueIsNull = valueIsNull.slice(positionOffset, length);
         return new FixedWidthBlock(fixedSize, length, newSlice, newValueIsNull);
@@ -124,6 +133,10 @@ public class FixedWidthBlock
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(positionCount, positionOffset, length);
+
+        if (positionOffset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
 
         Slice newSlice = compactSlice(slice, positionOffset * fixedSize, length * fixedSize);
         Slice newValueIsNull = compactSlice(valueIsNull, positionOffset, length);

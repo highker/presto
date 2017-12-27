@@ -33,6 +33,7 @@ import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
 import static com.facebook.presto.spi.block.BlockUtil.compactArray;
 import static com.facebook.presto.spi.block.BlockUtil.compactOffsets;
 import static com.facebook.presto.spi.block.BlockUtil.compactSlice;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 import static io.airlift.slice.SizeOf.SIZE_OF_BYTE;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
@@ -139,6 +140,10 @@ public class VariableWidthBlockBuilder
     public Block copyPositions(int[] positions, int offset, int length)
     {
         checkArrayRange(positions, offset, length);
+
+        if (offset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
 
         int finalLength = stream(positions, offset, offset + length)
                 .map(this::getSliceLength)
@@ -290,6 +295,10 @@ public class VariableWidthBlockBuilder
         int positionCount = getPositionCount();
         checkValidRegion(positionCount, positionOffset, length);
 
+        if (positionOffset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         return new VariableWidthBlock(positionOffset, length, sliceOutput.slice(), offsets, valueIsNull);
     }
 
@@ -298,6 +307,10 @@ public class VariableWidthBlockBuilder
     {
         int positionCount = getPositionCount();
         checkValidRegion(positionCount, positionOffset, length);
+
+        if (positionOffset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
 
         int[] newOffsets = compactOffsets(offsets, positionOffset, length);
         boolean[] newValueIsNull = compactArray(valueIsNull, positionOffset, length);
@@ -311,6 +324,9 @@ public class VariableWidthBlockBuilder
     {
         if (currentEntrySize > 0) {
             throw new IllegalStateException("Current entry must be closed before the block can be built");
+        }
+        if (positions == 0) {
+            return EMPTY_BLOCK;
         }
         return new VariableWidthBlock(positions, sliceOutput.slice(), offsets, valueIsNull);
     }

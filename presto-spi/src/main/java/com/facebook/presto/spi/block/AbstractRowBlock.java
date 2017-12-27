@@ -18,6 +18,7 @@ import static com.facebook.presto.spi.block.BlockUtil.checkArrayRange;
 import static com.facebook.presto.spi.block.BlockUtil.checkValidRegion;
 import static com.facebook.presto.spi.block.BlockUtil.compactArray;
 import static com.facebook.presto.spi.block.BlockUtil.compactOffsets;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 
 public abstract class AbstractRowBlock
         implements Block
@@ -61,6 +62,10 @@ public abstract class AbstractRowBlock
     {
         checkArrayRange(positions, offset, length);
 
+        if (offset == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         int[] newOffsets = new int[length + 1];
         boolean[] newRowIsNull = new boolean[length];
 
@@ -94,6 +99,10 @@ public abstract class AbstractRowBlock
             return this;
         }
 
+        if (position == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
+
         return new RowBlock(position + getOffsetBase(), length, getRowIsNull(), getFieldBlockOffsets(), getFieldBlocks());
     }
 
@@ -119,6 +128,10 @@ public abstract class AbstractRowBlock
     {
         int positionCount = getPositionCount();
         checkValidRegion(positionCount, position, length);
+
+        if (position == 0 && length == 0) {
+            return EMPTY_BLOCK;
+        }
 
         int startFieldBlockOffset = getFieldBlockOffset(position);
         int endFieldBlockOffset = getFieldBlockOffset(position + length);

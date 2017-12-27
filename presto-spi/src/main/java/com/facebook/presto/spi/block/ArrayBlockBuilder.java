@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.function.BiConsumer;
 
 import static com.facebook.presto.spi.block.BlockUtil.calculateBlockResetSize;
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static java.lang.Math.max;
 import static java.util.Objects.requireNonNull;
@@ -231,10 +232,14 @@ public class ArrayBlockBuilder
     }
 
     @Override
-    public ArrayBlock build()
+    public Block build()
     {
         if (currentEntryOpened) {
             throw new IllegalStateException("Current entry must be closed before the block can be built");
+        }
+
+        if (positionCount == 0) {
+            return EMPTY_BLOCK;
         }
         return new ArrayBlock(positionCount, valueIsNull, offsets, values.build());
     }

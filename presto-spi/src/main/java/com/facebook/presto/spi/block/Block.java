@@ -17,6 +17,8 @@ import io.airlift.slice.Slice;
 
 import java.util.function.BiConsumer;
 
+import static com.facebook.presto.spi.block.EmptyBlock.EMPTY_BLOCK;
+
 public interface Block
 {
     /**
@@ -198,6 +200,9 @@ public interface Block
      */
     default Block getPositions(int[] positions)
     {
+        if (positions.length == 0) {
+            return EMPTY_BLOCK;
+        }
         return new DictionaryBlock(this, positions);
     }
 
