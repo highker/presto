@@ -19,6 +19,7 @@ import com.facebook.presto.spi.block.BlockEncodingFactory;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.block.ByteArrayBlockEncoding;
 import com.facebook.presto.spi.block.DictionaryBlockEncoding;
+import com.facebook.presto.spi.block.EmptyBlockEncoding;
 import com.facebook.presto.spi.block.FixedWidthBlockEncoding;
 import com.facebook.presto.spi.block.IntArrayBlockEncoding;
 import com.facebook.presto.spi.block.LongArrayBlockEncoding;
@@ -76,6 +77,7 @@ public final class BlockEncodingManager
         addBlockEncodingFactory(RowBlockEncoding.FACTORY);
         addBlockEncodingFactory(SingleRowBlockEncoding.FACTORY);
         addBlockEncodingFactory(RunLengthBlockEncoding.FACTORY);
+        addBlockEncodingFactory(EmptyBlockEncoding.FACTORY);
 
         for (BlockEncodingFactory<?> factory : requireNonNull(blockEncodingFactories, "blockEncodingFactories is null")) {
             addBlockEncodingFactory(factory);

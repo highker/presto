@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.List;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
@@ -79,6 +80,9 @@ public abstract class AbstractTestBlock
             for (Field field : fields) {
                 Class<?> type = field.getType();
                 if (type.isPrimitive()) {
+                    continue;
+                }
+                if (Modifier.isStatic(field.getModifiers())) {
                     continue;
                 }
 

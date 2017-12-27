@@ -54,6 +54,7 @@ public final class TestingBlockEncodingSerde
         addBlockEncodingFactory(ArrayBlockEncoding.FACTORY);
         addBlockEncodingFactory(MapBlockEncoding.FACTORY);
         addBlockEncodingFactory(SingleMapBlockEncoding.FACTORY);
+        addBlockEncodingFactory(EmptyBlockEncoding.FACTORY);
 
         for (BlockEncodingFactory<?> factory : requireNonNull(blockEncodingFactories, "blockEncodingFactories is null")) {
             addBlockEncodingFactory(factory);
