@@ -125,6 +125,51 @@ public class TestTopNRowNumberOperator
         assertOperatorEquals(operatorFactory, driverContext, input, expected);
     }
 
+    @Test(dataProvider = "hashEnabledValues")
+    public void testTopOneRowNumberPartitioned(boolean hashEnabled)
+            throws Exception
+    {
+        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(hashEnabled, Ints.asList(0), BIGINT, DOUBLE);
+        List<Page> input = rowPagesBuilder
+                .row(1L, 0.3)
+                .row(2L, 0.2)
+                .row(3L, 0.91)
+                .row(3L, 0.1)
+                .pageBreak()
+                .row(1L, 0.4)
+                .pageBreak()
+                .row(1L, 0.5)
+                .row(1L, 0.6)
+                .row(2L, 0.8)
+                .row(2L, 0.7)
+                .pageBreak()
+                .row(2L, 0.9)
+                .build();
+
+        TopNRowNumberOperatorFactory operatorFactory = new TopNRowNumberOperatorFactory(
+                0,
+                new PlanNodeId("test"),
+                ImmutableList.of(BIGINT, DOUBLE),
+                Ints.asList(1, 0),
+                Ints.asList(0),
+                ImmutableList.of(BIGINT),
+                Ints.asList(1),
+                ImmutableList.of(SortOrder.ASC_NULLS_LAST),
+                1,
+                false,
+                Optional.empty(),
+                10,
+                joinCompiler);
+
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), DOUBLE, BIGINT, BIGINT)
+                .row(0.3, 1L, 1L)
+                .row(0.2, 2L, 1L)
+                .row(0.1, 3L, 1L)
+                .build();
+
+        assertOperatorEquals(operatorFactory, driverContext, input, expected);
+    }
+
     @Test
     public void testTopNRowNumberUnPartitioned()
             throws Exception

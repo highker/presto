@@ -270,7 +270,12 @@ public class TopNRowNumberOperator
         for (int position = 0; position < page.getPositionCount(); position++) {
             long partitionId = groupByHash.isPresent() ? partitionIds.get().getGroupId(position) : 0;
             if (!partitionRows.containsKey(partitionId)) {
-                partitionRows.put(partitionId, new PartitionBuilder(sortTypes, sortChannels, sortOrders, maxRowCountPerPartition));
+                if (maxRowCountPerPartition == 1) {
+                    partitionRows.put(partitionId, new SingleValuePartitionBuilder());
+                }
+                else {
+                    partitionRows.put(partitionId, new MultiValuePartitionBuilder(sortTypes, sortChannels, sortOrders, maxRowCountPerPartition));
+                }
             }
             PartitionBuilder partitionBuilder = partitionRows.get(partitionId);
             if (partitionBuilder.getRowCount() < maxRowCountPerPartition) {
@@ -400,19 +405,34 @@ public class TopNRowNumberOperator
         return size;
     }
 
-    private static class PartitionBuilder
+    private interface PartitionBuilder
+    {
+        long replaceRow(Block[] row);
+
+        long addRow(Block[] row);
+
+        Iterator<Block[]> build();
+
+        int getRowCount();
+
+        Block[] peekLastRow();
+    }
+
+    private static class MultiValuePartitionBuilder
+            implements  PartitionBuilder
     {
         private final MinMaxPriorityQueue<Block[]> candidateRows;
         private final int maxRowCountPerPartition;
 
-        private PartitionBuilder(List<Type> sortTypes, List<Integer> sortChannels, List<SortOrder> sortOrders, int maxRowCountPerPartition)
+        private MultiValuePartitionBuilder(List<Type> sortTypes, List<Integer> sortChannels, List<SortOrder> sortOrders, int maxRowCountPerPartition)
         {
             this.maxRowCountPerPartition = maxRowCountPerPartition;
             Ordering<Block[]> comparator = Ordering.from(new RowComparator(sortTypes, sortChannels, sortOrders));
             this.candidateRows = MinMaxPriorityQueue.orderedBy(comparator).maximumSize(maxRowCountPerPartition).create();
         }
 
-        private long replaceRow(Block[] row)
+        @Override
+        public long replaceRow(Block[] row)
         {
             checkState(candidateRows.size() == maxRowCountPerPartition);
             Block[] previousRow = candidateRows.removeLast();
@@ -420,7 +440,8 @@ public class TopNRowNumberOperator
             return sizeDelta - sizeOfRow(previousRow);
         }
 
-        private long addRow(Block[] row)
+        @Override
+        public long addRow(Block[] row)
         {
             checkState(candidateRows.size() < maxRowCountPerPartition);
             long sizeDelta = sizeOfRow(row);
@@ -428,7 +449,8 @@ public class TopNRowNumberOperator
             return sizeDelta;
         }
 
-        private Iterator<Block[]> build()
+        @Override
+        public Iterator<Block[]> build()
         {
             ImmutableList.Builder<Block[]> sortedRows = ImmutableList.builder();
             while (!candidateRows.isEmpty()) {
@@ -437,14 +459,59 @@ public class TopNRowNumberOperator
             return sortedRows.build().iterator();
         }
 
-        private int getRowCount()
+        @Override
+        public int getRowCount()
         {
             return candidateRows.size();
         }
 
-        private Block[] peekLastRow()
+        @Override
+        public Block[] peekLastRow()
         {
             return candidateRows.peekLast();
+        }
+    }
+
+    private static class SingleValuePartitionBuilder
+            implements  PartitionBuilder
+    {
+        private Block[] candidateRow;
+
+        @Override
+        public long replaceRow(Block[] row)
+        {
+            checkState(candidateRow != null);
+            long sizeDelta = sizeOfRow(row) - sizeOfRow(candidateRow);
+            candidateRow = row;
+            return sizeDelta;
+        }
+
+        @Override
+        public long addRow(Block[] row)
+        {
+            checkState(candidateRow == null);
+            candidateRow = row;
+            return sizeOfRow(row);
+        }
+
+        @Override
+        public Iterator<Block[]> build()
+        {
+            checkState(candidateRow != null);
+            return ImmutableList.of(candidateRow).iterator();
+        }
+
+        @Override
+        public int getRowCount()
+        {
+            return candidateRow != null ? 1 : 0;
+        }
+
+        @Override
+        public Block[] peekLastRow()
+        {
+            checkState(candidateRow != null);
+            return candidateRow;
         }
     }
 
