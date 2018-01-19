@@ -1282,6 +1282,43 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void testDeleteFromPartitionedTable()
+    {
+        @Language("SQL") String createPartitionedTable = "" +
+                "CREATE TABLE test_delete_partitioned " +
+                "WITH (" +
+                "  partitioned_by = ARRAY['partition_bigint', 'partition_varchar']" +
+                ") AS " +
+                "SELECT * FROM (" +
+                "  VALUES " +
+                "    ('string1', 1, 'partition1')," +
+                "    ('string2', 1, 'partition2')," +
+                "    ('string3', 1, 'partition3')," +
+                "    ('string4', 2, 'partition1')," +
+                "    ('string5', 2, 'partition2')," +
+                "    ('string6', 2, 'partition3')" +
+                ") AS t(string_col, partition_bigint, partition_varchar)";
+
+        assertUpdate(createPartitionedTable, 6);
+
+        // delete with simple predicate
+        assertUpdate("DELETE FROM test_delete_partitioned where partition_bigint * 100 > 100 or string_col is not null");
+        MaterializedResult result = computeActual("SELECT * from test_delete_partitioned");
+        assertEquals(result.getRowCount(), 3);
+        System.out.println("first delete done");
+
+        // delete with complicated predicate
+        assertUpdate("DELETE FROM test_delete_partitioned where partition_varchar like '_artit%'");
+        result = computeActual("SELECT * from test_delete_partitioned");
+        assertEquals(result.getRowCount(), 3);
+        System.out.println("second delete done");
+
+        assertUpdate("DROP TABLE test_delete_partitioned");
+
+        assertFalse(getQueryRunner().tableExists(getSession(), "test_delete_partitioned"));
+    }
+
+    @Test
     public void testDeleteFromUnpartitionedTable()
     {
         assertUpdate("CREATE TABLE test_delete_unpartitioned AS SELECT orderstatus FROM tpch.tiny.orders", "SELECT count(*) from orders");

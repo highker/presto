@@ -208,10 +208,25 @@ public class HivePartitionManager
         }
         Map<ColumnHandle, NullableValue> values = builder.build();
 
+        System.out.println(constraint.predicate());
+        for (Map.Entry<ColumnHandle, NullableValue> entry : values.entrySet()) {
+            String value = "NULL";
+            if (!entry.getValue().isNull()) {
+                if (entry.getValue().getValue() instanceof Slice) {
+                    value = ((Slice) entry.getValue().getValue()).toStringUtf8();
+                }
+                else {
+                    value = (entry.getValue().getValue()).toString();
+                }
+            }
+            System.out.println(((HiveColumnHandle) entry.getKey()).getName() + " --> " + value);
+        }
         if (!constraint.predicate().test(values)) {
+            System.out.println("didn't pass test");
             return Optional.empty();
         }
 
+        System.out.println("pass test");
         return Optional.of(values);
     }
 

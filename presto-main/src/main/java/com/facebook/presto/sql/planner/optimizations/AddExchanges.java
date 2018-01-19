@@ -675,6 +675,7 @@ public class AddExchanges
                 }
                 ExpressionInterpreter optimizer = ExpressionInterpreter.expressionOptimizer(expression, metadata, session, expressionTypes);
                 Object optimized = optimizer.optimize(inputs);
+                System.out.println(expression.toString() + " --> " + optimized);
                 if (Boolean.FALSE.equals(optimized) || optimized == null || optimized instanceof NullLiteral) {
                     return true;
                 }
