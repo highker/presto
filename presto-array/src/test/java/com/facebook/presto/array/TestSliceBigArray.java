@@ -98,4 +98,18 @@ public class TestSliceBigArray
         sliceBigArray.set(2, wrappedBuffer(secondBytes, 201, 1501));
         assertEquals(sliceBigArray.sizeOf(), BIG_ARRAY_INSTANCE_SIZE + sizeOf(secondBytes) + SLICE_INSTANCE_SIZE * 4);
     }
+
+    @Test
+    public void testStress()
+    {
+        int samples = 1_000_000_000;
+        sliceBigArray = new SliceBigArray();
+        for (int i = 0; i < samples; i++) {
+            if (i % (samples / 100) == 0) {
+                System.out.println("progress: " + (i / (samples / 100)) + "%; size: " + sliceBigArray.sizeOf());
+            }
+            sliceBigArray.ensureCapacity(i + 1);
+            sliceBigArray.set(i, wrappedBuffer(firstBytes, 0, 100));
+        }
+    }
 }
