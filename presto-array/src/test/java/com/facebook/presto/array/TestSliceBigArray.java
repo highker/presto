@@ -18,6 +18,8 @@ import org.openjdk.jol.info.ClassLayout;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.airlift.slice.Slices.wrappedBuffer;
 import static org.testng.Assert.assertEquals;
@@ -97,5 +99,20 @@ public class TestSliceBigArray
         sliceBigArray.set(0, wrappedBuffer(secondBytes, 11, 1200));
         sliceBigArray.set(2, wrappedBuffer(secondBytes, 201, 1501));
         assertEquals(sliceBigArray.sizeOf(), BIG_ARRAY_INSTANCE_SIZE + sizeOf(secondBytes) + SLICE_INSTANCE_SIZE * 4);
+    }
+
+    @Test
+    public void testStress()
+    {
+        int samples = 100_000_000;
+        sliceBigArray = new SliceBigArray();
+        for (int i = 0; i < samples; i++) {
+            if (i % (samples / 100) == 0) {
+                System.out.println("progress: " + (i / (samples / 100)) + "%; size: " + sliceBigArray.sizeOf());
+            }
+            sliceBigArray.ensureCapacity(i + 1);
+            // byte[] firstBytes = new byte[ (int) Math.abs(ThreadLocalRandom.current().nextGaussian() * 1000) + 1];
+            sliceBigArray.set(i, wrappedBuffer(firstBytes, 0, firstBytes.length));
+        }
     }
 }
