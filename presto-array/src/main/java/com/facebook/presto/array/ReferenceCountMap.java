@@ -14,39 +14,40 @@
 package com.facebook.presto.array;
 
 import io.airlift.slice.SizeOf;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenCustomHashMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import org.openjdk.jol.info.ClassLayout;
 
+// This class tracks how many times an objects have been referenced
+// in order not to over count memory in complex objects such as SliceBigArray or BlockBigArray.
+// Ideally the key set should be the object references themselves.
+// But it turns out such implementation can lead to GC performance issues.
+// With several attempts including breaking down the object arrays into object big arrays,
+// the problem can be solved but tracking overhead is still high.
+// Benchmark results show using hash maps with primitive arrays perform way better than object arrays.
+// Therefore, we use identity hash code + size of an object to identify an object.
+// This may lead to hash collision but neglectable.
 public final class ReferenceCountMap
-        extends Object2IntOpenCustomHashMap<Object>
+        extends Long2IntOpenHashMap
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ReferenceCountMap.class).instanceSize();
 
     /**
-     * Two different blocks can share the same underlying data
-     * Use the map to avoid memory over counting
-     */
-    public ReferenceCountMap()
-    {
-        super(new ObjectStrategy());
-    }
-
-    /**
      * Increments the reference count of an object by 1 and returns the updated reference count
      */
-    public int incrementAndGet(Object key)
+    public int incrementAndGet(Object key, int size)
     {
-        return addTo(key, 1) + 1;
+        return addTo(getHashCode(key, size), 1) + 1;
     }
 
     /**
      * Decrements the reference count of an object by 1 and returns the updated reference count
      */
-    public int decrementAndGet(Object key)
+    public int decrementAndGet(Object key, int size)
     {
-        int previousCount = addTo(key, -1);
+        long hashCode = getHashCode(key, size);
+        int previousCount = addTo(hashCode, -1);
         if (previousCount == 1) {
-            remove(key);
+            remove(hashCode);
         }
         return previousCount - 1;
     }
@@ -59,19 +60,10 @@ public final class ReferenceCountMap
         return INSTANCE_SIZE + SizeOf.sizeOf(key) + SizeOf.sizeOf(value) + SizeOf.sizeOf(used);
     }
 
-    private static final class ObjectStrategy
-            implements Strategy<Object>
+    private static long getHashCode(Object key, int size)
     {
-        @Override
-        public int hashCode(Object object)
-        {
-            return System.identityHashCode(object);
-        }
-
-        @Override
-        public boolean equals(Object left, Object right)
-        {
-            return left == right;
-        }
+        // identityHashCode does not guarantee the uniqueness of an object.
+        // Use size as an extra identity.
+        return (((long) System.identityHashCode(key)) << Integer.SIZE) + size;
     }
 }

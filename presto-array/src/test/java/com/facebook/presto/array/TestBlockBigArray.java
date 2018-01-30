@@ -44,7 +44,7 @@ public class TestBlockBigArray
         }
 
         ReferenceCountMap referenceCountMap = new ReferenceCountMap();
-        referenceCountMap.incrementAndGet(block);
+        referenceCountMap.incrementAndGet(block, (int) block.getRetainedSizeInBytes());
         long expectedSize = ClassLayout.parseClass(BlockBigArray.class).instanceSize()
                 + referenceCountMap.sizeOf()
                 + (new ObjectBigArray()).sizeOf()

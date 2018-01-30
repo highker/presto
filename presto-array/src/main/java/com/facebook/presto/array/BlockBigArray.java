@@ -67,7 +67,7 @@ public final class BlockBigArray
                     sizeOfBlocks -= size;
                     return;
                 }
-                if (trackedObjects.decrementAndGet(object) == 0) {
+                if (trackedObjects.decrementAndGet(object, (int) size.longValue()) == 0) {
                     // decrement the size only when it is the last reference
                     sizeOfBlocks -= size;
                 }
@@ -80,7 +80,7 @@ public final class BlockBigArray
                     sizeOfBlocks += size;
                     return;
                 }
-                if (trackedObjects.incrementAndGet(object) == 1) {
+                if (trackedObjects.incrementAndGet(object, (int) size.longValue()) == 1) {
                     // increment the size only when it is the first reference
                     sizeOfBlocks += size;
                 }

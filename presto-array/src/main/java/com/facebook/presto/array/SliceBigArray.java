@@ -77,8 +77,8 @@ public final class SliceBigArray
     {
         Slice currentValue = array.get(index);
         if (currentValue != null) {
-            int baseReferenceCount = trackedSlices.decrementAndGet(currentValue.getBase());
-            int sliceReferenceCount = trackedSlices.decrementAndGet(currentValue);
+            int baseReferenceCount = trackedSlices.decrementAndGet(currentValue.getBase(), getSliceBaseSize(currentValue));
+            int sliceReferenceCount = trackedSlices.decrementAndGet(currentValue, (int) currentValue.getRetainedSize());
             if (baseReferenceCount == 0) {
                 // it is the last referenced base
                 sizeOfSlices -= currentValue.getRetainedSize();
@@ -89,8 +89,8 @@ public final class SliceBigArray
             }
         }
         if (value != null) {
-            int baseReferenceCount = trackedSlices.incrementAndGet(value.getBase());
-            int sliceReferenceCount = trackedSlices.incrementAndGet(value);
+            int baseReferenceCount = trackedSlices.incrementAndGet(value.getBase(), getSliceBaseSize(value));
+            int sliceReferenceCount = trackedSlices.incrementAndGet(value, (int) value.getRetainedSize());
             if (baseReferenceCount == 1) {
                 // it is the first referenced base
                 sizeOfSlices += value.getRetainedSize();
@@ -100,5 +100,14 @@ public final class SliceBigArray
                 sizeOfSlices += SLICE_INSTANCE_SIZE;
             }
         }
+    }
+
+    private static int getSliceBaseSize(Slice slice)
+    {
+        Object base = slice.getBase();
+        if (base != null && base instanceof byte[]) {
+            return ((byte[]) base).length;
+        }
+        return 0;
     }
 }
