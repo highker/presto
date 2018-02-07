@@ -339,6 +339,7 @@ public class QueryMonitor
                     max(finishing, 0),
                     queryStartTime,
                     queryEndTime);
+            log.info("CPU time: " + queryInfo.getQueryStats().getTotalCpuTime().toMillis());
         }
         catch (Exception e) {
             log.error(e, "Error logging query timeline");
