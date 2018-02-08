@@ -196,6 +196,7 @@ public class TestInterpretedPageFilterFunction
     private static void assertFilter(String expression, boolean expectedValue)
     {
         InterpretedPageFilter filterFunction = new InterpretedPageFilter(
+                null,
                 createExpression(expression, METADATA, ImmutableMap.of()),
                 ImmutableMap.of(),
                 ImmutableMap.of(),

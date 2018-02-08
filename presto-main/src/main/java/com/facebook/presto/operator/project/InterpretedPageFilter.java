@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableMap;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 
@@ -40,12 +41,15 @@ import static java.util.Collections.emptyList;
 public class InterpretedPageFilter
         implements PageFilter
 {
+    private final PageFilter compilePageFiler;
+    private Method filter;
     private final ExpressionInterpreter evaluator;
     private final InputChannels inputChannels;
     private final boolean deterministic;
     private boolean[] selectedPositions = new boolean[0];
 
     public InterpretedPageFilter(
+            PageFilter compilePageFiler,
             Expression expression,
             Map<Symbol, Type> symbolTypes,
             Map<Symbol, Integer> symbolToInputMappings,
@@ -53,6 +57,13 @@ public class InterpretedPageFilter
             SqlParser sqlParser,
             Session session)
     {
+        this.compilePageFiler = compilePageFiler;
+        try {
+            this.filter = compilePageFiler.getClass().getDeclaredMethod("filter", ConnectorSession.class, Page.class, int.class);
+        }
+        catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
         SymbolToInputParameterRewriter rewriter = new SymbolToInputParameterRewriter(symbolTypes, symbolToInputMappings);
         Expression rewritten = rewriter.rewrite(expression);
         this.inputChannels = new InputChannels(rewriter.getInputChannels());
@@ -89,14 +100,19 @@ public class InterpretedPageFilter
         }
 
         for (int position = 0; position < page.getPositionCount(); position++) {
-            selectedPositions[position] = filter(page, position);
+            selectedPositions[position] = filter(page, position, session);
         }
 
         return PageFilter.positionsArrayToSelectedPositions(selectedPositions, page.getPositionCount());
     }
 
-    private boolean filter(Page page, int position)
+    private boolean filter(Page page, int position, ConnectorSession session)
     {
-        return TRUE.equals(evaluator.evaluate(position, page.getBlocks()));
+        try {
+            return TRUE.equals(filter.invoke(compilePageFiler, session, page, position));
+        }
+        catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
 }

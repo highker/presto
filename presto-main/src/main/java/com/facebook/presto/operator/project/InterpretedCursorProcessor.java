@@ -30,16 +30,16 @@ import com.google.common.collect.ImmutableMap;
 
 import javax.annotation.Nullable;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.function.Supplier;
 
 import static com.facebook.presto.spi.type.TypeUtils.writeNativeValue;
 import static com.facebook.presto.sql.analyzer.ExpressionAnalyzer.getExpressionTypesFromInput;
 import static com.facebook.presto.sql.planner.ExpressionInterpreter.expressionInterpreter;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.lang.Boolean.TRUE;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
@@ -47,12 +47,13 @@ public class InterpretedCursorProcessor
         implements CursorProcessor
 {
     @Nullable
-    private final ExpressionInterpreter filter;
-    private final List<ExpressionInterpreter> projections;
+    private Method filter;
+    private final Method[] projections;
     private final List<Type> types;
+    private final CursorProcessor cursorProcessor;
 
     public InterpretedCursorProcessor(
-            Optional<Expression> filter,
+            Supplier<CursorProcessor> cursorProcessorSupplier,
             List<Expression> projections,
             Map<Symbol, Type> symbolTypes,
             Map<Symbol, Integer> symbolToInputMappings,
@@ -60,13 +61,28 @@ public class InterpretedCursorProcessor
             SqlParser sqlParser,
             Session session)
     {
-        this.filter = filter.map(expression -> getExpressionInterpreter(expression, symbolTypes, symbolToInputMappings, metadata, sqlParser, session)).orElse(null);
-        this.projections = projections.stream()
+        cursorProcessor = cursorProcessorSupplier.get();
+        try {
+            this.filter = cursorProcessor.getClass().getDeclaredMethod("filter", ConnectorSession.class, RecordCursor.class);
+        }
+        catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+        List<ExpressionInterpreter> projectionInterpreters = projections.stream()
                 .map(expression -> getExpressionInterpreter(expression, symbolTypes, symbolToInputMappings, metadata, sqlParser, session))
                 .collect(toImmutableList());
-        this.types = this.projections.stream()
+        this.types = projectionInterpreters.stream()
                 .map(ExpressionInterpreter::getType)
                 .collect(toImmutableList());
+        this.projections = new Method[projectionInterpreters.size()];
+        try {
+            for (int i = 0; i < this.projections.length; i++) {
+                this.projections[i] = cursorProcessor.getClass().getDeclaredMethod("project_" + i + "_value", ConnectorSession.class, RecordCursor.class);
+            }
+        }
+        catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private static ExpressionInterpreter getExpressionInterpreter(
@@ -108,25 +124,34 @@ public class InterpretedCursorProcessor
                 return new CursorProcessorOutput(position, true);
             }
 
-            if (filter(cursor)) {
+            if (filter(cursor, session)) {
                 pageBuilder.declarePosition();
-                for (int channel = 0; channel < projections.size(); channel++) {
-                    project(cursor, channel, pageBuilder);
+                for (int channel = 0; channel < projections.length; channel++) {
+                    project(cursor, channel, session, pageBuilder);
                 }
             }
             position++;
         }
     }
 
-    private boolean filter(RecordCursor cursor)
+    private boolean filter(RecordCursor cursor, ConnectorSession session)
     {
-        return filter == null || TRUE.equals(filter.evaluate(cursor));
+        try {
+            return filter == null || (boolean) filter.invoke(cursorProcessor, session, cursor);
+        }
+        catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    private void project(RecordCursor cursor, int channel, PageBuilder pageBuilder)
+    private void project(RecordCursor cursor, int channel, ConnectorSession session, PageBuilder pageBuilder)
     {
-        ExpressionInterpreter projection = projections.get(channel);
-        Object value = projection.evaluate(cursor);
-        writeNativeValue(types.get(channel), pageBuilder.getBlockBuilder(channel), value);
+        try {
+            Object value = projections[channel].invoke(cursorProcessor, session, cursor);
+            writeNativeValue(types.get(channel), pageBuilder.getBlockBuilder(channel), value);
+        }
+        catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
     }
 }

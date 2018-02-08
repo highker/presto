@@ -56,21 +56,13 @@ public class PageProcessor
 
     public PageProcessor(Optional<PageFilter> filter, List<? extends PageProjection> projections)
     {
-        this.filter = requireNonNull(filter, "filter is null")
-                .map(pageFilter -> {
-                    if (pageFilter.getInputChannels().size() == 1 && pageFilter.isDeterministic()) {
-                        return new DictionaryAwarePageFilter(pageFilter);
-                    }
-                    return pageFilter;
-                });
-        this.projections = requireNonNull(projections, "projections is null").stream()
-                .map(projection -> {
-                    if (projection.getInputChannels().size() == 1 && projection.isDeterministic()) {
-                        return new DictionaryAwarePageProjection(projection, dictionarySourceIdFunction);
-                    }
-                    return projection;
-                })
-                .collect(toImmutableList());
+        this.filter = filter;
+        this.projections = requireNonNull(projections, "projections is null").stream().collect(toImmutableList());
+    }
+
+    public PageFilter getFilter()
+    {
+        return filter.orElse(null);
     }
 
     public PageProcessorOutput process(ConnectorSession session, DriverYieldSignal yieldSignal, Page page)

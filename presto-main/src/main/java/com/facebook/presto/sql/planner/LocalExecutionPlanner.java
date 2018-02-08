@@ -58,7 +58,6 @@ import com.facebook.presto.operator.RowNumberOperator;
 import com.facebook.presto.operator.ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory;
 import com.facebook.presto.operator.SetBuilderOperator.SetBuilderOperatorFactory;
 import com.facebook.presto.operator.SetBuilderOperator.SetSupplier;
-import com.facebook.presto.operator.SourceOperatorFactory;
 import com.facebook.presto.operator.TableScanOperator.TableScanOperatorFactory;
 import com.facebook.presto.operator.TaskContext;
 import com.facebook.presto.operator.TaskOutputOperator.TaskOutputFactory;
@@ -1125,74 +1124,49 @@ public class LocalExecutionPlanner
                     .map(expression -> toRowExpression(expression, expressionTypes))
                     .collect(toImmutableList());
 
+            Supplier<CursorProcessor> cursorProcessorSupplier;
+            Supplier<PageProcessor> pageProcessorSupplier = () -> null;
             try {
                 if (columns != null) {
-                    Supplier<CursorProcessor> cursorProcessor = expressionCompiler.compileCursorProcessor(translatedFilter, translatedProjections, sourceNode.getId());
-                    Supplier<PageProcessor> pageProcessor = expressionCompiler.compilePageProcessor(translatedFilter, translatedProjections, Optional.of(context.getStageId() + "_" + planNodeId));
-
-                    SourceOperatorFactory operatorFactory = new ScanFilterAndProjectOperatorFactory(
-                            context.getNextOperatorId(),
-                            planNodeId,
-                            sourceNode.getId(),
-                            pageSourceProvider,
-                            cursorProcessor,
-                            pageProcessor,
-                            columns,
-                            getTypes(rewrittenProjections, expressionTypes),
-                            getFilterAndProjectMinOutputPageSize(session),
-                            getFilterAndProjectMinOutputPageRowCount(session));
-
-                    return new PhysicalOperation(operatorFactory, outputMappings, groupEnumerable ? GROUPED_EXECUTION : UNGROUPED_EXECUTION);
+                    cursorProcessorSupplier = expressionCompiler.compileCursorProcessor(translatedFilter, translatedProjections, sourceNode.getId());
+                    pageProcessorSupplier = expressionCompiler.compilePageProcessor(translatedFilter, translatedProjections, Optional.of(context.getStageId() + "_" + planNodeId));
                 }
                 else {
-                    Supplier<PageProcessor> pageProcessor = expressionCompiler.compilePageProcessor(translatedFilter, translatedProjections, Optional.of(context.getStageId() + "_" + planNodeId));
-
-                    OperatorFactory operatorFactory = new FilterAndProjectOperator.FilterAndProjectOperatorFactory(
-                            context.getNextOperatorId(),
-                            planNodeId,
-                            pageProcessor,
-                            getTypes(rewrittenProjections, expressionTypes),
-                            getFilterAndProjectMinOutputPageSize(session),
-                            getFilterAndProjectMinOutputPageRowCount(session));
-
-                    return new PhysicalOperation(operatorFactory, outputMappings, source);
+                    cursorProcessorSupplier = () -> null;
+                    pageProcessorSupplier = expressionCompiler.compilePageProcessor(translatedFilter, translatedProjections, Optional.of(context.getStageId() + "_" + planNodeId));
                 }
             }
             catch (RuntimeException e) {
-                if (!interpreterEnabled) {
-                    throw new PrestoException(COMPILER_ERROR, "Compiler failed and interpreter is disabled", e);
-                }
-
-                // compilation failed, use interpreter
-                log.error(e, "Compile failed for filter=%s projections=%s sourceTypes=%s error=%s", filterExpression, assignments, sourceTypes, e);
+                throw new PrestoException(COMPILER_ERROR, "Compiler failed and interpreter is disabled", e);
             }
 
-            PageProcessor pageProcessor = createInterpretedColumnarPageProcessor(
-                    filterExpression,
-                    outputSymbols.stream()
-                            .map(assignments::get)
-                            .collect(toImmutableList()),
-                    context.getTypes(),
-                    sourceLayout,
-                    context.getSession());
+            PageProcessor compiledProcessor = pageProcessorSupplier.get();
             if (columns != null) {
-                InterpretedCursorProcessor cursorProcessor = new InterpretedCursorProcessor(
-                        filterExpression,
-                        outputSymbols.stream()
-                                .map(assignments::get)
-                                .collect(toImmutableList()),
-                        context.getTypes(),
-                        sourceLayout,
-                        metadata,
-                        sqlParser,
-                        context.getSession());
                 OperatorFactory operatorFactory = new ScanFilterAndProjectOperatorFactory(
                         context.getNextOperatorId(),
                         planNodeId,
                         sourceNode.getId(),
                         pageSourceProvider,
-                        () -> cursorProcessor,
-                        () -> pageProcessor,
+                        () -> new InterpretedCursorProcessor(
+                                cursorProcessorSupplier,
+                                outputSymbols.stream()
+                                        .map(assignments::get)
+                                        .collect(toImmutableList()),
+                                context.getTypes(),
+                                sourceLayout,
+                                metadata,
+                                sqlParser,
+                                context.getSession()),
+                        () -> createInterpretedColumnarPageProcessor(
+                                compiledProcessor.getFilter(),
+                                compiledProcessor.getProjections(),
+                                filterExpression,
+                                outputSymbols.stream()
+                                        .map(assignments::get)
+                                        .collect(toImmutableList()),
+                                context.getTypes(),
+                                sourceLayout,
+                                context.getSession()),
                         columns,
                         getTypes(rewrittenProjections, expressionTypes),
                         getFilterAndProjectMinOutputPageSize(session),
@@ -1204,7 +1178,16 @@ public class LocalExecutionPlanner
                 OperatorFactory operatorFactory = new FilterAndProjectOperator.FilterAndProjectOperatorFactory(
                         context.getNextOperatorId(),
                         planNodeId,
-                        () -> pageProcessor,
+                        () -> createInterpretedColumnarPageProcessor(
+                                compiledProcessor.getFilter(),
+                                compiledProcessor.getProjections(),
+                                filterExpression,
+                                outputSymbols.stream()
+                                        .map(assignments::get)
+                                        .collect(toImmutableList()),
+                                context.getTypes(),
+                                sourceLayout,
+                                context.getSession()),
                         getTypes(rewrittenProjections, expressionTypes),
                         getFilterAndProjectMinOutputPageSize(session),
                         getFilterAndProjectMinOutputPageRowCount(session));
@@ -1213,18 +1196,26 @@ public class LocalExecutionPlanner
         }
 
         private PageProcessor createInterpretedColumnarPageProcessor(
+                PageFilter compiledFilter,
+                List<PageProjection> compiledProjections,
                 Optional<Expression> filter,
                 List<Expression> projections,
                 Map<Symbol, Type> symbolTypes,
                 Map<Symbol, Integer> symbolToInputMappings,
                 Session session)
         {
-            Optional<PageFilter> pageFilter = filter
-                    .map(expression -> new InterpretedPageFilter(expression, symbolTypes, symbolToInputMappings, metadata, sqlParser, session));
-            List<PageProjection> pageProjections = projections.stream()
-                    .map(expression -> new InterpretedPageProjection(expression, symbolTypes, symbolToInputMappings, metadata, sqlParser, session))
-                    .collect(toImmutableList());
-            return new PageProcessor(pageFilter, pageProjections);
+            Optional<PageFilter> pageFilter;
+            if (compiledFilter == null) {
+                pageFilter = Optional.empty();
+            }
+            else {
+                pageFilter = filter.map(expression -> new InterpretedPageFilter(compiledFilter, expression, symbolTypes, symbolToInputMappings, metadata, sqlParser, session));
+            }
+            ImmutableList.Builder<PageProjection> pageProjections = ImmutableList.builder();
+            for (int i = 0; i < projections.size(); i++) {
+                pageProjections.add(new InterpretedPageProjection(compiledProjections.get(i), projections.get(i), symbolTypes, symbolToInputMappings, metadata, sqlParser, session));
+            }
+            return new PageProcessor(pageFilter, pageProjections.build());
         }
 
         private RowExpression toRowExpression(Expression expression, Map<NodeRef<Expression>, Type> types)

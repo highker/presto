@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.operator.project;
 
-import com.facebook.presto.operator.CompletedWork;
 import com.facebook.presto.operator.DriverYieldSignal;
 import com.facebook.presto.operator.Work;
 import com.facebook.presto.spi.ConnectorSession;
@@ -66,6 +65,39 @@ public class InputPageProjection
         else {
             result = block.getRegion(selectedPositions.getOffset(), selectedPositions.size());
         }
-        return new CompletedWork<>(result);
+        return new CompletedWork(result);
+    }
+
+    public final class CompletedWork
+            implements Work<Block>
+    {
+        private final Block result;
+
+        public CompletedWork(Block value)
+        {
+            this.result = requireNonNull(value);
+        }
+
+        public Type getType()
+        {
+            return type;
+        }
+
+        @Override
+        public boolean process()
+        {
+            return true;
+        }
+
+        @Override
+        public Block getResult()
+        {
+            return result;
+        }
+
+        public long evaluate_value(ConnectorSession session, Page page, int position)
+        {
+            return result.getLong(position, 0);
+        }
     }
 }

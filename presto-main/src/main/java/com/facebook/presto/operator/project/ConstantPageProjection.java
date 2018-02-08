@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.operator.project;
 
-import com.facebook.presto.operator.CompletedWork;
 import com.facebook.presto.operator.DriverYieldSignal;
 import com.facebook.presto.operator.Work;
 import com.facebook.presto.spi.ConnectorSession;
@@ -26,6 +25,7 @@ import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 
 import static com.facebook.presto.spi.type.TypeUtils.writeNativeValue;
+import static java.util.Objects.requireNonNull;
 
 public class ConstantPageProjection
         implements PageProjection
@@ -64,6 +64,34 @@ public class ConstantPageProjection
     @Override
     public Work<Block> project(ConnectorSession session, DriverYieldSignal yieldSignal, Page page, SelectedPositions selectedPositions)
     {
-        return new CompletedWork<>(new RunLengthEncodedBlock(value, selectedPositions.size()));
+        return new CompletedWork(new RunLengthEncodedBlock(value, selectedPositions.size()));
+    }
+
+    private final class CompletedWork
+            implements Work<Block>
+    {
+        private final Block result;
+
+        public CompletedWork(Block value)
+        {
+            this.result = requireNonNull(value);
+        }
+
+        @Override
+        public boolean process()
+        {
+            return true;
+        }
+
+        @Override
+        public Block getResult()
+        {
+            return result;
+        }
+
+        public Object evaluate_value(ConnectorSession session, Page page, int position)
+        {
+            return result.getObject(position, type.getJavaType());
+        }
     }
 }

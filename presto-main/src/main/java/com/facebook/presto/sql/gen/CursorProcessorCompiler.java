@@ -48,6 +48,7 @@ import io.airlift.slice.Slice;
 import java.util.List;
 import java.util.Set;
 
+import static com.facebook.presto.sql.gen.BytecodeUtils.boxPrimitiveIfNecessary;
 import static com.facebook.presto.sql.gen.BytecodeUtils.generateWrite;
 import static com.facebook.presto.sql.gen.LambdaAndTryExpressionExtractor.extractLambdaAndTryExpressions;
 import static io.airlift.bytecode.Access.PUBLIC;
@@ -84,6 +85,7 @@ public class CursorProcessorCompiler
             String methodName = "project_" + i;
             PreGeneratedExpressions projectPreGeneratedExpressions = generateMethodsForLambdaAndTry(classDefinition, callSiteBinder, cachedInstanceBinder, projections.get(i), methodName);
             generateProjectMethod(classDefinition, callSiteBinder, cachedInstanceBinder, projectPreGeneratedExpressions, methodName, projections.get(i));
+            generateProjectValueMethod(classDefinition, callSiteBinder, cachedInstanceBinder, projectPreGeneratedExpressions, methodName, projections.get(i));
         }
 
         MethodDefinition constructorDefinition = classDefinition.declareConstructor(a(PUBLIC));
@@ -298,6 +300,35 @@ public class CursorProcessorCompiler
                 .append(compiler.compile(projection, scope))
                 .append(generateWrite(callSiteBinder, scope, wasNullVariable, projection.getType()))
                 .ret();
+    }
+
+    private void generateProjectValueMethod(
+            ClassDefinition classDefinition,
+            CallSiteBinder callSiteBinder,
+            CachedInstanceBinder cachedInstanceBinder,
+            PreGeneratedExpressions preGeneratedExpressions,
+            String methodName,
+            RowExpression projection)
+    {
+        Parameter session = arg("session", ConnectorSession.class);
+        Parameter cursor = arg("cursor", RecordCursor.class);
+        MethodDefinition method = classDefinition.declareMethod(a(PUBLIC), methodName + "_value", type(Object.class), session, cursor);
+
+        Scope scope = method.getScope();
+        Variable wasNullVariable = scope.declareVariable(type(boolean.class), "wasNull");
+
+        RowExpressionCompiler compiler = new RowExpressionCompiler(
+                callSiteBinder,
+                cachedInstanceBinder,
+                fieldReferenceCompiler(cursor),
+                metadata.getFunctionRegistry(),
+                preGeneratedExpressions);
+
+        method.getBody()
+                .putVariable(wasNullVariable, false)
+                .append(compiler.compile(projection, scope))
+                .append(boxPrimitiveIfNecessary(scope, Primitives.wrap(projection.getType().getJavaType())))
+                .retObject();
     }
 
     private static RowExpressionVisitor<BytecodeNode, Scope> fieldReferenceCompiler(Variable cursorVariable)

@@ -857,6 +857,7 @@ public class LocalQueryRunner
             symbolTypes.put(symbol, columnTypes.get(channel));
             symbolToInputMapping.put(symbol, channel);
             projections.add(new InterpretedPageProjection(
+                    null,
                     new SymbolReference(symbol.getName()),
                     ImmutableMap.of(symbol, columnTypes.get(channel)),
                     ImmutableMap.of(symbol, channel),
@@ -868,6 +869,7 @@ public class LocalQueryRunner
         Optional<Expression> hashExpression = HashGenerationOptimizer.getHashExpression(ImmutableList.copyOf(symbolTypes.build().keySet()));
         verify(hashExpression.isPresent());
         projections.add(new InterpretedPageProjection(
+                null,
                 hashExpression.get(),
                 symbolTypes.build(),
                 symbolToInputMapping.build(),

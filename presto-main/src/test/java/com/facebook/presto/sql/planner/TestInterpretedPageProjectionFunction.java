@@ -206,6 +206,7 @@ public class TestInterpretedPageProjectionFunction
             Block... blocks)
     {
         InterpretedPageProjection projectionFunction = new InterpretedPageProjection(
+                null,
                 createExpression(expression, METADATA, symbolTypes),
                 symbolTypes,
                 symbolToInputMappings,

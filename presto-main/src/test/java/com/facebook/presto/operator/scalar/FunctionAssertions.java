@@ -867,6 +867,7 @@ public final class FunctionAssertions
     {
         Optional<PageFilter> pageFilter = filter
                 .map(expression -> new InterpretedPageFilter(
+                        null,
                         expression,
                         SYMBOL_TYPES,
                         INPUT_MAPPING,
@@ -874,7 +875,7 @@ public final class FunctionAssertions
                         SQL_PARSER,
                         session));
 
-        PageProjection pageProjection = new InterpretedPageProjection(projection, SYMBOL_TYPES, INPUT_MAPPING, metadata, SQL_PARSER, session);
+        PageProjection pageProjection = new InterpretedPageProjection(null, projection, SYMBOL_TYPES, INPUT_MAPPING, metadata, SQL_PARSER, session);
 
         PageProcessor processor = new PageProcessor(pageFilter, ImmutableList.of(pageProjection));
         OperatorFactory operatorFactory = new FilterAndProjectOperatorFactory(

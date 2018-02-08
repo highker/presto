@@ -32,6 +32,7 @@ import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.NodeRef;
 import com.google.common.collect.ImmutableMap;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 
@@ -44,12 +45,14 @@ import static java.util.Objects.requireNonNull;
 public class InterpretedPageProjection
         implements PageProjection
 {
+    private final PageProjection compiledProjection;
     private final ExpressionInterpreter evaluator;
     private final InputChannels inputChannels;
     private final boolean deterministic;
     private BlockBuilder blockBuilder;
 
     public InterpretedPageProjection(
+            PageProjection compiledProjection,
             Expression expression,
             Map<Symbol, Type> symbolTypes,
             Map<Symbol, Integer> symbolToInputMappings,
@@ -57,6 +60,7 @@ public class InterpretedPageProjection
             SqlParser sqlParser,
             Session session)
     {
+        this.compiledProjection = compiledProjection;
         SymbolToInputParameterRewriter rewriter = new SymbolToInputParameterRewriter(symbolTypes, symbolToInputMappings);
         Expression rewritten = rewriter.rewrite(expression);
         this.inputChannels = new InputChannels(rewriter.getInputChannels());
@@ -96,25 +100,41 @@ public class InterpretedPageProjection
     @Override
     public Work<Block> project(ConnectorSession session, DriverYieldSignal yieldSignal, Page page, SelectedPositions selectedPositions)
     {
-        return new InterpretedPageProjectionWork(yieldSignal, page, selectedPositions);
+        return new InterpretedPageProjectionWork(session, yieldSignal, page, selectedPositions);
     }
 
     private class InterpretedPageProjectionWork
             implements Work<Block>
     {
         private final DriverYieldSignal yieldSignal;
-        private final Block[] blocks;
+        private final Page page;
         private final SelectedPositions selectedPositions;
+        private final ConnectorSession session;
+        private final Method projection_object;
+        private final Work<Block> work;
 
         private int nextIndexOrPosition;
         private Block result;
 
-        public InterpretedPageProjectionWork(DriverYieldSignal yieldSignal, Page page, SelectedPositions selectedPositions)
+        public InterpretedPageProjectionWork(ConnectorSession session, DriverYieldSignal yieldSignal, Page page, SelectedPositions selectedPositions)
         {
             this.yieldSignal = requireNonNull(yieldSignal, "yieldSignal is null");
-            this.blocks = requireNonNull(page, "page is null").getBlocks();
+            this.page = requireNonNull(page, "page is null");
             this.selectedPositions = requireNonNull(selectedPositions, "selectedPositions is null");
             this.nextIndexOrPosition = selectedPositions.getOffset();
+            this.session = session;
+            try {
+                this.work = compiledProjection.project(session, yieldSignal, page, selectedPositions);
+                if (work instanceof InputPageProjection.CompletedWork) {
+                    this.projection_object = null;
+                }
+                else {
+                    this.projection_object = work.getClass().getDeclaredMethod("evaluate_value", ConnectorSession.class, Page.class, int.class);
+                }
+            }
+            catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
         }
 
         @Override
@@ -125,7 +145,19 @@ public class InterpretedPageProjection
             if (selectedPositions.isList()) {
                 int[] positions = selectedPositions.getPositions();
                 while (nextIndexOrPosition < length) {
-                    writeNativeValue(evaluator.getType(), blockBuilder, evaluator.evaluate(positions[nextIndexOrPosition], blocks));
+                    try {
+                        if (work instanceof InputPageProjection.CompletedWork) {
+                            InputPageProjection.CompletedWork inputWork = (InputPageProjection.CompletedWork) work;
+                            inputWork.getType().appendTo(inputWork.getResult(), positions[nextIndexOrPosition], blockBuilder);
+                        }
+                        else {
+                            Object value = projection_object.invoke(work, session, page, positions[nextIndexOrPosition]);
+                            writeNativeValue(evaluator.getType(), blockBuilder, value);
+                        }
+                    }
+                    catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
                     nextIndexOrPosition++;
                     if (yieldSignal.isSet()) {
                         return false;
@@ -134,7 +166,19 @@ public class InterpretedPageProjection
             }
             else {
                 while (nextIndexOrPosition < length) {
-                    writeNativeValue(evaluator.getType(), blockBuilder, evaluator.evaluate(nextIndexOrPosition, blocks));
+                    try {
+                        if (work instanceof InputPageProjection.CompletedWork) {
+                            InputPageProjection.CompletedWork inputWork = (InputPageProjection.CompletedWork) work;
+                            inputWork.getType().appendTo(inputWork.getResult(), nextIndexOrPosition, blockBuilder);
+                        }
+                        else {
+                            Object value = projection_object.invoke(work, session, page, nextIndexOrPosition);
+                            writeNativeValue(evaluator.getType(), blockBuilder, value);
+                        }
+                    }
+                    catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
                     nextIndexOrPosition++;
                     if (yieldSignal.isSet()) {
                         return false;

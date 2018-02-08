@@ -46,6 +46,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.primitives.Primitives;
 import io.airlift.bytecode.BytecodeBlock;
 import io.airlift.bytecode.BytecodeNode;
 import io.airlift.bytecode.ClassDefinition;
@@ -72,6 +73,7 @@ import java.util.function.Supplier;
 
 import static com.facebook.presto.operator.project.PageFieldsToInputParametersRewriter.rewritePageFieldsToInputParameters;
 import static com.facebook.presto.spi.StandardErrorCode.COMPILER_ERROR;
+import static com.facebook.presto.sql.gen.BytecodeUtils.boxPrimitiveIfNecessary;
 import static com.facebook.presto.sql.gen.BytecodeUtils.generateWrite;
 import static com.facebook.presto.sql.gen.BytecodeUtils.invoke;
 import static com.facebook.presto.sql.gen.LambdaAndTryExpressionExtractor.extractLambdaAndTryExpressions;
@@ -247,6 +249,7 @@ public class PageFunctionCompiler
         // evaluate
         PreGeneratedExpressions preGeneratedExpressions = generateMethodsForLambdaAndTry(classDefinition, callSiteBinder, cachedInstanceBinder, projection);
         generateEvaluateMethod(classDefinition, callSiteBinder, cachedInstanceBinder, preGeneratedExpressions, projection, blockBuilderField);
+        generateEvaluateValueMethod(classDefinition, callSiteBinder, cachedInstanceBinder, preGeneratedExpressions, projection, blockBuilderField);
 
         // constructor
         Parameter blockBuilder = arg("blockBuilder", BlockBuilder.class);
@@ -384,6 +387,49 @@ public class PageFunctionCompiler
                 .append(compiler.compile(projection, scope))
                 .append(generateWrite(callSiteBinder, scope, wasNullVariable, projection.getType()))
                 .ret();
+        return method;
+    }
+
+    private MethodDefinition generateEvaluateValueMethod(
+            ClassDefinition classDefinition,
+            CallSiteBinder callSiteBinder,
+            CachedInstanceBinder cachedInstanceBinder,
+            PreGeneratedExpressions preGeneratedExpressions,
+            RowExpression projection,
+            FieldDefinition blockBuilder)
+    {
+        Parameter session = arg("session", ConnectorSession.class);
+        Parameter page = arg("page", Page.class);
+        Parameter position = arg("position", int.class);
+
+        MethodDefinition method = classDefinition.declareMethod(
+                a(PUBLIC),
+                "evaluate_value",
+                type(Object.class),
+                ImmutableList.<Parameter>builder()
+                        .add(session)
+                        .add(page)
+                        .add(position)
+                        .build());
+
+        method.comment("Projection: %s", projection.toString());
+
+        Scope scope = method.getScope();
+        BytecodeBlock body = method.getBody();
+
+        declareBlockVariables(projection, page, scope, body);
+
+        Variable wasNullVariable = scope.declareVariable("wasNull", body, constantFalse());
+        RowExpressionCompiler compiler = new RowExpressionCompiler(
+                callSiteBinder,
+                cachedInstanceBinder,
+                fieldReferenceCompiler(callSiteBinder),
+                metadata.getFunctionRegistry(),
+                preGeneratedExpressions);
+
+        body.append(compiler.compile(projection, scope))
+                .append(boxPrimitiveIfNecessary(scope, Primitives.wrap(projection.getType().getJavaType())))
+                .retObject();
         return method;
     }
 
