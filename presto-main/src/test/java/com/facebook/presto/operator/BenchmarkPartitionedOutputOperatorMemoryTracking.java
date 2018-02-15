@@ -298,7 +298,6 @@ public class BenchmarkPartitionedOutputOperatorMemoryTracking
     {
         // assure the benchmarks are valid before running
         BenchmarkData data = new BenchmarkData();
-        new BenchmarkPartitionedOutputOperatorMemoryTracking().updateMemoryUsageInConstructor(data);
         new BenchmarkPartitionedOutputOperatorMemoryTracking().updateMemoryUsageInAddInput(data);
 
         Options options = new OptionsBuilder()

@@ -320,7 +320,7 @@ public class PartitionedOutputOperator
         return null;
     }
 
-    private static class PagePartitioner
+    private class PagePartitioner
     {
         private final OutputBuffer outputBuffer;
         private final List<Type> sourceTypes;
@@ -334,6 +334,8 @@ public class PartitionedOutputOperator
         private final AtomicLong rowsAdded = new AtomicLong();
         private final AtomicLong pagesAdded = new AtomicLong();
         private boolean hasAnyRowBeenReplicated;
+        private long[] partitionBuilderRetainedSizes;
+        private long builderRetainedSizeInBytes;
 
         public PagePartitioner(
                 PartitionFunction partitionFunction,
@@ -362,19 +364,18 @@ public class PartitionedOutputOperator
             pageSize = max(1, pageSize);
 
             this.pageBuilders = new PageBuilder[partitionCount];
+            this.partitionBuilderRetainedSizes = new long[partitionCount];
             for (int i = 0; i < partitionCount; i++) {
                 pageBuilders[i] = PageBuilder.withMaxPageSize(pageSize, sourceTypes);
+                partitionBuilderRetainedSizes[i] = pageBuilders[i].getRetainedSizeInBytes();
+                builderRetainedSizeInBytes += partitionBuilderRetainedSizes[i];
             }
         }
 
         // Does not include size of SharedBuffer
         public long getRetainedSizeInBytes()
         {
-            long retainedSizeInBytes = 0;
-            for (PageBuilder pageBuilder : pageBuilders) {
-                retainedSizeInBytes += pageBuilder.getRetainedSizeInBytes();
-            }
-            return retainedSizeInBytes;
+            return builderRetainedSizeInBytes;
         }
 
         public PartitionedOutputInfo getInfo()
@@ -432,10 +433,19 @@ public class PartitionedOutputOperator
         public ListenableFuture<?> flush(boolean force)
         {
             // add all full pages to output buffer
+            boolean shouldUpdateMemory = false;
             List<ListenableFuture<?>> blockedFutures = new ArrayList<>();
             for (int partition = 0; partition < pageBuilders.length; partition++) {
                 PageBuilder partitionPageBuilder = pageBuilders[partition];
                 if (!partitionPageBuilder.isEmpty() && (force || partitionPageBuilder.isFull())) {
+                    long flushSizeInBytes = partitionPageBuilder.getRetainedSizeInBytes();
+                    if (flushSizeInBytes > partitionBuilderRetainedSizes[partition]) {
+                        System.out.println("new size " + partition + ": " + partitionBuilderRetainedSizes[partition] + " -> " + flushSizeInBytes);
+                        builderRetainedSizeInBytes += flushSizeInBytes - partitionBuilderRetainedSizes[partition];
+                        partitionBuilderRetainedSizes[partition] = flushSizeInBytes;
+                        shouldUpdateMemory = true;
+                    }
+
                     Page pagePartition = partitionPageBuilder.build();
                     partitionPageBuilder.reset();
 
@@ -447,6 +457,9 @@ public class PartitionedOutputOperator
                     pagesAdded.incrementAndGet();
                     rowsAdded.addAndGet(pagePartition.getPositionCount());
                 }
+            }
+            if (shouldUpdateMemory) {
+                systemMemoryContext.setBytes(builderRetainedSizeInBytes);
             }
             ListenableFuture<?> future = Futures.allAsList(blockedFutures);
             if (future.isDone()) {
