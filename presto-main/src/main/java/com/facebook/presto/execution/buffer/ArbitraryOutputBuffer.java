@@ -369,6 +369,11 @@ public class ArbitraryOutputBuffer
         }
     }
 
+    /**
+     * TODO:
+     * (1) we should select a random consumer to notify
+     * (2) when a new page comes in, give each consumer at most min(1MN, max(size/#consumer, #long_pull_req))
+     */
     @ThreadSafe
     private static class MasterBuffer
             implements PagesSupplier
