@@ -46,6 +46,7 @@ import com.facebook.presto.execution.ResetSessionTask;
 import com.facebook.presto.execution.RevokeTask;
 import com.facebook.presto.execution.RollbackTask;
 import com.facebook.presto.execution.SetSessionTask;
+import com.facebook.presto.execution.SqlQueryExecution;
 import com.facebook.presto.execution.SqlQueryManager;
 import com.facebook.presto.execution.SqlQueryQueueManager;
 import com.facebook.presto.execution.StartTransactionTask;
@@ -129,7 +130,8 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import static com.facebook.presto.execution.DataDefinitionExecution.DataDefinitionExecutionFactory;
 import static com.facebook.presto.execution.QueryExecution.QueryExecutionFactory;
-import static com.facebook.presto.execution.SqlQueryExecution.SqlQueryExecutionFactory;
+import static com.facebook.presto.execution.QueuedSqlQueryExecution.QueuedSqlQueryExecutionFactory;
+import static com.facebook.presto.execution.RunningSqlQueryExecution.RunningSqlQueryExecutionFactory;
 import static com.google.inject.multibindings.MapBinder.newMapBinder;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.airlift.configuration.ConditionalModule.installModuleIf;
@@ -235,24 +237,12 @@ public class CoordinatorModule
 
         binder.bind(SplitSchedulerStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(SplitSchedulerStats.class).withGeneratedName();
-        binder.bind(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(Query.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(Explain.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowCreate.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowColumns.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowStats.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowPartitions.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowFunctions.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowTables.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowSchemas.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowCatalogs.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowSession.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowGrants.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(CreateTableAsSelect.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(Insert.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(Delete.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(DescribeInput.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(DescribeOutput.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
+        if (true) {
+            bindSqlQueryExecutionFactory(binder, RunningSqlQueryExecutionFactory.class, executionBinder);
+        }
+        else {
+            bindSqlQueryExecutionFactory(binder, QueuedSqlQueryExecutionFactory.class, executionBinder);
+        }
 
         binder.bind(DataDefinitionExecutionFactory.class).in(Scopes.SINGLETON);
         bindDataDefinitionTask(binder, executionBinder, CreateSchema.class, CreateSchemaTask.class);
@@ -284,6 +274,31 @@ public class CoordinatorModule
 
         // cleanup
         binder.bind(ExecutorCleanup.class).in(Scopes.SINGLETON);
+    }
+
+    private static void bindSqlQueryExecutionFactory(
+            Binder binder,
+            Class<? extends QueryExecutionFactory<? extends SqlQueryExecution>> sqlQueryExecutionFactory,
+            MapBinder<Class<? extends Statement>, QueryExecutionFactory<?>> executionBinder)
+    {
+        binder.bind(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(Query.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(Explain.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowCreate.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowColumns.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowStats.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowPartitions.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowFunctions.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowTables.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowSchemas.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowCatalogs.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowSession.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowGrants.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(CreateTableAsSelect.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(Insert.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(Delete.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(DescribeInput.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(DescribeOutput.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
     }
 
     private static <T extends Statement> void bindDataDefinitionTask(
