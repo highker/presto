@@ -352,13 +352,12 @@ public class SqlQueryManager
     }
 
     @Override
-    public QueryInfo createQuery(SessionContext sessionContext, String query)
+    public QueryInfo createQuery(SessionContext sessionContext, String query, QueryId queryId)
     {
         requireNonNull(sessionContext, "sessionFactory is null");
         requireNonNull(query, "query is null");
+        requireNonNull(queryId, "queryId is null");
         checkArgument(!query.isEmpty(), "query must not be empty string");
-
-        QueryId queryId = queryIdGenerator.createNextQueryId();
 
         Session session = null;
         QueryExecution queryExecution;

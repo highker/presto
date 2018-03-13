@@ -59,7 +59,7 @@ public class TestQueryManager
     {
         QueryManager queryManager = queryRunner.getCoordinator().getQueryManager();
         QueryId queryId = queryManager.createQuery(new TestingSessionContext(TEST_SESSION),
-                "SELECT * FROM lineitem").getQueryId();
+                "SELECT * FROM lineitem", new QueryId("fake_query_id")).getQueryId();
 
         // wait until query starts running
         while (true) {

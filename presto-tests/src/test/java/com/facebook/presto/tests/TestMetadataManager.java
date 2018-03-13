@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.tests;
 
+import com.facebook.presto.execution.QueryIdGenerator;
 import com.facebook.presto.execution.QueryInfo;
 import com.facebook.presto.execution.QueryManager;
 import com.facebook.presto.execution.TestingSessionContext;
@@ -82,9 +83,10 @@ public class TestMetadataManager
     public void testMetadataIsClearedAfterQueryCanceled()
             throws Exception
     {
+        QueryIdGenerator generator = new QueryIdGenerator();
         QueryManager queryManager = queryRunner.getCoordinator().getQueryManager();
         QueryId queryId = queryManager.createQuery(new TestingSessionContext(TEST_SESSION),
-                "SELECT * FROM lineitem").getQueryId();
+                "SELECT * FROM lineitem", generator.createNextQueryId()).getQueryId();
 
         // wait until query starts running
         while (true) {

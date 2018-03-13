@@ -237,7 +237,7 @@ public class CoordinatorModule
 
         binder.bind(SplitSchedulerStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(SplitSchedulerStats.class).withGeneratedName();
-        if (true) {
+        if (false) {
             bindSqlQueryExecutionFactory(binder, RunningSqlQueryExecutionFactory.class, executionBinder);
         }
         else {

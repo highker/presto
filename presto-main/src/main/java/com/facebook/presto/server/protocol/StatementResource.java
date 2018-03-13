@@ -14,6 +14,7 @@
 package com.facebook.presto.server.protocol;
 
 import com.facebook.presto.client.QueryResults;
+import com.facebook.presto.execution.QueryIdGenerator;
 import com.facebook.presto.execution.QueryManager;
 import com.facebook.presto.memory.context.SimpleLocalMemoryContext;
 import com.facebook.presto.metadata.SessionPropertyManager;
@@ -28,6 +29,7 @@ import com.google.common.collect.Ordering;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.BoundedExecutor;
+import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 
 import javax.annotation.PreDestroy;
@@ -78,12 +80,15 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 @Path("/v1/statement")
 public class StatementResource
 {
+    private static final Logger log = Logger.get(StatementResource.class);
+
     private static final Duration MAX_WAIT_TIME = new Duration(1, SECONDS);
     private static final Ordering<Comparable<Duration>> WAIT_ORDERING = Ordering.natural().nullsLast();
 
     private final QueryManager queryManager;
     private final SessionPropertyManager sessionPropertyManager;
     private final ExchangeClientSupplier exchangeClientSupplier;
+    private final QueryIdGenerator queryIdGenerator;
     private final BlockEncodingSerde blockEncodingSerde;
     private final BoundedExecutor responseExecutor;
     private final ScheduledExecutorService timeoutExecutor;
@@ -96,6 +101,7 @@ public class StatementResource
             QueryManager queryManager,
             SessionPropertyManager sessionPropertyManager,
             ExchangeClientSupplier exchangeClientSupplier,
+            QueryIdGenerator queryIdGenerator,
             BlockEncodingSerde blockEncodingSerde,
             @ForStatementResource BoundedExecutor responseExecutor,
             @ForStatementResource ScheduledExecutorService timeoutExecutor)
@@ -103,6 +109,7 @@ public class StatementResource
         this.queryManager = requireNonNull(queryManager, "queryManager is null");
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
         this.exchangeClientSupplier = requireNonNull(exchangeClientSupplier, "exchangeClientSupplier is null");
+        this.queryIdGenerator = requireNonNull(queryIdGenerator, "queryIdGenerator is null");
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.responseExecutor = requireNonNull(responseExecutor, "responseExecutor is null");
         this.timeoutExecutor = requireNonNull(timeoutExecutor, "timeoutExecutor is null");
@@ -124,29 +131,24 @@ public class StatementResource
             @Context UriInfo uriInfo,
             @Suspended AsyncResponse asyncResponse)
     {
-        if (isNullOrEmpty(statement)) {
-            throw new WebApplicationException(Response
-                    .status(Status.BAD_REQUEST)
-                    .type(MediaType.TEXT_PLAIN)
-                    .entity("SQL statement is empty")
-                    .build());
-        }
+        Query query = createQuery(statement, queryIdGenerator.createNextQueryId(), servletRequest);
+        log.info("new query comes in with id = " + query.getQueryId().toString());
 
-        SessionContext sessionContext = new HttpRequestSessionContext(servletRequest);
+        waitQueryExecution(query, new Duration(1, MILLISECONDS), uriInfo, asyncResponse);
+    }
 
-        ExchangeClient exchangeClient = exchangeClientSupplier.get(new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext()));
-        Query query = Query.create(
-                sessionContext,
-                statement,
-                queryManager,
-                sessionPropertyManager,
-                exchangeClient,
-                responseExecutor,
-                timeoutExecutor,
-                blockEncodingSerde);
-        queries.put(query.getQueryId(), query);
-
-        asyncQueryResults(query, OptionalLong.empty(), new Duration(1, MILLISECONDS), uriInfo, asyncResponse);
+    @GET
+    @Path("{queryId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public void executeQuery(
+            @PathParam("queryId") QueryId queryId,
+            String statement,
+            @Context HttpServletRequest servletRequest,
+            @Context UriInfo uriInfo,
+            @Suspended AsyncResponse asyncResponse)
+    {
+        log.info("execution query comes in with id = " + queryId.toString());
+        asyncQueryResults(createQuery(statement, queryId, servletRequest), OptionalLong.empty(), new Duration(1, MILLISECONDS), uriInfo, asyncResponse);
     }
 
     @GET
@@ -168,10 +170,67 @@ public class StatementResource
         asyncQueryResults(query, OptionalLong.of(token), maxWait, uriInfo, asyncResponse);
     }
 
+    @GET
+    @Path("wait/{queryId}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public void waitQueryExecution(
+            @PathParam("queryId") QueryId queryId,
+            @QueryParam("maxWait") Duration maxWait,
+            @Context UriInfo uriInfo,
+            @Suspended AsyncResponse asyncResponse)
+    {
+        log.info("waiting query comes in with id = " + queryId.toString());
+        Query query = queries.get(queryId);
+        if (query == null) {
+            asyncResponse.resume(Response.status(Status.NOT_FOUND).build());
+            return;
+        }
+
+        waitQueryExecution(query, maxWait, uriInfo, asyncResponse);
+    }
+
+    private Query createQuery(String statement, QueryId queryId, HttpServletRequest servletRequest)
+    {
+        if (isNullOrEmpty(statement)) {
+            throw new WebApplicationException(Response
+                    .status(Status.BAD_REQUEST)
+                    .type(MediaType.TEXT_PLAIN)
+                    .entity("SQL statement is empty")
+                    .build());
+        }
+
+        SessionContext sessionContext = new HttpRequestSessionContext(servletRequest);
+
+        ExchangeClient exchangeClient = exchangeClientSupplier.get(new SimpleLocalMemoryContext(newSimpleAggregatedMemoryContext()));
+        Query query = Query.create(
+                sessionContext,
+                statement,
+                queryId,
+                queryManager,
+                sessionPropertyManager,
+                exchangeClient,
+                responseExecutor,
+                timeoutExecutor,
+                blockEncodingSerde);
+        queries.put(query.getQueryId(), query);
+
+        return query;
+    }
+
     private void asyncQueryResults(Query query, OptionalLong token, Duration maxWait, UriInfo uriInfo, AsyncResponse asyncResponse)
     {
         Duration wait = WAIT_ORDERING.min(MAX_WAIT_TIME, maxWait);
         ListenableFuture<QueryResults> queryResultsFuture = query.waitForResults(token, uriInfo, wait);
+
+        ListenableFuture<Response> response = Futures.transform(queryResultsFuture, queryResults -> toResponse(query, queryResults));
+
+        bindAsyncResponse(asyncResponse, response, responseExecutor);
+    }
+
+    private void waitQueryExecution(Query query, Duration maxWait, UriInfo uriInfo, AsyncResponse asyncResponse)
+    {
+        Duration wait = WAIT_ORDERING.min(MAX_WAIT_TIME, maxWait);
+        ListenableFuture<QueryResults> queryResultsFuture = query.waitForExecution(uriInfo, wait);
 
         ListenableFuture<Response> response = Futures.transform(queryResultsFuture, queryResults -> toResponse(query, queryResults));
 

@@ -73,6 +73,7 @@ import static com.facebook.presto.SystemSessionProperties.isExchangeCompressionE
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static com.facebook.presto.util.Failures.toFailure;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.addTimeout;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
@@ -142,6 +143,7 @@ class Query
     public static Query create(
             SessionContext sessionContext,
             String query,
+            QueryId queryId,
             QueryManager queryManager,
             SessionPropertyManager sessionPropertyManager,
             ExchangeClient exchangeClient,
@@ -149,7 +151,7 @@ class Query
             ScheduledExecutorService timeoutExecutor,
             BlockEncodingSerde blockEncodingSerde)
     {
-        Query result = new Query(sessionContext, query, queryManager, sessionPropertyManager, exchangeClient, dataProcessorExecutor, timeoutExecutor, blockEncodingSerde);
+        Query result = new Query(sessionContext, query, queryId, queryManager, sessionPropertyManager, exchangeClient, dataProcessorExecutor, timeoutExecutor, blockEncodingSerde);
 
         result.queryManager.addOutputInfoListener(result.getQueryId(), result::setQueryOutputInfo);
 
@@ -166,6 +168,7 @@ class Query
     private Query(
             SessionContext sessionContext,
             String query,
+            QueryId queryId,
             QueryManager queryManager,
             SessionPropertyManager sessionPropertyManager,
             ExchangeClient exchangeClient,
@@ -175,6 +178,7 @@ class Query
     {
         requireNonNull(sessionContext, "sessionContext is null");
         requireNonNull(query, "query is null");
+        requireNonNull(queryId, "queryId is null");
         requireNonNull(queryManager, "queryManager is null");
         requireNonNull(exchangeClient, "exchangeClient is null");
         requireNonNull(resultsProcessorExecutor, "resultsProcessorExecutor is null");
@@ -182,8 +186,8 @@ class Query
 
         this.queryManager = queryManager;
 
-        QueryInfo queryInfo = queryManager.createQuery(sessionContext, query);
-        queryId = queryInfo.getQueryId();
+        QueryInfo queryInfo = queryManager.createQuery(sessionContext, query, queryId);
+        this.queryId = queryInfo.getQueryId();
         session = queryInfo.getSession().toSession(sessionPropertyManager);
         this.exchangeClient = exchangeClient;
         this.resultsProcessorExecutor = resultsProcessorExecutor;
@@ -267,6 +271,20 @@ class Query
 
         // when state changes, fetch the next result
         return Futures.transform(futureStateChange, ignored -> getNextResult(token, uriInfo), resultsProcessorExecutor);
+    }
+
+    // TODO: we have to use QueryResults because that is expected by the client for backward compatibility
+    public synchronized ListenableFuture<QueryResults> waitForExecution(UriInfo uriInfo, Duration wait)
+    {
+        // wait for a results data or query to finish, up to the wait timeout
+        ListenableFuture<?> futureStateChange = addTimeout(
+                getFutureStateChange(),
+                () -> null,
+                wait,
+                timeoutExecutor);
+
+        // when state changes, fetch the next result
+        return Futures.transform(futureStateChange, ignored -> getWaitResult(uriInfo), resultsProcessorExecutor);
     }
 
     private synchronized ListenableFuture<?> getFutureStateChange()
@@ -378,21 +396,7 @@ class Query
             nextResultsUri = createNextResultsUri(uriInfo);
         }
 
-        // update catalog and schema
-        setCatalog = queryInfo.getSetCatalog();
-        setSchema = queryInfo.getSetSchema();
-
-        // update setSessionProperties
-        setSessionProperties = queryInfo.getSetSessionProperties();
-        resetSessionProperties = queryInfo.getResetSessionProperties();
-
-        // update preparedStatements
-        addedPreparedStatements = queryInfo.getAddedPreparedStatements();
-        deallocatedPreparedStatements = queryInfo.getDeallocatedPreparedStatements();
-
-        // update startedTransactionId
-        startedTransactionId = queryInfo.getStartedTransactionId();
-        clearTransactionId = queryInfo.isClearTransactionId();
+        updateInfo(queryInfo);
 
         // first time through, self is null
         QueryResults queryResults = new QueryResults(
@@ -416,6 +420,63 @@ class Query
         }
         lastResult = queryResults;
         return queryResults;
+    }
+
+    private synchronized QueryResults getWaitResult(UriInfo uriInfo)
+    {
+        // get the query info before returning
+        // force update if query manager is closed
+        QueryInfo queryInfo = queryManager.getQueryInfo(queryId);
+        queryManager.recordHeartbeat(queryId);
+
+        closeExchangeClientIfNecessary(queryInfo);
+
+        URI nextUri;
+        if (queryInfo.getState() == QueryState.STARTING) {
+            // createQuery end point now should take a query ID
+            // TODO: replace base URI to the coordinator URI
+            nextUri = uriInfo.getBaseUriBuilder().replacePath("/v1/statement").path(queryId.toString()).replaceQuery("").build();
+        }
+        else {
+            checkState(queryInfo.getState() == QueryState.QUEUED);
+            nextUri = uriInfo.getBaseUriBuilder().replacePath("/v1/statement/wait").path(queryId.toString()).replaceQuery("").build();
+        }
+
+        updateInfo(queryInfo);
+
+        log.info("wait for result with new uri = " + nextUri.toString());
+
+        // first time through, self is null
+        return new QueryResults(
+                queryId.toString(),
+                uriInfo.getRequestUriBuilder().replaceQuery(queryId.toString()).replacePath("query.html").build(),
+                null,
+                nextUri,
+                ImmutableList.of(),
+                null,
+                toStatementStats(queryInfo),
+                toQueryError(queryInfo),
+                queryInfo.getUpdateType(),
+                updateCount);
+    }
+
+    private void updateInfo(QueryInfo queryInfo)
+    {
+        // update catalog and schema
+        setCatalog = queryInfo.getSetCatalog();
+        setSchema = queryInfo.getSetSchema();
+
+        // update setSessionProperties
+        setSessionProperties = queryInfo.getSetSessionProperties();
+        resetSessionProperties = queryInfo.getResetSessionProperties();
+
+        // update preparedStatements
+        addedPreparedStatements = queryInfo.getAddedPreparedStatements();
+        deallocatedPreparedStatements = queryInfo.getDeallocatedPreparedStatements();
+
+        // update startedTransactionId
+        startedTransactionId = queryInfo.getStartedTransactionId();
+        clearTransactionId = queryInfo.isClearTransactionId();
     }
 
     private synchronized void closeExchangeClientIfNecessary(QueryInfo queryInfo)
