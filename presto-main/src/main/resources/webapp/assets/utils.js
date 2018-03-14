@@ -268,6 +268,7 @@ function updateClusterInfo() {
     $.get("/v1/info", function (info) {
         $('#version-number').text(info.nodeVersion.version);
         $('#environment').text(info.environment);
+        $('#server-type').text(info.serverType);
         $('#uptime').text(info.uptime);
         $('#status-indicator').removeClass("status-light-red").removeClass("status-light-green").addClass("status-light-green");
     }).error(function() {

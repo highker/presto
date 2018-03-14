@@ -152,6 +152,8 @@ public class CoordinatorModule
     @Override
     protected void setup(Binder binder)
     {
+        ServerConfig serverConfig = buildConfigObject(ServerConfig.class);
+
         httpServerBinder(binder).bindResource("/", "webapp").withWelcomeFile("index.html");
 
         // presto coordinator announcement
@@ -162,6 +164,12 @@ public class CoordinatorModule
         jsonCodecBinder(binder).bindJsonCodec(TaskInfo.class);
         jsonCodecBinder(binder).bindJsonCodec(QueryResults.class);
         jaxrsBinder(binder).bind(StatementResource.class);
+        httpClientBinder(binder).bindHttpClient("statementResource", ForQueryInfo.class)
+                .withTracing()
+                .withConfigDefaults(config -> {
+                    config.setIdleTimeout(new Duration(10, SECONDS));
+                    config.setRequestTimeout(new Duration(20, SECONDS));
+                });
 
         // query execution visualizer
         jaxrsBinder(binder).bind(QueryExecutionResource.class);
@@ -237,7 +245,7 @@ public class CoordinatorModule
 
         binder.bind(SplitSchedulerStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(SplitSchedulerStats.class).withGeneratedName();
-        if (false) {
+        if (serverConfig.getServerType() == ServerType.COORDINATOR) {
             bindSqlQueryExecutionFactory(binder, RunningSqlQueryExecutionFactory.class, executionBinder);
         }
         else {

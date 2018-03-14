@@ -14,6 +14,7 @@
 package com.facebook.presto.server.protocol;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.SessionRepresentation;
 import com.facebook.presto.client.Column;
 import com.facebook.presto.client.FailureInfo;
 import com.facebook.presto.client.QueryError;
@@ -30,23 +31,34 @@ import com.facebook.presto.execution.TaskInfo;
 import com.facebook.presto.execution.buffer.PagesSerde;
 import com.facebook.presto.execution.buffer.PagesSerdeFactory;
 import com.facebook.presto.execution.buffer.SerializedPage;
+import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.operator.ExchangeClient;
+import com.facebook.presto.operator.PageTransportErrorException;
 import com.facebook.presto.server.SessionContext;
 import com.facebook.presto.spi.ErrorCode;
+import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.Page;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.BooleanType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.transaction.TransactionId;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.http.client.FullJsonResponseHandler;
+import io.airlift.http.client.HttpClient;
+import io.airlift.http.client.HttpStatus;
+import io.airlift.http.client.Request;
+import io.airlift.http.client.ResponseHandler;
+import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
@@ -57,7 +69,9 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -70,23 +84,46 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.facebook.presto.SystemSessionProperties.isExchangeCompressionEnabled;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_CATALOG;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_CLIENT_INFO;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_CLIENT_TAGS;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_LANGUAGE;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_PREPARED_STATEMENT;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_SCHEMA;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_SESSION;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_SOURCE;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_TIME_ZONE;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_TRANSACTION_ID;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_USER;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static com.facebook.presto.util.Failures.toFailure;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
+import static com.google.common.net.HttpHeaders.USER_AGENT;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.addTimeout;
+import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
+import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
+import static io.airlift.http.client.Request.Builder.preparePost;
+import static io.airlift.http.client.ResponseHandlerUtils.propagate;
+import static io.airlift.http.client.StaticBodyGenerator.createStaticBodyGenerator;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static java.lang.String.format;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
+import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 
 @ThreadSafe
 class Query
 {
+    private static final String UNKNOWN_FIELD = "unknown";
     private static final Logger log = Logger.get(Query.class);
     private static final long DESIRED_RESULT_BYTES = new DataSize(1, MEGABYTE).toBytes();
 
     private final QueryManager queryManager;
+    private final InternalNodeManager internalNodeManager;
+    private final HttpClient httpClient;
     private final QueryId queryId;
 
     @GuardedBy("this")
@@ -144,14 +181,26 @@ class Query
             SessionContext sessionContext,
             String query,
             QueryId queryId,
+            InternalNodeManager internalNodeManager,
             QueryManager queryManager,
+            HttpClient httpClient,
             SessionPropertyManager sessionPropertyManager,
             ExchangeClient exchangeClient,
             Executor dataProcessorExecutor,
             ScheduledExecutorService timeoutExecutor,
             BlockEncodingSerde blockEncodingSerde)
     {
-        Query result = new Query(sessionContext, query, queryId, queryManager, sessionPropertyManager, exchangeClient, dataProcessorExecutor, timeoutExecutor, blockEncodingSerde);
+        Query result = new Query(
+                sessionContext,
+                query,
+                queryId,
+                internalNodeManager,
+                queryManager,
+                httpClient,
+                sessionPropertyManager,
+                exchangeClient,
+                dataProcessorExecutor,
+                timeoutExecutor, blockEncodingSerde);
 
         result.queryManager.addOutputInfoListener(result.getQueryId(), result::setQueryOutputInfo);
 
@@ -169,7 +218,9 @@ class Query
             SessionContext sessionContext,
             String query,
             QueryId queryId,
+            InternalNodeManager internalNodeManager,
             QueryManager queryManager,
+            HttpClient httpClient,
             SessionPropertyManager sessionPropertyManager,
             ExchangeClient exchangeClient,
             Executor resultsProcessorExecutor,
@@ -179,12 +230,16 @@ class Query
         requireNonNull(sessionContext, "sessionContext is null");
         requireNonNull(query, "query is null");
         requireNonNull(queryId, "queryId is null");
+        requireNonNull(internalNodeManager, "internalNodeManager is null");
+        requireNonNull(httpClient, "httpClient is null");
         requireNonNull(queryManager, "queryManager is null");
         requireNonNull(exchangeClient, "exchangeClient is null");
         requireNonNull(resultsProcessorExecutor, "resultsProcessorExecutor is null");
         requireNonNull(timeoutExecutor, "timeoutExecutor is null");
 
+        this.internalNodeManager = internalNodeManager;
         this.queryManager = queryManager;
+        this.httpClient = httpClient;
 
         QueryInfo queryInfo = queryManager.createQuery(sessionContext, query, queryId);
         this.queryId = queryInfo.getQueryId();
@@ -434,17 +489,26 @@ class Query
         URI nextUri;
         if (queryInfo.getState() == QueryState.STARTING) {
             // createQuery end point now should take a query ID
-            // TODO: replace base URI to the coordinator URI
-            nextUri = uriInfo.getBaseUriBuilder().replacePath("/v1/statement").path(queryId.toString()).replaceQuery("").build();
+            Set<Node> coordinators = internalNodeManager.getCoordinators();
+            checkState(coordinators.size() == 1);
+            nextUri = uriBuilderFrom(coordinators.iterator().next().getHttpUri()).replacePath("/v1/statement").appendPath(queryId.toString()).build();
+            log.info("query " + queryId.toString() + " will be redirected to " + nextUri.toString());
+
+            QueryResults queryResults = httpClient.execute(buildQueryRequest(nextUri, queryInfo.getSession(), queryInfo.getQuery()), new QueryResultsResponseHandler());
+            nextUri = queryResults.getNextUri();
+
+            if (nextUri == null) {
+                queryManager.failQuery(queryId, new PrestoException(GENERIC_INTERNAL_ERROR, "empty next uri"));
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "empty next uri");
+            }
+            log.info("query " + queryId.toString() + " has been redirected; ack client with  " + nextUri.toString());
         }
         else {
-            checkState(queryInfo.getState() == QueryState.QUEUED);
             nextUri = uriInfo.getBaseUriBuilder().replacePath("/v1/statement/wait").path(queryId.toString()).replaceQuery("").build();
+            log.info("query " + queryId.toString() + " is still waiting at " + nextUri.toString());
         }
 
         updateInfo(queryInfo);
-
-        log.info("wait for result with new uri = " + nextUri.toString());
 
         // first time through, self is null
         return new QueryResults(
@@ -458,6 +522,60 @@ class Query
                 toQueryError(queryInfo),
                 queryInfo.getUpdateType(),
                 updateCount);
+    }
+
+    private Request buildQueryRequest(URI uri, SessionRepresentation session, String query)
+    {
+        Request.Builder builder = preparePost()
+                .addHeader(PRESTO_USER, session.getUser())
+                .addHeader(USER_AGENT, session.getUserAgent().orElse(UNKNOWN_FIELD))
+                .setUri(uri)
+                .setBodyGenerator(createStaticBodyGenerator(query, UTF_8));
+
+        if (session.getSource() != null) {
+            builder.addHeader(PRESTO_SOURCE, session.getSource().orElse(UNKNOWN_FIELD));
+        }
+        if (session.getClientTags() != null && !session.getClientTags().isEmpty()) {
+            builder.addHeader(PRESTO_CLIENT_TAGS, Joiner.on(",").join(session.getClientTags()));
+        }
+        if (session.getClientInfo() != null) {
+            builder.addHeader(PRESTO_CLIENT_INFO, session.getClientInfo().orElse(UNKNOWN_FIELD));
+        }
+        if (session.getCatalog() != null) {
+            builder.addHeader(PRESTO_CATALOG, session.getCatalog().orElse(UNKNOWN_FIELD));
+        }
+        if (session.getSchema() != null) {
+            builder.addHeader(PRESTO_SCHEMA, session.getSchema().orElse(UNKNOWN_FIELD));
+        }
+        builder.addHeader(PRESTO_TIME_ZONE, session.getTimeZoneKey().getId());
+        if (session.getLocale() != null) {
+            builder.addHeader(PRESTO_LANGUAGE, session.getLocale().toLanguageTag());
+        }
+
+        Map<String, String> property = session.getSystemProperties();
+        for (Map.Entry<String, String> entry : property.entrySet()) {
+            builder.addHeader(PRESTO_SESSION, entry.getKey() + "=" + entry.getValue());
+        }
+
+        Map<String, String> statements = session.getPreparedStatements();
+        for (Map.Entry<String, String> entry : statements.entrySet()) {
+            builder.addHeader(PRESTO_PREPARED_STATEMENT, urlEncode(entry.getKey()) + "=" + urlEncode(entry.getValue()));
+        }
+
+        //builder.addHeader(PRESTO_TRANSACTION_ID,  session.getTransactionId().map(TransactionId::toString).orElse("NONE"));
+        builder.addHeader(PRESTO_TRANSACTION_ID,  "NONE");
+
+        return builder.build();
+    }
+
+    private static String urlEncode(String value)
+    {
+        try {
+            return URLEncoder.encode(value, "UTF-8");
+        }
+        catch (UnsupportedEncodingException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private void updateInfo(QueryInfo queryInfo)
@@ -663,5 +781,54 @@ class Query
                 errorCode.getType().toString(),
                 failure.getErrorLocation(),
                 failure);
+    }
+
+    private static class QueryResultsResponseHandler
+            implements ResponseHandler<QueryResults, RuntimeException>
+    {
+        private static final JsonCodec<QueryResults> CODEC = JsonCodec.jsonCodec(QueryResults.class);
+        private final FullJsonResponseHandler<QueryResults> handler;
+
+        public QueryResultsResponseHandler()
+        {
+            handler = createFullJsonResponseHandler(CODEC);
+        }
+
+        @Override
+        public QueryResults handleException(Request request, Exception exception)
+        {
+            throw propagate(request, exception);
+        }
+
+        @Override
+        public QueryResults handle(Request request, io.airlift.http.client.Response response)
+        {
+            FullJsonResponseHandler.JsonResponse<QueryResults> jsonResponse;
+            try {
+                jsonResponse = handler.handle(request, response);
+            }
+            catch (RuntimeException e) {
+                throw new PageTransportErrorException(format("Error fetching %s: %s", request.getUri().toASCIIString(), e.getMessage()), e);
+            }
+
+            if (response.getStatusCode() != HttpStatus.OK.code()) {
+                throw new PageTransportErrorException(format(
+                        "Expected response code to be 200, but was %s %s:%n%s",
+                        response.getStatusCode(),
+                        response.getStatusMessage(),
+                        response.toString()));
+            }
+
+            // invalid content type can happen when an error page is returned, but is unlikely given the above 200
+            String contentType = response.getHeader(CONTENT_TYPE);
+            if (contentType == null) {
+                throw new PageTransportErrorException(format("%s header is not set: %s", CONTENT_TYPE, response));
+            }
+            if (!contentType.equals(APPLICATION_JSON)) {
+                throw new PageTransportErrorException(format("Expected %s response from server but got %s", APPLICATION_JSON, contentType));
+            }
+
+            return jsonResponse.getValue();
+        }
     }
 }

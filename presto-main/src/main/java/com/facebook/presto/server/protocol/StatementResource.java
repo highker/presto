@@ -17,18 +17,22 @@ import com.facebook.presto.client.QueryResults;
 import com.facebook.presto.execution.QueryIdGenerator;
 import com.facebook.presto.execution.QueryManager;
 import com.facebook.presto.memory.context.SimpleLocalMemoryContext;
+import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.operator.ExchangeClient;
 import com.facebook.presto.operator.ExchangeClientSupplier;
+import com.facebook.presto.server.ForQueryInfo;
 import com.facebook.presto.server.ForStatementResource;
 import com.facebook.presto.server.HttpRequestSessionContext;
 import com.facebook.presto.server.SessionContext;
+import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.google.common.collect.Ordering;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.BoundedExecutor;
+import io.airlift.http.client.HttpClient;
 import io.airlift.log.Logger;
 import io.airlift.units.Duration;
 
@@ -56,6 +60,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.Map.Entry;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
@@ -69,6 +74,7 @@ import static com.facebook.presto.client.PrestoHeaders.PRESTO_SET_SCHEMA;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_SET_SESSION;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_STARTED_TRANSACTION_ID;
 import static com.facebook.presto.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.airlift.http.server.AsyncResponseHandler.bindAsyncResponse;
@@ -85,6 +91,7 @@ public class StatementResource
     private static final Duration MAX_WAIT_TIME = new Duration(1, SECONDS);
     private static final Ordering<Comparable<Duration>> WAIT_ORDERING = Ordering.natural().nullsLast();
 
+    private final InternalNodeManager nodeManager;
     private final QueryManager queryManager;
     private final SessionPropertyManager sessionPropertyManager;
     private final ExchangeClientSupplier exchangeClientSupplier;
@@ -92,20 +99,24 @@ public class StatementResource
     private final BlockEncodingSerde blockEncodingSerde;
     private final BoundedExecutor responseExecutor;
     private final ScheduledExecutorService timeoutExecutor;
+    private final HttpClient httpClient;
 
     private final ConcurrentMap<QueryId, Query> queries = new ConcurrentHashMap<>();
     private final ScheduledExecutorService queryPurger = newSingleThreadScheduledExecutor(threadsNamed("query-purger"));
 
     @Inject
     public StatementResource(
+            InternalNodeManager nodeManager,
             QueryManager queryManager,
             SessionPropertyManager sessionPropertyManager,
             ExchangeClientSupplier exchangeClientSupplier,
             QueryIdGenerator queryIdGenerator,
             BlockEncodingSerde blockEncodingSerde,
             @ForStatementResource BoundedExecutor responseExecutor,
-            @ForStatementResource ScheduledExecutorService timeoutExecutor)
+            @ForStatementResource ScheduledExecutorService timeoutExecutor,
+            @ForQueryInfo HttpClient httpClient)
     {
+        this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
         this.queryManager = requireNonNull(queryManager, "queryManager is null");
         this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
         this.exchangeClientSupplier = requireNonNull(exchangeClientSupplier, "exchangeClientSupplier is null");
@@ -113,6 +124,7 @@ public class StatementResource
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.responseExecutor = requireNonNull(responseExecutor, "responseExecutor is null");
         this.timeoutExecutor = requireNonNull(timeoutExecutor, "timeoutExecutor is null");
+        this.httpClient = requireNonNull(httpClient, "httpClient is null");
 
         queryPurger.scheduleWithFixedDelay(new PurgeQueriesRunnable(queries, queryManager), 200, 200, MILLISECONDS);
     }
@@ -137,7 +149,7 @@ public class StatementResource
         waitQueryExecution(query, new Duration(1, MILLISECONDS), uriInfo, asyncResponse);
     }
 
-    @GET
+    @POST
     @Path("{queryId}")
     @Produces(MediaType.APPLICATION_JSON)
     public void executeQuery(
@@ -148,6 +160,11 @@ public class StatementResource
             @Suspended AsyncResponse asyncResponse)
     {
         log.info("execution query comes in with id = " + queryId.toString());
+
+        // TODO: flip this
+        Set<Node> coordinators = nodeManager.getCoordinators();
+        checkState(coordinators.size() == 1);
+
         asyncQueryResults(createQuery(statement, queryId, servletRequest), OptionalLong.empty(), new Duration(1, MILLISECONDS), uriInfo, asyncResponse);
     }
 
@@ -206,7 +223,9 @@ public class StatementResource
                 sessionContext,
                 statement,
                 queryId,
+                nodeManager,
                 queryManager,
+                httpClient,
                 sessionPropertyManager,
                 exchangeClient,
                 responseExecutor,
