@@ -75,6 +75,11 @@ public interface QueryExecution
         throw new UnsupportedOperationException();
     }
 
+    default void finishQuery()
+    {
+        throw new UnsupportedOperationException();
+    }
+
     void cancelStage(StageId stageId);
 
     void recordHeartbeat();
@@ -88,7 +93,7 @@ public interface QueryExecution
 
     interface QueryExecutionFactory<T extends QueryExecution>
     {
-        T createQueryExecution(QueryId queryId, String query, Session session, Statement statement, List<Expression> parameters);
+        T createQueryExecution(QueryId queryId, String query, Session session, Statement statement, List<Expression> parameters, Optional<Runnable> dispatcherNotifier);
     }
 
     Optional<QueryType> getQueryType();

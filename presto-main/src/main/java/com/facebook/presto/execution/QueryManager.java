@@ -45,7 +45,7 @@ public interface QueryManager
 
     void recordHeartbeat(QueryId queryId);
 
-    QueryInfo createQuery(SessionContext sessionContext, String query, QueryId queryId);
+    QueryInfo createQuery(SessionContext sessionContext, String query, QueryId queryId, Optional<Runnable> dispatcherNotifier);
 
     void failQuery(QueryId queryId, Throwable cause);
 
@@ -54,6 +54,8 @@ public interface QueryManager
     void cancelStage(StageId stageId);
 
     void submitQuery(QueryId queryId);
+
+    void finishQuery(QueryId queryId);
 
     SqlQueryManagerStats getStats();
 }

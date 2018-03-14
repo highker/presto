@@ -352,7 +352,7 @@ public class SqlQueryManager
     }
 
     @Override
-    public QueryInfo createQuery(SessionContext sessionContext, String query, QueryId queryId)
+    public QueryInfo createQuery(SessionContext sessionContext, String query, QueryId queryId, Optional<Runnable> dispatcherNotifier)
     {
         requireNonNull(sessionContext, "sessionFactory is null");
         requireNonNull(query, "query is null");
@@ -396,7 +396,7 @@ public class SqlQueryManager
                     throw new PrestoException(NOT_SUPPORTED, "EXPLAIN ANALYZE only supported for statements that are queries");
                 }
             }
-            queryExecution = queryExecutionFactory.createQueryExecution(queryId, query, session, statement, parameters);
+            queryExecution = queryExecutionFactory.createQueryExecution(queryId, query, session, statement, parameters, dispatcherNotifier);
         }
         catch (ParsingException | PrestoException | SemanticException e) {
             // This is intentionally not a method, since after the state change listener is registered
@@ -506,6 +506,15 @@ public class SqlQueryManager
 
         tryGetQuery(queryId)
                 .ifPresent(QueryExecution::submitQuery);
+    }
+
+    @Override
+    public void finishQuery(QueryId queryId)
+    {
+        log.debug("submit query %s", queryId);
+
+        tryGetQuery(queryId)
+                .ifPresent(QueryExecution::finishQuery);
     }
 
     @Override

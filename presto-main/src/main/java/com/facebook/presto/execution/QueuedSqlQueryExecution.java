@@ -28,6 +28,7 @@ import javax.inject.Inject;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
 import static io.airlift.units.Duration.succinctNanos;
@@ -76,6 +77,12 @@ public final class QueuedSqlQueryExecution
     }
 
     @Override
+    public void finishQuery()
+    {
+        stateMachine.transitionToFinishing();
+    }
+
+    @Override
     public void cancelStage(StageId stageId)
     {
         // no-op
@@ -118,7 +125,7 @@ public final class QueuedSqlQueryExecution
         }
 
         @Override
-        public QueuedSqlQueryExecution createQueryExecution(QueryId queryId, String query, Session session, Statement statement, List<Expression> parameters)
+        public QueuedSqlQueryExecution createQueryExecution(QueryId queryId, String query, Session session, Statement statement, List<Expression> parameters, Optional<Runnable> dispatcherNotifier)
         {
             return new QueuedSqlQueryExecution(
                     queryId,

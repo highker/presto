@@ -25,6 +25,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.Optional;
+
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
 import static com.facebook.presto.execution.QueryState.FAILED;
 import static com.facebook.presto.execution.QueryState.RUNNING;
@@ -85,8 +87,11 @@ public class TestMetadataManager
     {
         QueryIdGenerator generator = new QueryIdGenerator();
         QueryManager queryManager = queryRunner.getCoordinator().getQueryManager();
-        QueryId queryId = queryManager.createQuery(new TestingSessionContext(TEST_SESSION),
-                "SELECT * FROM lineitem", generator.createNextQueryId()).getQueryId();
+        QueryId queryId = queryManager.createQuery(
+                new TestingSessionContext(TEST_SESSION),
+                "SELECT * FROM lineitem",
+                generator.createNextQueryId(),
+                Optional.empty()).getQueryId();
 
         // wait until query starts running
         while (true) {

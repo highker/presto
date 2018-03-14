@@ -206,6 +206,14 @@ public class StatementResource
         waitQueryExecution(query, maxWait, uriInfo, asyncResponse);
     }
 
+    @DELETE
+    @Path("{queryId}")
+    public void finishQueryExecution(@PathParam("queryId") QueryId queryId)
+    {
+        log.info("finish query with id = " + queryId.toString());
+        queryManager.finishQuery(queryId);
+    }
+
     private Query createQuery(String statement, QueryId queryId, HttpServletRequest servletRequest)
     {
         if (isNullOrEmpty(statement)) {

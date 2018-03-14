@@ -20,6 +20,7 @@ import com.facebook.presto.tpch.TpchPlugin;
 import com.google.common.collect.ImmutableSet;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.execution.QueryState.RUNNING;
@@ -32,7 +33,7 @@ public final class TestQueryRunnerUtil
 
     public static QueryId createQuery(DistributedQueryRunner queryRunner, Session session, String sql)
     {
-        return queryRunner.getCoordinator().getQueryManager().createQuery(new TestingSessionContext(session), sql, new QueryId("fake_query_id")).getQueryId();
+        return queryRunner.getCoordinator().getQueryManager().createQuery(new TestingSessionContext(session), sql, new QueryId("fake_query_id"), Optional.empty()).getQueryId();
     }
 
     public static void cancelQuery(DistributedQueryRunner queryRunner, QueryId queryId)

@@ -132,7 +132,8 @@ public final class RunningSqlQueryExecution
             PlanFlattener planFlattener,
             ExecutionPolicy executionPolicy,
             List<Expression> parameters,
-            SplitSchedulerStats schedulerStats)
+            SplitSchedulerStats schedulerStats,
+            Optional<Runnable> dispatcherNotifier)
     {
         super(queryId, query, session, self, statement, transactionManager, metadata, accessControl, queryExecutor);
         try (SetThreadName ignored = new SetThreadName("Query-%s", queryId)) {
@@ -168,6 +169,15 @@ public final class RunningSqlQueryExecution
                 if (scheduler != null) {
                     scheduler.abort();
                 }
+            });
+
+            stateMachine.addStateChangeListener(state -> {
+                if (!state.isDone()) {
+                    return;
+                }
+
+                // notify dispatcher to prune queries
+                dispatcherNotifier.ifPresent(Runnable::run);
             });
 
             this.remoteTaskFactory = new MemoryTrackingRemoteTaskFactory(requireNonNull(remoteTaskFactory, "remoteTaskFactory is null"), stateMachine);
@@ -506,7 +516,7 @@ public final class RunningSqlQueryExecution
         }
 
         @Override
-        public RunningSqlQueryExecution createQueryExecution(QueryId queryId, String query, Session session, Statement statement, List<Expression> parameters)
+        public RunningSqlQueryExecution createQueryExecution(QueryId queryId, String query, Session session, Statement statement, List<Expression> parameters, Optional<Runnable> dispatcherNotifier)
         {
             String executionPolicyName = SystemSessionProperties.getExecutionPolicy(session);
             ExecutionPolicy executionPolicy = executionPolicies.get(executionPolicyName);
@@ -537,7 +547,8 @@ public final class RunningSqlQueryExecution
                     planFlattener,
                     executionPolicy,
                     parameters,
-                    schedulerStats);
+                    schedulerStats,
+                    dispatcherNotifier);
         }
     }
 }

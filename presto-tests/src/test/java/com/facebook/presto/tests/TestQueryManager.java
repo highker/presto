@@ -23,6 +23,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.Optional;
+
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
 import static com.facebook.presto.execution.QueryState.FAILED;
 import static com.facebook.presto.execution.QueryState.RUNNING;
@@ -59,7 +61,7 @@ public class TestQueryManager
     {
         QueryManager queryManager = queryRunner.getCoordinator().getQueryManager();
         QueryId queryId = queryManager.createQuery(new TestingSessionContext(TEST_SESSION),
-                "SELECT * FROM lineitem", new QueryId("fake_query_id")).getQueryId();
+                "SELECT * FROM lineitem", new QueryId("fake_query_id"), Optional.empty()).getQueryId();
 
         // wait until query starts running
         while (true) {

@@ -104,7 +104,9 @@ import static com.google.common.net.HttpHeaders.USER_AGENT;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.addTimeout;
 import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
+import static io.airlift.http.client.HttpStatus.familyForStatusCode;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
+import static io.airlift.http.client.Request.Builder.prepareDelete;
 import static io.airlift.http.client.Request.Builder.preparePost;
 import static io.airlift.http.client.ResponseHandlerUtils.propagate;
 import static io.airlift.http.client.StaticBodyGenerator.createStaticBodyGenerator;
@@ -241,7 +243,7 @@ class Query
         this.queryManager = queryManager;
         this.httpClient = httpClient;
 
-        QueryInfo queryInfo = queryManager.createQuery(sessionContext, query, queryId);
+        QueryInfo queryInfo = queryManager.createQuery(sessionContext, query, queryId, Optional.of(this::finishQueryIfNecessary));
         this.queryId = queryInfo.getQueryId();
         session = queryInfo.getSession().toSession(sessionPropertyManager);
         this.exchangeClient = exchangeClient;
@@ -607,6 +609,32 @@ class Query
                 (queryInfo.getState().isDone() && !queryInfo.getOutputStage().isPresent())) {
             exchangeClient.close();
         }
+    }
+
+    private synchronized void finishQueryIfNecessary()
+    {
+        Set<Node> dispatchers = internalNodeManager.getDispatchers();
+        checkState(dispatchers.size() == 1);
+        URI uri = uriBuilderFrom(dispatchers.iterator().next().getHttpUri()).replacePath("/v1/statement").appendPath(queryId.toString()).build();
+        httpClient.executeAsync(prepareDelete().setUri(uri).build(), new ResponseHandler<Void, RuntimeException>()
+        {
+            @Override
+            public Void handleException(Request request, Exception exception)
+            {
+                log.debug(exception, "Acknowledge request failed: %s", uri);
+                return null;
+            }
+
+            @Override
+            public Void handle(Request request, io.airlift.http.client.Response response)
+            {
+                if (familyForStatusCode(response.getStatusCode()) != HttpStatus.Family.SUCCESSFUL) {
+                    log.debug("Unexpected acknowledge response code: %s", response.getStatusCode());
+                }
+                return null;
+            }
+        });
+        log.info("sent cancel query " + queryId.toString());
     }
 
     private synchronized void setQueryOutputInfo(QueryExecution.QueryOutputInfo outputInfo)

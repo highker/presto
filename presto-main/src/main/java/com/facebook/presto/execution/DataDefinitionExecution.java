@@ -285,7 +285,8 @@ public class DataDefinitionExecution<T extends Statement>
                 String query,
                 Session session,
                 Statement statement,
-                List<Expression> parameters)
+                List<Expression> parameters,
+                Optional<Runnable> dispatcherNotifier)
         {
             URI self = locationFactory.createQueryLocation(queryId);
 
