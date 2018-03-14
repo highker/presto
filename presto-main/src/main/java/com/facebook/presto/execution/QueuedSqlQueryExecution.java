@@ -70,6 +70,12 @@ public final class QueuedSqlQueryExecution
     }
 
     @Override
+    public void submitQuery()
+    {
+        stateMachine.transitionToSubmitted();
+    }
+
+    @Override
     public void cancelStage(StageId stageId)
     {
         // no-op

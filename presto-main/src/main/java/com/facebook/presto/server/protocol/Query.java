@@ -502,6 +502,7 @@ class Query
                 throw new PrestoException(GENERIC_INTERNAL_ERROR, "empty next uri");
             }
             log.info("query " + queryId.toString() + " has been redirected; ack client with  " + nextUri.toString());
+            queryManager.submitQuery(queryId);
         }
         else {
             nextUri = uriInfo.getBaseUriBuilder().replacePath("/v1/statement/wait").path(queryId.toString()).replaceQuery("").build();

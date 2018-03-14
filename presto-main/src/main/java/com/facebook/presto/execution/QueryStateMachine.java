@@ -70,6 +70,7 @@ import static com.facebook.presto.execution.QueryState.PLANNING;
 import static com.facebook.presto.execution.QueryState.QUEUED;
 import static com.facebook.presto.execution.QueryState.RUNNING;
 import static com.facebook.presto.execution.QueryState.STARTING;
+import static com.facebook.presto.execution.QueryState.SUBMITTED;
 import static com.facebook.presto.execution.QueryState.TERMINAL_QUERY_STATES;
 import static com.facebook.presto.execution.StageInfo.getAllStages;
 import static com.facebook.presto.memory.LocalMemoryManager.GENERAL_POOL;
@@ -625,6 +626,15 @@ public class QueryStateMachine
         totalPlanningTime.compareAndSet(null, nanosSince(totalPlanningStartNanos.get()));
 
         return queryState.setIf(STARTING, currentState -> currentState == QUEUED || currentState == PLANNING);
+    }
+
+    public boolean transitionToSubmitted()
+    {
+        queuedTime.compareAndSet(null, nanosSince(createNanos).convertToMostSuccinctTimeUnit());
+        totalPlanningStartNanos.compareAndSet(null, tickerNanos());
+        totalPlanningTime.compareAndSet(null, nanosSince(totalPlanningStartNanos.get()));
+
+        return queryState.setIf(SUBMITTED, currentState -> currentState == STARTING || currentState == PLANNING);
     }
 
     public boolean transitionToRunning()

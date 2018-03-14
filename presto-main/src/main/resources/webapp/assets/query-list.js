@@ -193,6 +193,7 @@ const FILTER_TYPE = {
     FINISHED: function (query) { return query.state === "FINISHED"},
     FAILED: function (query) { return query.state === "FAILED" && query.errorType !== "USER_ERROR"},
     USER_ERROR: function (query) { return query.state === "FAILED" && query.errorType === "USER_ERROR"},
+    SUBMITTED: function (query) { return query.state === "SUBMITTED"},
 };
 
 const SORT_TYPE = {
@@ -481,6 +482,7 @@ let QueryList = React.createClass({
                                 { this.renderFilterButton(FILTER_TYPE.FINISHED, "Finished") }
                                 { this.renderFilterButton(FILTER_TYPE.FAILED, "Failed") }
                                 { this.renderFilterButton(FILTER_TYPE.USER_ERROR, "User error") }
+                                { this.renderFilterButton(FILTER_TYPE.SUBMITTED, "Submitted") }
                             </div>
                             &nbsp;
                             <div className="input-group-btn">

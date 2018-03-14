@@ -20,6 +20,7 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 public enum QueryState
 {
+    SUBMITTED(false),
     /**
      * Query has been accepted and is awaiting execution.
      */

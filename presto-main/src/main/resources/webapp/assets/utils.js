@@ -28,7 +28,8 @@ var STATE_COLOR_MAP = {
     USER_CANCELED: '#858959',
     INSUFFICIENT_RESOURCES: '#7f5b72',
     EXTERNAL_ERROR: '#ca7640',
-    UNKNOWN_ERROR: '#943524'
+    UNKNOWN_ERROR: '#ff8564',
+    SUBMITTED: '',
 };
 
 function getQueryStateColor(query)
@@ -61,6 +62,8 @@ function getQueryStateColor(query)
             }
         case "FINISHED":
             return STATE_COLOR_MAP.FINISHED;
+        case "SUBMITTED":
+            return STATE_COLOR_MAP.SUBMITTED;
         default:
             return STATE_COLOR_MAP.QUEUED;
     }

@@ -53,5 +53,7 @@ public interface QueryManager
 
     void cancelStage(StageId stageId);
 
+    void submitQuery(QueryId queryId);
+
     SqlQueryManagerStats getStats();
 }

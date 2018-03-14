@@ -70,6 +70,11 @@ public interface QueryExecution
 
     void cancelQuery();
 
+    default void submitQuery()
+    {
+        throw new UnsupportedOperationException();
+    }
+
     void cancelStage(StageId stageId);
 
     void recordHeartbeat();

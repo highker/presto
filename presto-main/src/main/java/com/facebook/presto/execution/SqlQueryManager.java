@@ -500,6 +500,15 @@ public class SqlQueryManager
     }
 
     @Override
+    public void submitQuery(QueryId queryId)
+    {
+        log.debug("submit query %s", queryId);
+
+        tryGetQuery(queryId)
+                .ifPresent(QueryExecution::submitQuery);
+    }
+
+    @Override
     public void cancelStage(StageId stageId)
     {
         requireNonNull(stageId, "stageId is null");
