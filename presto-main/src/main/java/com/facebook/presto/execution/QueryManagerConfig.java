@@ -36,7 +36,7 @@ public class QueryManagerConfig
 {
     private int scheduleSplitBatchSize = 1000;
     private int minScheduleSplitBatchSize = 100;
-    private int maxConcurrentQueries = 1000;
+    private int maxConcurrentQueries = 3;
     private int maxQueuedQueries = 5000;
     private String queueConfigFile;
 
