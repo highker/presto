@@ -28,6 +28,7 @@ import com.facebook.presto.execution.DropTableTask;
 import com.facebook.presto.execution.DropViewTask;
 import com.facebook.presto.execution.ForQueryExecution;
 import com.facebook.presto.execution.GrantTask;
+import com.facebook.presto.execution.ImmediateQueueManager;
 import com.facebook.presto.execution.PlanFlattener;
 import com.facebook.presto.execution.PrepareTask;
 import com.facebook.presto.execution.QueryExecution;
@@ -186,7 +187,10 @@ public class CoordinatorModule
         newExporter(binder).export(InternalResourceGroupManager.class).withGeneratedName();
         binder.bind(ResourceGroupManager.class).to(InternalResourceGroupManager.class);
         binder.bind(LegacyResourceGroupConfigurationManagerFactory.class).in(Scopes.SINGLETON);
-        if (buildConfigObject(FeaturesConfig.class).isResourceGroupsEnabled()) {
+        if (serverConfig.getServerType() == ServerType.COORDINATOR) {
+            binder.bind(QueryQueueManager.class).to(ImmediateQueueManager.class);
+        }
+        else if (buildConfigObject(FeaturesConfig.class).isResourceGroupsEnabled()) {
             binder.bind(QueryQueueManager.class).to(InternalResourceGroupManager.class);
         }
         else {
