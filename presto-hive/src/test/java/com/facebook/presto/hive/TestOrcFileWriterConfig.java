@@ -22,7 +22,7 @@ import java.util.Map;
 import static io.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
 import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
 import static io.airlift.configuration.testing.ConfigAssertions.recordDefaults;
-import static io.airlift.units.DataSize.Unit.BYTE;
+import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 
@@ -37,7 +37,7 @@ public class TestOrcFileWriterConfig
                 .setStripeMaxRowCount(10_000_000)
                 .setRowGroupMaxRowCount(10_000)
                 .setDictionaryMaxMemory(new DataSize(16, MEGABYTE))
-                .setStringStatisticsLimit(new DataSize(64, BYTE))
+                .setStringStatisticsLimit(new DataSize(1.99, GIGABYTE))
                 .setMaxCompressionBufferSize(new DataSize(256, KILOBYTE)));
     }
 
