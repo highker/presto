@@ -375,6 +375,7 @@ public class ServerMainModule
 
         // transaction manager
         configBinder(binder).bindConfig(TransactionManagerConfig.class);
+        jaxrsBinder(binder).bind(TransactionResource.class);
 
         // data stream provider
         binder.bind(PageSourceManager.class).in(Scopes.SINGLETON);
