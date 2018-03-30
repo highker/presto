@@ -28,6 +28,9 @@ var STATE_COLOR_MAP = {
     USER_CANCELED: '#858959',
     INSUFFICIENT_RESOURCES: '#7f5b72',
     EXTERNAL_ERROR: '#ca7640',
+    SUBMITTING: '#50df13',
+    SUBMITTED: '#c4df13',
+    ACKNOWLEDGED: '#1a4629',
     UNKNOWN_ERROR: '#943524'
 };
 
@@ -61,6 +64,12 @@ function getQueryStateColor(query)
             }
         case "FINISHED":
             return STATE_COLOR_MAP.FINISHED;
+        case "SUBMITTING":
+            return STATE_COLOR_MAP.SUBMITTING;
+        case "SUBMITTED":
+            return STATE_COLOR_MAP.SUBMITTED;
+        case "ACKNOWLEDGED":
+            return STATE_COLOR_MAP.ACKNOWLEDGED;
         default:
             return STATE_COLOR_MAP.QUEUED;
     }
@@ -268,6 +277,7 @@ function updateClusterInfo() {
     $.get("/v1/info", function (info) {
         $('#version-number').text(info.nodeVersion.version);
         $('#environment').text(info.environment);
+        $('#node-type').text(info.nodeType);
         $('#uptime').text(info.uptime);
         $('#status-indicator').removeClass("status-light-red").removeClass("status-light-green").addClass("status-light-green");
     }).error(function() {
