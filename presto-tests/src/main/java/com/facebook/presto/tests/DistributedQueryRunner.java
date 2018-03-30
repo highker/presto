@@ -25,6 +25,7 @@ import com.facebook.presto.metadata.QualifiedObjectName;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.server.testing.TestingPrestoServer;
 import com.facebook.presto.spi.Node;
+import com.facebook.presto.spi.NodeType;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.sql.parser.SqlParserOptions;
@@ -50,11 +51,17 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static com.facebook.presto.spi.NodeType.COORDINATOR;
+import static com.facebook.presto.spi.NodeType.DISPATCHER;
+import static com.facebook.presto.spi.NodeType.QUERY_COORDINATOR;
+import static com.facebook.presto.spi.NodeType.WORKER;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
 import static com.facebook.presto.testing.TestingSession.TESTING_CATALOG;
 import static com.facebook.presto.testing.TestingSession.createBogusTestingCatalog;
 import static com.facebook.presto.tests.AbstractTestQueries.TEST_CATALOG_PROPERTIES;
@@ -74,6 +81,7 @@ public class DistributedQueryRunner
     private static final SqlParserOptions DEFAULT_SQL_PARSER_OPTIONS = new SqlParserOptions();
 
     private final TestingDiscoveryServer discoveryServer;
+    private final Optional<TestingPrestoServer> dispatcher;
     private final TestingPrestoServer coordinator;
     private final List<TestingPrestoServer> servers;
 
@@ -122,7 +130,7 @@ public class DistributedQueryRunner
             ImmutableList.Builder<TestingPrestoServer> servers = ImmutableList.builder();
 
             for (int i = 1; i < nodeCount; i++) {
-                TestingPrestoServer worker = closer.register(createTestingPrestoServer(discoveryServer.getBaseUrl(), false, extraProperties, parserOptions, environment));
+                TestingPrestoServer worker = closer.register(createTestingPrestoServer(discoveryServer.getBaseUrl(), WORKER, extraProperties, parserOptions, environment));
                 servers.add(worker);
             }
 
@@ -130,7 +138,16 @@ public class DistributedQueryRunner
             extraCoordinatorProperties.put("experimental.iterative-optimizer-enabled", "true");
             extraCoordinatorProperties.putAll(extraProperties);
             extraCoordinatorProperties.putAll(coordinatorProperties);
-            coordinator = closer.register(createTestingPrestoServer(discoveryServer.getBaseUrl(), true, extraCoordinatorProperties, parserOptions, environment));
+
+            if (extraCoordinatorProperties.containsKey("dispatcher.http.port")) {
+                coordinator = closer.register(createTestingPrestoServer(discoveryServer.getBaseUrl(), QUERY_COORDINATOR, extraCoordinatorProperties, parserOptions, environment));
+                dispatcher = Optional.of(closer.register(createTestingPrestoServer(discoveryServer.getBaseUrl(), DISPATCHER, extraCoordinatorProperties, parserOptions, environment)));
+                servers.add(dispatcher.get());
+            }
+            else {
+                coordinator = closer.register(createTestingPrestoServer(discoveryServer.getBaseUrl(), COORDINATOR, extraCoordinatorProperties, parserOptions, environment));
+                dispatcher = Optional.empty();
+            }
             servers.add(coordinator);
 
             this.servers = servers.build();
@@ -172,7 +189,7 @@ public class DistributedQueryRunner
         }
     }
 
-    private static TestingPrestoServer createTestingPrestoServer(URI discoveryUri, boolean coordinator, Map<String, String> extraProperties, SqlParserOptions parserOptions, String environment)
+    private static TestingPrestoServer createTestingPrestoServer(URI discoveryUri, NodeType nodeType, Map<String, String> extraProperties, SqlParserOptions parserOptions, String environment)
             throws Exception
     {
         long start = System.nanoTime();
@@ -182,14 +199,14 @@ public class DistributedQueryRunner
                 .put("task.max-index-memory", "16kB") // causes index joins to fault load
                 .put("datasources", "system")
                 .put("distributed-index-joins-enabled", "true");
-        if (coordinator) {
+        if (isCoordinator(nodeType)) {
             propertiesBuilder.put("node-scheduler.include-coordinator", "true");
             propertiesBuilder.put("distributed-joins-enabled", "true");
         }
         HashMap<String, String> properties = new HashMap<>(propertiesBuilder.build());
         properties.putAll(extraProperties);
 
-        TestingPrestoServer server = new TestingPrestoServer(coordinator, properties, environment, discoveryUri, parserOptions, ImmutableList.of());
+        TestingPrestoServer server = new TestingPrestoServer(nodeType, properties, environment, discoveryUri, parserOptions, ImmutableList.of());
 
         log.info("Created TestingPrestoServer in %s", nanosSince(start).convertToMostSuccinctTimeUnit());
 
@@ -258,6 +275,11 @@ public class DistributedQueryRunner
     public TestingPrestoServer getCoordinator()
     {
         return coordinator;
+    }
+
+    public Optional<TestingPrestoServer> getDispatcher()
+    {
+        return dispatcher;
     }
 
     public List<TestingPrestoServer> getServers()

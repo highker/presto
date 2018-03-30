@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+import static com.facebook.presto.spi.NodeType.COORDINATOR;
 import static java.util.Objects.requireNonNull;
 
 public class TestingNodeManager
@@ -43,7 +44,7 @@ public class TestingNodeManager
 
     public TestingNodeManager(String environment)
     {
-        this(environment, new PrestoNode("local", URI.create("local://127.0.0.1"), NodeVersion.UNKNOWN, true), ImmutableSet.of());
+        this(environment, new PrestoNode("local", URI.create("local://127.0.0.1"), NodeVersion.UNKNOWN, COORDINATOR), ImmutableSet.of());
     }
 
     public TestingNodeManager(Node localNode)

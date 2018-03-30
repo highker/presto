@@ -13,28 +13,30 @@
  */
 package com.facebook.presto.server;
 
+import com.facebook.presto.spi.NodeType;
 import io.airlift.configuration.Config;
 import io.airlift.units.Duration;
 
+import static com.facebook.presto.spi.NodeType.COORDINATOR;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class ServerConfig
 {
-    private boolean coordinator = true;
+    private NodeType nodeType = COORDINATOR;
     private String prestoVersion;
     private String dataSources;
     private boolean includeExceptionInResponse = true;
     private Duration gracePeriod = new Duration(2, MINUTES);
 
-    public boolean isCoordinator()
+    public NodeType getNodeType()
     {
-        return coordinator;
+        return nodeType;
     }
 
-    @Config("coordinator")
-    public ServerConfig setCoordinator(boolean coordinator)
+    @Config("node-type")
+    public ServerConfig setNodeType(NodeType nodeType)
     {
-        this.coordinator = coordinator;
+        this.nodeType = nodeType;
         return this;
     }
 

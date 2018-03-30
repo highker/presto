@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.client;
 
+import com.facebook.presto.spi.NodeType;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.units.Duration;
@@ -30,7 +31,7 @@ public class ServerInfo
 {
     private final NodeVersion nodeVersion;
     private final String environment;
-    private final boolean coordinator;
+    private final NodeType nodeType;
 
     // optional to maintain compatibility with older servers
     private final Optional<Duration> uptime;
@@ -39,12 +40,12 @@ public class ServerInfo
     public ServerInfo(
             @JsonProperty("nodeVersion") NodeVersion nodeVersion,
             @JsonProperty("environment") String environment,
-            @JsonProperty("coordinator") boolean coordinator,
+            @JsonProperty("nodeType") NodeType nodeType,
             @JsonProperty("uptime") Optional<Duration> uptime)
     {
         this.nodeVersion = requireNonNull(nodeVersion, "nodeVersion is null");
         this.environment = requireNonNull(environment, "environment is null");
-        this.coordinator = requireNonNull(coordinator, "coordinator is null");
+        this.nodeType = requireNonNull(nodeType, "nodeType is null");
         this.uptime = requireNonNull(uptime, "uptime is null");
     }
 
@@ -61,9 +62,9 @@ public class ServerInfo
     }
 
     @JsonProperty
-    public boolean isCoordinator()
+    public NodeType getNodeType()
     {
-        return coordinator;
+        return nodeType;
     }
 
     @JsonProperty
@@ -99,7 +100,7 @@ public class ServerInfo
         return toStringHelper(this)
                 .add("nodeVersion", nodeVersion)
                 .add("environment", environment)
-                .add("coordinator", coordinator)
+                .add("nodeType", nodeType)
                 .add("uptime", uptime.orElse(null))
                 .omitNullValues()
                 .toString();

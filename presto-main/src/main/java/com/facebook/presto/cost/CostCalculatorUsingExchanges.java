@@ -49,6 +49,8 @@ import java.util.function.IntSupplier;
 import static com.facebook.presto.cost.PlanNodeCostEstimate.UNKNOWN_COST;
 import static com.facebook.presto.cost.PlanNodeCostEstimate.ZERO_COST;
 import static com.facebook.presto.cost.PlanNodeCostEstimate.cpuCost;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
+import static com.facebook.presto.spi.NodeType.isDispatcher;
 import static com.facebook.presto.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static java.lang.Math.toIntExact;
 import static java.lang.String.format;
@@ -74,11 +76,8 @@ public class CostCalculatorUsingExchanges
         requireNonNull(nodeManager, "nodeManager is null");
         return () -> {
             Set<Node> activeNodes = nodeManager.getAllNodes().getActiveNodes();
-            if (includeCoordinator) {
-                return activeNodes.size();
-            }
             return toIntExact(activeNodes.stream()
-                    .filter(node -> !node.isCoordinator())
+                    .filter(node -> (includeCoordinator || !isCoordinator(node.getNodeType())) && !isDispatcher(node.getNodeType()))
                     .count());
         };
     }

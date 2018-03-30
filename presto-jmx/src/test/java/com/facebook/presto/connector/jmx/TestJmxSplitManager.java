@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.facebook.presto.connector.jmx.JmxMetadata.HISTORY_SCHEMA_NAME;
 import static com.facebook.presto.connector.jmx.JmxMetadata.JMX_SCHEMA_NAME;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static com.facebook.presto.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.UNGROUPED_SCHEDULING;
 import static com.facebook.presto.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
 import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
@@ -217,6 +218,6 @@ public class TestJmxSplitManager
 
     private static Node createTestingNode(String hostname)
     {
-        return new PrestoNode(hostname, URI.create(format("http://%s:8080", hostname)), NodeVersion.UNKNOWN, false);
+        return new PrestoNode(hostname, URI.create(format("http://%s:8080", hostname)), NodeVersion.UNKNOWN, WORKER);
     }
 }

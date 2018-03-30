@@ -32,6 +32,9 @@ import java.util.Map;
 
 import static com.facebook.presto.execution.QueryState.FINISHED;
 import static com.facebook.presto.memory.TestMemoryManager.createQueryRunner;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
+import static com.facebook.presto.spi.NodeType.isDispatcher;
+import static com.facebook.presto.spi.NodeType.isWorker;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -66,7 +69,7 @@ public class TestGracefulShutdown
 
             TestingPrestoServer worker = queryRunner.getServers()
                     .stream()
-                    .filter(server -> !server.isCoordinator())
+                    .filter(server -> isWorker(server.getNodeType()))
                     .findFirst()
                     .get();
 
@@ -105,11 +108,26 @@ public class TestGracefulShutdown
         try (DistributedQueryRunner queryRunner = createQueryRunner(TINY_SESSION, ImmutableMap.of())) {
             TestingPrestoServer coordinator = queryRunner.getServers()
                     .stream()
-                    .filter(TestingPrestoServer::isCoordinator)
+                    .filter(server -> isCoordinator(server.getNodeType()))
                     .findFirst()
                     .get();
 
             coordinator.getGracefulShutdownHandler().requestShutdown();
+        }
+    }
+
+    @Test(expectedExceptions = UnsupportedOperationException.class)
+    public void testDispatcherShutdown()
+            throws Exception
+    {
+        try (DistributedQueryRunner queryRunner = createQueryRunner(TINY_SESSION, ImmutableMap.of("dispatcher.http.port", "8080"))) {
+            TestingPrestoServer dispatcher = queryRunner.getServers()
+                    .stream()
+                    .filter(server -> isDispatcher(server.getNodeType()))
+                    .findFirst()
+                    .get();
+
+            dispatcher.getGracefulShutdownHandler().requestShutdown();
         }
     }
 }

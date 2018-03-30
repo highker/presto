@@ -41,6 +41,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static com.facebook.presto.spi.NodeType.COORDINATOR;
 import static com.facebook.presto.tests.AbstractTestQueries.TEST_CATALOG_PROPERTIES;
 import static com.facebook.presto.tests.AbstractTestQueries.TEST_SYSTEM_PROPERTIES;
 import static java.util.Objects.requireNonNull;
@@ -247,6 +248,6 @@ public final class StandaloneQueryRunner
                 .put("node-scheduler.min-candidates", "1")
                 .put("datasources", "system");
 
-        return new TestingPrestoServer(true, properties.build(), null, null, new SqlParserOptions(), ImmutableList.of());
+        return new TestingPrestoServer(COORDINATOR, properties.build(), null, null, new SqlParserOptions(), ImmutableList.of());
     }
 }

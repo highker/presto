@@ -20,6 +20,8 @@ import org.testng.annotations.Test;
 import java.util.Optional;
 
 import static com.facebook.presto.client.NodeVersion.UNKNOWN;
+import static com.facebook.presto.spi.NodeType.COORDINATOR;
+import static com.facebook.presto.spi.NodeType.DISPATCHER;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static org.testng.Assert.assertEquals;
 
@@ -30,15 +32,15 @@ public class TestServerInfo
     @Test
     public void testJsonRoundTrip()
     {
-        assertJsonRoundTrip(new ServerInfo(UNKNOWN, "test", true, Optional.of(Duration.valueOf("2m"))));
-        assertJsonRoundTrip(new ServerInfo(UNKNOWN, "test", true, Optional.empty()));
+        assertJsonRoundTrip(new ServerInfo(UNKNOWN, "test", COORDINATOR, Optional.of(Duration.valueOf("2m"))));
+        assertJsonRoundTrip(new ServerInfo(UNKNOWN, "test", DISPATCHER, Optional.empty()));
     }
 
     @Test
     public void testBackwardsCompatible()
     {
-        ServerInfo newServerInfo = new ServerInfo(UNKNOWN, "test", true, Optional.empty());
-        ServerInfo legacyServerInfo = SERVER_INFO_CODEC.fromJson("{\"nodeVersion\":{\"version\":\"<unknown>\"},\"environment\":\"test\",\"coordinator\":true}");
+        ServerInfo newServerInfo = new ServerInfo(UNKNOWN, "test", COORDINATOR, Optional.empty());
+        ServerInfo legacyServerInfo = SERVER_INFO_CODEC.fromJson("{\"nodeVersion\":{\"version\":\"<unknown>\"},\"environment\":\"test\",\"nodeType\":\"COORDINATOR\"}");
         assertEquals(newServerInfo, legacyServerInfo);
     }
 

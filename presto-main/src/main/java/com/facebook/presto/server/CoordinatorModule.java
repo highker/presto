@@ -131,6 +131,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import static com.facebook.presto.execution.DataDefinitionExecution.DataDefinitionExecutionFactory;
 import static com.facebook.presto.execution.QueryExecution.QueryExecutionFactory;
 import static com.facebook.presto.execution.SqlQueryExecution.SqlQueryExecutionFactory;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
 import static com.google.inject.multibindings.MapBinder.newMapBinder;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.concurrent.Threads.threadsNamed;
@@ -154,7 +155,7 @@ public class CoordinatorModule
     protected void setup(Binder binder)
     {
         ServerConfig serverConfig = buildConfigObject(ServerConfig.class);
-        boolean isCoordinator = serverConfig.isCoordinator();
+        boolean isCoordinator = isCoordinator(serverConfig.getNodeType());
 
         httpServerBinder(binder).bindResource("/", "webapp").withWelcomeFile("index.html");
 
@@ -238,8 +239,8 @@ public class CoordinatorModule
 
         binder.bind(SplitSchedulerStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(SplitSchedulerStats.class).withGeneratedName();
-        // TODO: update the condition once the dispatcher module is ready
-        if (true) {
+
+        if (isCoordinator(serverConfig.getNodeType())) {
             bindSqlFactory(binder, SqlQueryExecutionFactory.class, executionBinder);
             bindSqlFactory(binder, SqlQueryFactory.class, queryBinder);
         }

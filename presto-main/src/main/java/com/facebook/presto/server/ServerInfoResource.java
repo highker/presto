@@ -16,6 +16,7 @@ package com.facebook.presto.server;
 import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.client.ServerInfo;
 import com.facebook.presto.spi.NodeState;
+import com.facebook.presto.spi.NodeType;
 import io.airlift.node.NodeInfo;
 
 import javax.inject.Inject;
@@ -32,6 +33,7 @@ import java.util.Optional;
 
 import static com.facebook.presto.spi.NodeState.ACTIVE;
 import static com.facebook.presto.spi.NodeState.SHUTTING_DOWN;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
 import static io.airlift.units.Duration.nanosSince;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -44,7 +46,7 @@ public class ServerInfoResource
 {
     private final NodeVersion version;
     private final String environment;
-    private final boolean coordinator;
+    private final NodeType nodeType;
     private final GracefulShutdownHandler shutdownHandler;
     private final long startTime = System.nanoTime();
 
@@ -53,7 +55,7 @@ public class ServerInfoResource
     {
         this.version = requireNonNull(nodeVersion, "nodeVersion is null");
         this.environment = requireNonNull(nodeInfo, "nodeInfo is null").getEnvironment();
-        this.coordinator = requireNonNull(serverConfig, "serverConfig is null").isCoordinator();
+        this.nodeType = requireNonNull(serverConfig, "serverConfig is null").getNodeType();
         this.shutdownHandler = requireNonNull(shutdownHandler, "shutdownHandler is null");
     }
 
@@ -61,7 +63,7 @@ public class ServerInfoResource
     @Produces(APPLICATION_JSON)
     public ServerInfo getInfo()
     {
-        return new ServerInfo(version, environment, coordinator, Optional.of(nanosSince(startTime)));
+        return new ServerInfo(version, environment, nodeType, Optional.of(nanosSince(startTime)));
     }
 
     @PUT
@@ -109,7 +111,7 @@ public class ServerInfoResource
     @Produces(TEXT_PLAIN)
     public Response getServerCoordinator()
     {
-        if (coordinator) {
+        if (isCoordinator(nodeType)) {
             return Response.ok().build();
         }
         // return 404 to allow load balancers to only send traffic to the coordinator

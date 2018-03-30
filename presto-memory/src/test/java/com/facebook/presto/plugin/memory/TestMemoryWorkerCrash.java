@@ -21,6 +21,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.plugin.memory.MemoryQueryRunner.createQueryRunner;
+import static com.facebook.presto.spi.NodeType.isWorker;
 import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 import static io.airlift.testing.Assertions.assertLessThan;
 import static io.airlift.units.Duration.nanosSince;
@@ -60,7 +61,7 @@ public class TestMemoryWorkerCrash
     {
         int nodeCount = queryRunner.getNodeCount();
         TestingPrestoServer worker = queryRunner.getServers().stream()
-                .filter(server -> !server.isCoordinator())
+                .filter(server -> isWorker(server.getNodeType()))
                 .findAny()
                 .orElseThrow(() -> new IllegalStateException("No worker nodes"));
         worker.close();

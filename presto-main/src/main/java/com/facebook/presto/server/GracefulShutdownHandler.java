@@ -30,6 +30,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 
+import static com.facebook.presto.spi.NodeType.isWorker;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 import static io.airlift.concurrent.Threads.threadsNamed;
@@ -49,7 +50,7 @@ public class GracefulShutdownHandler
     private final ExecutorService lifeCycleStopper = newSingleThreadExecutor(threadsNamed("lifecycle-stopper-%s"));
     private final LifeCycleManager lifeCycleManager;
     private final TaskManager sqlTaskManager;
-    private final boolean isCoordinator;
+    private final boolean isWorker;
     private final ShutdownAction shutdownAction;
     private final Duration gracePeriod;
 
@@ -66,7 +67,7 @@ public class GracefulShutdownHandler
         this.sqlTaskManager = requireNonNull(sqlTaskManager, "sqlTaskManager is null");
         this.shutdownAction = requireNonNull(shutdownAction, "shutdownAction is null");
         this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
-        this.isCoordinator = requireNonNull(serverConfig, "serverConfig is null").isCoordinator();
+        this.isWorker = isWorker(requireNonNull(serverConfig, "serverConfig is null").getNodeType());
         this.gracePeriod = serverConfig.getGracePeriod();
     }
 
@@ -74,8 +75,8 @@ public class GracefulShutdownHandler
     {
         log.info("Shutdown requested");
 
-        if (isCoordinator) {
-            throw new UnsupportedOperationException("Cannot shutdown coordinator");
+        if (!isWorker) {
+            throw new UnsupportedOperationException("Cannot shutdown non-worker node");
         }
 
         if (isShutdownRequested()) {

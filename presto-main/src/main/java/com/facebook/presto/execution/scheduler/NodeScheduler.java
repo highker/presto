@@ -50,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType;
 import static com.facebook.presto.spi.NodeState.ACTIVE;
+import static com.facebook.presto.spi.NodeType.isDispatcher;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -143,7 +144,7 @@ public class NodeScheduler
                     .collect(toImmutableSet());
 
             for (Node node : nodes) {
-                if (useNetworkTopology && (includeCoordinator || !coordinatorNodeIds.contains(node.getNodeIdentifier()))) {
+                if (useNetworkTopology && (includeCoordinator || !coordinatorNodeIds.contains(node.getNodeIdentifier())) && !isDispatcher(node.getNodeType())) {
                     NetworkLocation location = networkLocationCache.get(node.getHostAndPort());
                     for (int i = 0; i <= location.getSegments().size(); i++) {
                         workersByNetworkPath.put(location.subLocation(0, i), node);
@@ -196,7 +197,7 @@ public class NodeScheduler
     public static ResettableRandomizedIterator<Node> randomizedNodes(NodeMap nodeMap, boolean includeCoordinator, Set<Node> excludedNodes)
     {
         ImmutableList<Node> nodes = nodeMap.getNodesByHostAndPort().values().stream()
-                .filter(node -> includeCoordinator || !nodeMap.getCoordinatorNodeIds().contains(node.getNodeIdentifier()))
+                .filter(node -> (includeCoordinator || !nodeMap.getCoordinatorNodeIds().contains(node.getNodeIdentifier())) && !isDispatcher(node.getNodeType()))
                 .filter(node -> !excludedNodes.contains(node))
                 .collect(toImmutableList());
         return new ResettableRandomizedIterator<>(nodes);
@@ -209,7 +210,7 @@ public class NodeScheduler
 
         for (HostAddress host : hosts) {
             nodeMap.getNodesByHostAndPort().get(host).stream()
-                    .filter(node -> includeCoordinator || !coordinatorIds.contains(node.getNodeIdentifier()))
+                    .filter(node -> (includeCoordinator || !coordinatorIds.contains(node.getNodeIdentifier())) && !isDispatcher(node.getNodeType()))
                     .forEach(chosen::add);
 
             InetAddress address;
@@ -224,7 +225,7 @@ public class NodeScheduler
             // consider a split with a host without a port as being accessible by all nodes in that host
             if (!host.hasPort()) {
                 nodeMap.getNodesByHost().get(address).stream()
-                        .filter(node -> includeCoordinator || !coordinatorIds.contains(node.getNodeIdentifier()))
+                        .filter(node -> (includeCoordinator || !coordinatorIds.contains(node.getNodeIdentifier())) && !isDispatcher(node.getNodeType()))
                         .forEach(chosen::add);
             }
         }

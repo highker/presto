@@ -76,6 +76,7 @@ import static com.facebook.presto.OutputBuffers.createInitialEmptyOutputBuffers;
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
 import static com.facebook.presto.execution.scheduler.SourcePartitionedScheduler.simpleSourcePartitionedScheduler;
 import static com.facebook.presto.operator.PipelineExecutionStrategy.UNGROUPED_EXECUTION;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static com.facebook.presto.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
@@ -107,9 +108,9 @@ public class TestSourcePartitionedScheduler
     public TestSourcePartitionedScheduler()
     {
         nodeManager.addNode(CONNECTOR_ID,
-                new PrestoNode("other1", URI.create("http://127.0.0.1:11"), NodeVersion.UNKNOWN, false),
-                new PrestoNode("other2", URI.create("http://127.0.0.1:12"), NodeVersion.UNKNOWN, false),
-                new PrestoNode("other3", URI.create("http://127.0.0.1:13"), NodeVersion.UNKNOWN, false));
+                new PrestoNode("other1", URI.create("http://127.0.0.1:11"), NodeVersion.UNKNOWN, WORKER),
+                new PrestoNode("other2", URI.create("http://127.0.0.1:12"), NodeVersion.UNKNOWN, WORKER),
+                new PrestoNode("other3", URI.create("http://127.0.0.1:13"), NodeVersion.UNKNOWN, WORKER));
     }
 
     @BeforeClass
@@ -320,9 +321,9 @@ public class TestSourcePartitionedScheduler
         // use private node manager so we can add a node later
         InMemoryNodeManager nodeManager = new InMemoryNodeManager();
         nodeManager.addNode(CONNECTOR_ID,
-                new PrestoNode("other1", URI.create("http://127.0.0.1:11"), NodeVersion.UNKNOWN, false),
-                new PrestoNode("other2", URI.create("http://127.0.0.1:12"), NodeVersion.UNKNOWN, false),
-                new PrestoNode("other3", URI.create("http://127.0.0.1:13"), NodeVersion.UNKNOWN, false));
+                new PrestoNode("other1", URI.create("http://127.0.0.1:11"), NodeVersion.UNKNOWN, WORKER),
+                new PrestoNode("other2", URI.create("http://127.0.0.1:12"), NodeVersion.UNKNOWN, WORKER),
+                new PrestoNode("other3", URI.create("http://127.0.0.1:13"), NodeVersion.UNKNOWN, WORKER));
         NodeTaskMap nodeTaskMap = new NodeTaskMap(finalizerService);
 
         // Schedule 15 splits - there are 3 nodes, each node should get 5 splits
@@ -340,7 +341,7 @@ public class TestSourcePartitionedScheduler
         }
 
         // Add new node
-        Node additionalNode = new PrestoNode("other4", URI.create("http://127.0.0.1:14"), NodeVersion.UNKNOWN, false);
+        Node additionalNode = new PrestoNode("other4", URI.create("http://127.0.0.1:14"), NodeVersion.UNKNOWN, WORKER);
         nodeManager.addNode(CONNECTOR_ID, additionalNode);
 
         // Schedule 5 splits in another query. Since the new node does not have any splits, all 5 splits are assigned to the new node

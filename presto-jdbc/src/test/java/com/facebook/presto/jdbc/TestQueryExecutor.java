@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 import static com.facebook.presto.client.NodeVersion.UNKNOWN;
+import static com.facebook.presto.spi.NodeType.COORDINATOR;
 import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static org.testng.Assert.assertEquals;
@@ -57,7 +58,7 @@ public class TestQueryExecutor
     public void testGetServerInfo()
             throws Exception
     {
-        ServerInfo expected = new ServerInfo(UNKNOWN, "test", true, Optional.of(Duration.valueOf("2m")));
+        ServerInfo expected = new ServerInfo(UNKNOWN, "test", COORDINATOR, Optional.of(Duration.valueOf("2m")));
 
         server.enqueue(new MockResponse()
                 .addHeader(CONTENT_TYPE, "application/json")
@@ -67,6 +68,7 @@ public class TestQueryExecutor
 
         ServerInfo actual = executor.getServerInfo(server.url("/v1/info").uri());
         assertEquals(actual.getEnvironment(), "test");
+        assertEquals(actual.getNodeType(), COORDINATOR);
         assertEquals(actual.getUptime(), Optional.of(Duration.valueOf("2m")));
 
         assertEquals(server.getRequestCount(), 1);

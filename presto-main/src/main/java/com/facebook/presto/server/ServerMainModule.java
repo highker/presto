@@ -176,6 +176,8 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.FLAT;
 import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.LEGACY;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
+import static com.facebook.presto.spi.NodeType.isWorker;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.reflect.Reflection.newProxy;
@@ -211,7 +213,7 @@ public class ServerMainModule
     {
         ServerConfig serverConfig = buildConfigObject(ServerConfig.class);
 
-        if (serverConfig.isCoordinator()) {
+        if (!isWorker(serverConfig.getNodeType())) {
             install(new CoordinatorModule());
             binder.bind(new TypeLiteral<Optional<QueryPerformanceFetcher>>() {}).toProvider(QueryPerformanceFetcherProvider.class).in(Scopes.SINGLETON);
         }
@@ -245,7 +247,7 @@ public class ServerMainModule
         binder.bind(SqlParser.class).in(Scopes.SINGLETON);
         binder.bind(SqlParserOptions.class).toInstance(sqlParserOptions);
 
-        bindFailureDetector(binder, serverConfig.isCoordinator());
+        bindFailureDetector(binder, isCoordinator(serverConfig.getNodeType()));
 
         jaxrsBinder(binder).bind(ThrowableMapper.class);
 
@@ -450,7 +452,7 @@ public class ServerMainModule
         // presto announcement
         discoveryBinder(binder).bindHttpAnnouncement("presto")
                 .addProperty("node_version", nodeVersion.toString())
-                .addProperty("coordinator", String.valueOf(serverConfig.isCoordinator()))
+                .addProperty("node_type", String.valueOf(serverConfig.getNodeType()))
                 .addProperty("connectorIds", nullToEmpty(serverConfig.getDataSources()));
 
         // server info resource
