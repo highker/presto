@@ -20,6 +20,7 @@ import com.facebook.presto.failureDetector.FailureDetector;
 import com.facebook.presto.server.InternalCommunicationConfig;
 import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.NodeState;
+import com.facebook.presto.spi.NodeType;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
@@ -52,6 +53,8 @@ import java.util.concurrent.TimeUnit;
 import static com.facebook.presto.spi.NodeState.ACTIVE;
 import static com.facebook.presto.spi.NodeState.INACTIVE;
 import static com.facebook.presto.spi.NodeState.SHUTTING_DOWN;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
+import static com.facebook.presto.spi.NodeType.isDispatcher;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Sets.difference;
@@ -91,6 +94,9 @@ public final class DiscoveryNodeManager
 
     @GuardedBy("this")
     private Set<Node> coordinators;
+
+    @GuardedBy("this")
+    private Set<Node> dispatchers;
 
     @Inject
     public DiscoveryNodeManager(
@@ -173,14 +179,15 @@ public final class DiscoveryNodeManager
         ImmutableSet.Builder<Node> inactiveNodesBuilder = ImmutableSet.builder();
         ImmutableSet.Builder<Node> shuttingDownNodesBuilder = ImmutableSet.builder();
         ImmutableSet.Builder<Node> coordinatorsBuilder = ImmutableSet.builder();
+        ImmutableSet.Builder<Node> dispatcherBuilder = ImmutableSet.builder();
         ImmutableSetMultimap.Builder<ConnectorId, Node> byConnectorIdBuilder = ImmutableSetMultimap.builder();
 
         for (ServiceDescriptor service : services) {
             URI uri = getHttpUri(service);
             NodeVersion nodeVersion = getNodeVersion(service);
-            boolean coordinator = isCoordinator(service);
+            NodeType nodeType = getNodeType(service);
             if (uri != null && nodeVersion != null) {
-                PrestoNode node = new PrestoNode(service.getNodeId(), uri, nodeVersion, coordinator);
+                PrestoNode node = new PrestoNode(service.getNodeId(), uri, nodeVersion, nodeType);
                 NodeState nodeState = getNodeState(node);
 
                 // record current node
@@ -192,8 +199,11 @@ public final class DiscoveryNodeManager
                 switch (nodeState) {
                     case ACTIVE:
                         activeNodesBuilder.add(node);
-                        if (coordinator) {
+                        if (isCoordinator(nodeType)) {
                             coordinatorsBuilder.add(node);
+                        }
+                        else if (isDispatcher(nodeType)) {
+                            dispatcherBuilder.add(node);
                         }
 
                         // record available active nodes organized by connector id
@@ -231,6 +241,7 @@ public final class DiscoveryNodeManager
         allNodes = new AllNodes(activeNodesBuilder.build(), inactiveNodesBuilder.build(), shuttingDownNodesBuilder.build());
         activeNodesByConnectorId = byConnectorIdBuilder.build();
         coordinators = coordinatorsBuilder.build();
+        dispatchers = dispatcherBuilder.build();
 
         checkState(currentNode != null, "INVARIANT: current node not returned from service selector");
         return currentNode;
@@ -326,6 +337,13 @@ public final class DiscoveryNodeManager
         return coordinators;
     }
 
+    @Override
+    public synchronized Set<Node> getDispatchers()
+    {
+        refreshIfNecessary();
+        return dispatchers;
+    }
+
     private URI getHttpUri(ServiceDescriptor descriptor)
     {
         String url = descriptor.getProperties().get(httpsRequired ? "https" : "http");
@@ -345,8 +363,8 @@ public final class DiscoveryNodeManager
         return nodeVersion == null ? null : new NodeVersion(nodeVersion);
     }
 
-    private static boolean isCoordinator(ServiceDescriptor service)
+    private static NodeType getNodeType(ServiceDescriptor service)
     {
-        return Boolean.parseBoolean(service.getProperties().get("coordinator"));
+        return NodeType.valueOf(service.getProperties().get("node_type"));
     }
 }

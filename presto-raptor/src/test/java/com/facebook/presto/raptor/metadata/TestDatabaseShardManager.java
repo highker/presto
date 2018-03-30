@@ -66,6 +66,7 @@ import static com.facebook.presto.raptor.RaptorErrorCode.RAPTOR_EXTERNAL_BATCH_A
 import static com.facebook.presto.raptor.metadata.DatabaseShardManager.shardIndexTable;
 import static com.facebook.presto.raptor.metadata.SchemaDaoUtil.createTablesWithRetry;
 import static com.facebook.presto.raptor.storage.ShardStats.MAX_BINARY_INDEX_SIZE;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static com.facebook.presto.spi.StandardErrorCode.SERVER_STARTING_UP;
 import static com.facebook.presto.spi.StandardErrorCode.TRANSACTION_CONFLICT;
 import static com.facebook.presto.spi.predicate.Range.greaterThan;
@@ -802,7 +803,7 @@ public class TestDatabaseShardManager
 
     private static Node createTestingNode()
     {
-        return new PrestoNode(UUID.randomUUID().toString(), URI.create("http://test"), NodeVersion.UNKNOWN, false);
+        return new PrestoNode(UUID.randomUUID().toString(), URI.create("http://test"), NodeVersion.UNKNOWN, WORKER);
     }
 
     private int columnCount(long tableId)

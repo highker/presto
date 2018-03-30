@@ -15,6 +15,7 @@ package com.facebook.presto.server;
 
 import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.memory.MemoryInfo;
+import com.facebook.presto.spi.NodeType;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.airlift.units.Duration;
@@ -26,7 +27,7 @@ public class NodeStatus
     private final String nodeId;
     private final NodeVersion nodeVersion;
     private final String environment;
-    private final boolean coordinator;
+    private final NodeType nodeType;
     private final Duration uptime;
     private final String externalAddress;
     private final String internalAddress;
@@ -43,7 +44,7 @@ public class NodeStatus
             @JsonProperty("nodeId") String nodeId,
             @JsonProperty("nodeVersion") NodeVersion nodeVersion,
             @JsonProperty("environment") String environment,
-            @JsonProperty("coordinator") boolean coordinator,
+            @JsonProperty("nodeType") NodeType nodeType,
             @JsonProperty("uptime") Duration uptime,
             @JsonProperty("externalAddress") String externalAddress,
             @JsonProperty("internalAddress") String internalAddress,
@@ -58,7 +59,7 @@ public class NodeStatus
         this.nodeId = requireNonNull(nodeId, "nodeId is null");
         this.nodeVersion = requireNonNull(nodeVersion, "nodeVersion is null");
         this.environment = requireNonNull(environment, "environment is null");
-        this.coordinator = coordinator;
+        this.nodeType = requireNonNull(nodeType, "nodeType is null");
         this.uptime = requireNonNull(uptime, "uptime is null");
         this.externalAddress = requireNonNull(externalAddress, "externalAddress is null");
         this.internalAddress = requireNonNull(internalAddress, "internalAddress is null");
@@ -90,9 +91,9 @@ public class NodeStatus
     }
 
     @JsonProperty
-    public boolean isCoordinator()
+    public NodeType getNodeType()
     {
-        return coordinator;
+        return nodeType;
     }
 
     @JsonProperty

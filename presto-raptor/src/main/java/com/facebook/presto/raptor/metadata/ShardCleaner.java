@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.facebook.presto.raptor.metadata.ShardDao.CLEANABLE_SHARDS_BATCH_SIZE;
 import static com.facebook.presto.raptor.metadata.ShardDao.CLEANUP_TRANSACTIONS_BATCH_SIZE;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
 import static com.google.common.collect.Sets.difference;
 import static com.google.common.collect.Sets.newConcurrentHashSet;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
@@ -109,7 +110,7 @@ public class ShardCleaner
         this(
                 shardDaoSupplier,
                 nodeManager.getCurrentNode().getNodeIdentifier(),
-                nodeManager.getCurrentNode().isCoordinator(),
+                isCoordinator(nodeManager.getCurrentNode().getNodeType()),
                 ticker,
                 storageService,
                 backupStore,

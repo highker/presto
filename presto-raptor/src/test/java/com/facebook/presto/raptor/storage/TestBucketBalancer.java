@@ -45,6 +45,7 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.raptor.metadata.Distribution.serializeColumnTypes;
 import static com.facebook.presto.raptor.metadata.SchemaDaoUtil.createTablesWithRetry;
 import static com.facebook.presto.raptor.metadata.TestDatabaseShardManager.createShardManager;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.testing.Assertions.assertGreaterThanOrEqual;
@@ -306,6 +307,6 @@ public class TestBucketBalancer
 
     private static Node createTestingNode(String nodeIdentifier)
     {
-        return new PrestoNode(nodeIdentifier, URI.create("http://test"), NodeVersion.UNKNOWN, false);
+        return new PrestoNode(nodeIdentifier, URI.create("http://test"), NodeVersion.UNKNOWN, WORKER);
     }
 }

@@ -64,6 +64,7 @@ import static com.facebook.presto.memory.LocalMemoryManager.GENERAL_POOL;
 import static com.facebook.presto.memory.LocalMemoryManager.RESERVED_POOL;
 import static com.facebook.presto.spi.NodeState.ACTIVE;
 import static com.facebook.presto.spi.NodeState.SHUTTING_DOWN;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
 import static com.facebook.presto.spi.StandardErrorCode.CLUSTER_OUT_OF_MEMORY;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
@@ -131,7 +132,7 @@ public class ClusterMemoryManager
         this.lowMemoryKiller = requireNonNull(lowMemoryKiller, "lowMemoryKiller is null");
         this.maxQueryMemory = config.getMaxQueryMemory();
         this.coordinatorId = queryIdGenerator.getCoordinatorId();
-        this.enabled = serverConfig.isCoordinator();
+        this.enabled = isCoordinator(serverConfig.getNodeType());
         this.killOnOutOfMemoryDelay = config.getKillOnOutOfMemoryDelay();
     }
 

@@ -28,6 +28,8 @@ import javax.inject.Inject;
 import java.net.URI;
 import java.util.Set;
 
+import static com.facebook.presto.spi.NodeType.WORKER;
+
 public class InMemoryNodeManager
         implements InternalNodeManager
 {
@@ -42,7 +44,7 @@ public class InMemoryNodeManager
 
     public InMemoryNodeManager(URI localUri)
     {
-        localNode = new PrestoNode("local", localUri, NodeVersion.UNKNOWN, false);
+        localNode = new PrestoNode("local", localUri, NodeVersion.UNKNOWN, WORKER);
     }
 
     public void addCurrentNodeConnector(ConnectorId connectorId)
@@ -97,6 +99,13 @@ public class InMemoryNodeManager
     public Set<Node> getCoordinators()
     {
         // always use localNode as coordinator
+        return ImmutableSet.of(localNode);
+    }
+
+    @Override
+    public Set<Node> getDispatchers()
+    {
+        // always use localNode as dispatcher
         return ImmutableSet.of(localNode);
     }
 

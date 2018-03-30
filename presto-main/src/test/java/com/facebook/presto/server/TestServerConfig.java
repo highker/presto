@@ -20,6 +20,8 @@ import org.testng.annotations.Test;
 
 import java.util.Map;
 
+import static com.facebook.presto.spi.NodeType.COORDINATOR;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static io.airlift.configuration.testing.ConfigAssertions.assertFullMapping;
 import static io.airlift.configuration.testing.ConfigAssertions.assertRecordedDefaults;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -30,7 +32,7 @@ public class TestServerConfig
     public void testDefaults()
     {
         assertRecordedDefaults(ConfigAssertions.recordDefaults(ServerConfig.class)
-                .setCoordinator(true)
+                .setNodeType(COORDINATOR)
                 .setPrestoVersion(null)
                 .setDataSources(null)
                 .setIncludeExceptionInResponse(true)
@@ -41,7 +43,7 @@ public class TestServerConfig
     public void testExplicitPropertyMappings()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("coordinator", "false")
+                .put("node-type", "WORKER")
                 .put("presto.version", "test")
                 .put("datasources", "jmx")
                 .put("http.include-exception-in-response", "false")
@@ -49,7 +51,7 @@ public class TestServerConfig
                 .build();
 
         ServerConfig expected = new ServerConfig()
-                .setCoordinator(false)
+                .setNodeType(WORKER)
                 .setPrestoVersion("test")
                 .setDataSources("jmx")
                 .setIncludeExceptionInResponse(false)

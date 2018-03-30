@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -93,7 +94,7 @@ public class TestFixedCountScheduler
     {
         ImmutableMap.Builder<Integer, Node> nodes = ImmutableMap.builder();
         for (int i = 0; i < count; i++) {
-            nodes.put(i, new PrestoNode("other " + i, URI.create("http://127.0.0.1:11"), NodeVersion.UNKNOWN, false));
+            nodes.put(i, new PrestoNode("other " + i, URI.create("http://127.0.0.1:11"), NodeVersion.UNKNOWN, WORKER));
         }
         return nodes.build();
     }

@@ -46,6 +46,7 @@ import java.util.UUID;
 
 import static com.facebook.presto.raptor.metadata.SchemaDaoUtil.createTablesWithRetry;
 import static com.facebook.presto.raptor.metadata.TestDatabaseShardManager.createShardManager;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.google.common.io.Files.createTempDir;
 import static com.google.common.io.MoreFiles.deleteRecursively;
@@ -199,7 +200,7 @@ public class TestShardEjector
 
     private static Node createTestingNode(String identifier)
     {
-        return new PrestoNode(identifier, URI.create("http://test"), NodeVersion.UNKNOWN, false);
+        return new PrestoNode(identifier, URI.create("http://test"), NodeVersion.UNKNOWN, WORKER);
     }
 
     private static class TestingBackupStore

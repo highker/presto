@@ -15,6 +15,7 @@ package com.facebook.presto.server;
 
 import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.memory.LocalMemoryManager;
+import com.facebook.presto.spi.NodeType;
 import com.sun.management.OperatingSystemMXBean;
 import io.airlift.node.NodeInfo;
 
@@ -36,7 +37,7 @@ public class StatusResource
     private final NodeInfo nodeInfo;
     private final NodeVersion version;
     private final String environment;
-    private final boolean coordinator;
+    private final NodeType nodeType;
     private final long startTime = System.nanoTime();
     private final int logicalCores;
     private final LocalMemoryManager memoryManager;
@@ -50,7 +51,7 @@ public class StatusResource
         this.nodeInfo = requireNonNull(nodeInfo, "nodeInfo is null");
         this.version = requireNonNull(nodeVersion, "nodeVersion is null");
         this.environment = requireNonNull(nodeInfo, "nodeInfo is null").getEnvironment();
-        this.coordinator = requireNonNull(serverConfig, "serverConfig is null").isCoordinator();
+        this.nodeType = requireNonNull(serverConfig, "serverConfig is null").getNodeType();
         this.memoryManager = requireNonNull(memoryManager, "memoryManager is null");
         this.memoryMXBean = ManagementFactory.getMemoryMXBean();
         this.logicalCores = Runtime.getRuntime().availableProcessors();
@@ -69,7 +70,7 @@ public class StatusResource
                 nodeInfo.getNodeId(),
                 version,
                 environment,
-                coordinator,
+                nodeType,
                 nanosSince(startTime),
                 nodeInfo.getExternalAddress(),
                 nodeInfo.getInternalAddress(),

@@ -40,6 +40,8 @@ import java.util.UUID;
 
 import static com.facebook.presto.spi.NodeState.ACTIVE;
 import static com.facebook.presto.spi.NodeState.INACTIVE;
+import static com.facebook.presto.spi.NodeType.COORDINATOR;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static io.airlift.discovery.client.ServiceDescriptor.serviceDescriptor;
 import static io.airlift.http.client.HttpStatus.OK;
 import static io.airlift.testing.Assertions.assertEqualsIgnoreOrder;
@@ -64,15 +66,15 @@ public class TestDiscoveryNodeManager
         testHttpClient = new TestingHttpClient(input -> new TestingResponse(OK, ArrayListMultimap.create(), ACTIVE.name().getBytes()));
 
         expectedVersion = new NodeVersion("1");
-        coordinator = new PrestoNode(UUID.randomUUID().toString(), URI.create("https://192.0.2.8"), expectedVersion, false);
+        coordinator = new PrestoNode(UUID.randomUUID().toString(), URI.create("https://192.0.2.8"), expectedVersion, COORDINATOR);
         activeNodes = ImmutableList.of(
-                new PrestoNode(nodeInfo.getNodeId(), URI.create("http://192.0.1.1"), expectedVersion, false),
-                new PrestoNode(UUID.randomUUID().toString(), URI.create("http://192.0.2.1:8080"), expectedVersion, false),
-                new PrestoNode(UUID.randomUUID().toString(), URI.create("http://192.0.2.3"), expectedVersion, false),
+                new PrestoNode(nodeInfo.getNodeId(), URI.create("http://192.0.1.1"), expectedVersion, WORKER),
+                new PrestoNode(UUID.randomUUID().toString(), URI.create("http://192.0.2.1:8080"), expectedVersion, WORKER),
+                new PrestoNode(UUID.randomUUID().toString(), URI.create("http://192.0.2.3"), expectedVersion, WORKER),
                 coordinator);
         inactiveNodes = ImmutableList.of(
-                new PrestoNode(UUID.randomUUID().toString(), URI.create("https://192.0.3.9"), NodeVersion.UNKNOWN, false),
-                new PrestoNode(UUID.randomUUID().toString(), URI.create("https://192.0.4.9"), new NodeVersion("2"), false));
+                new PrestoNode(UUID.randomUUID().toString(), URI.create("https://192.0.3.9"), NodeVersion.UNKNOWN, WORKER),
+                new PrestoNode(UUID.randomUUID().toString(), URI.create("https://192.0.4.9"), new NodeVersion("2"), WORKER));
 
         List<ServiceDescriptor> descriptors = new ArrayList<>();
         for (PrestoNode node : Iterables.concat(activeNodes, inactiveNodes)) {
@@ -80,6 +82,7 @@ public class TestDiscoveryNodeManager
                     .setNodeId(node.getNodeIdentifier())
                     .addProperty("http", node.getHttpUri().toString())
                     .addProperty("node_version", node.getNodeVersion().toString())
+                    .addProperty("node_type", (node.equals(coordinator) ? COORDINATOR : WORKER).toString())
                     .addProperty("coordinator", String.valueOf(node.equals(coordinator)))
                     .build());
         }

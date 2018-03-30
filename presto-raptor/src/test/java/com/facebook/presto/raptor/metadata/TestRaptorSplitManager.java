@@ -56,6 +56,7 @@ import java.util.UUID;
 import static com.facebook.presto.raptor.metadata.DatabaseShardManager.shardIndexTable;
 import static com.facebook.presto.raptor.metadata.SchemaDaoUtil.createTablesWithRetry;
 import static com.facebook.presto.raptor.metadata.TestDatabaseShardManager.shardInfo;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static com.facebook.presto.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.UNGROUPED_SCHEDULING;
 import static com.facebook.presto.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
@@ -105,7 +106,7 @@ public class TestRaptorSplitManager
         NodeSupplier nodeSupplier = nodeManager::getWorkerNodes;
 
         String nodeName = UUID.randomUUID().toString();
-        nodeManager.addNode(new PrestoNode(nodeName, new URI("http://127.0.0.1/"), NodeVersion.UNKNOWN, false));
+        nodeManager.addNode(new PrestoNode(nodeName, new URI("http://127.0.0.1/"), NodeVersion.UNKNOWN, WORKER));
 
         RaptorConnectorId connectorId = new RaptorConnectorId("raptor");
         metadata = new RaptorMetadata(connectorId.toString(), dbi, shardManager);
@@ -174,7 +175,7 @@ public class TestRaptorSplitManager
         TestingNodeManager nodeManager = new TestingNodeManager();
         RaptorConnectorId connectorId = new RaptorConnectorId("raptor");
         NodeSupplier nodeSupplier = nodeManager::getWorkerNodes;
-        PrestoNode node = new PrestoNode(UUID.randomUUID().toString(), new URI("http://127.0.0.1/"), NodeVersion.UNKNOWN, false);
+        PrestoNode node = new PrestoNode(UUID.randomUUID().toString(), new URI("http://127.0.0.1/"), NodeVersion.UNKNOWN, WORKER);
         nodeManager.addNode(node);
         RaptorSplitManager raptorSplitManagerWithBackup = new RaptorSplitManager(connectorId, nodeSupplier, shardManager, true);
 

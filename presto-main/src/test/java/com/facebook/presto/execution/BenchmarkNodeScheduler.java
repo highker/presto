@@ -69,6 +69,7 @@ import java.util.concurrent.TimeUnit;
 import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.BENCHMARK;
 import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.FLAT;
 import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType.LEGACY;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
@@ -147,7 +148,7 @@ public class BenchmarkNodeScheduler
 
             ImmutableList.Builder<Node> nodeBuilder = ImmutableList.builder();
             for (int i = 0; i < NODES; i++) {
-                nodeBuilder.add(new PrestoNode("node" + i, URI.create("http://" + addressForHost(i).getHostText()), NodeVersion.UNKNOWN, false));
+                nodeBuilder.add(new PrestoNode("node" + i, URI.create("http://" + addressForHost(i).getHostText()), NodeVersion.UNKNOWN, WORKER));
             }
             List<Node> nodes = nodeBuilder.build();
             MockRemoteTaskFactory remoteTaskFactory = new MockRemoteTaskFactory(

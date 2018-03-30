@@ -49,6 +49,7 @@ import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.facebook.presto.spi.NodeType.isCoordinator;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static java.util.Comparator.comparingInt;
 import static java.util.Objects.requireNonNull;
@@ -102,7 +103,7 @@ public class BucketBalancer
                 config.isBalancerEnabled(),
                 config.getBalancerInterval(),
                 backupService.isBackupAvailable(),
-                nodeManager.getCurrentNode().isCoordinator(),
+                isCoordinator(nodeManager.getCurrentNode().getNodeType()),
                 connectorId.toString());
     }
 

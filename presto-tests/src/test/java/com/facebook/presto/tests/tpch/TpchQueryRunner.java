@@ -14,8 +14,11 @@
 package com.facebook.presto.tests.tpch;
 
 import com.facebook.presto.tests.DistributedQueryRunner;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.log.Logging;
+
+import static com.google.common.base.Verify.verify;
 
 public final class TpchQueryRunner
 {
@@ -24,13 +27,30 @@ public final class TpchQueryRunner
     public static void main(String[] args)
             throws Exception
     {
+        boolean dispatcherEnabled = false;
+
         Logging.initialize();
-        DistributedQueryRunner queryRunner = TpchQueryRunnerBuilder.builder()
-                .setSingleExtraProperty("http-server.http.port", "8080")
-                .build();
+        DistributedQueryRunner queryRunner;
+        if (dispatcherEnabled) {
+            queryRunner = TpchQueryRunnerBuilder.builder()
+                    .setExtraProperties(ImmutableMap.of("http-server.http.port", "8081", "dispatcher.http.port", "8080"))
+                    .build();
+        }
+        else {
+            queryRunner = TpchQueryRunnerBuilder.builder()
+                    .setExtraProperties(ImmutableMap.of("http-server.http.port", "8080"))
+                    .build();
+        }
         Thread.sleep(10);
         Logger log = Logger.get(TpchQueryRunner.class);
         log.info("======== SERVER STARTED ========");
-        log.info("\n====\n%s\n====", queryRunner.getCoordinator().getBaseUrl());
+
+        if (dispatcherEnabled) {
+            verify(queryRunner.getDispatcher().isPresent());
+            log.info("\n====\ndispatcher:\t\t%s\ncoordinator:\t%s\n====", queryRunner.getDispatcher().get().getBaseUrl(), queryRunner.getCoordinator().getBaseUrl());
+        }
+        else {
+            log.info("\n====\n%s\n====", queryRunner.getCoordinator().getBaseUrl());
+        }
     }
 }

@@ -37,7 +37,6 @@ import static com.facebook.presto.spi.NodeState.ACTIVE;
 import static com.facebook.presto.spi.NodeState.INACTIVE;
 import static com.facebook.presto.spi.NodeState.SHUTTING_DOWN;
 import static com.facebook.presto.spi.SystemTable.Distribution.SINGLE_COORDINATOR;
-import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static java.util.Objects.requireNonNull;
 
@@ -50,7 +49,7 @@ public class NodeSystemTable
             .column("node_id", createUnboundedVarcharType())
             .column("http_uri", createUnboundedVarcharType())
             .column("node_version", createUnboundedVarcharType())
-            .column("coordinator", BOOLEAN)
+            .column("node_type", createUnboundedVarcharType())
             .column("state", createUnboundedVarcharType())
             .build();
 
@@ -88,7 +87,7 @@ public class NodeSystemTable
     private void addRows(Builder table, Set<Node> nodes, NodeState state)
     {
         for (Node node : nodes) {
-            table.addRow(node.getNodeIdentifier(), node.getHttpUri().toString(), getNodeVersion(node), isCoordinator(node), state.toString().toLowerCase());
+            table.addRow(node.getNodeIdentifier(), node.getHttpUri().toString(), getNodeVersion(node), node.getNodeType().toString(), state.toString().toLowerCase());
         }
     }
 
@@ -98,10 +97,5 @@ public class NodeSystemTable
             return ((PrestoNode) node).getNodeVersion().toString();
         }
         return "";
-    }
-
-    private boolean isCoordinator(Node node)
-    {
-        return nodeManager.getCoordinators().contains(node);
     }
 }

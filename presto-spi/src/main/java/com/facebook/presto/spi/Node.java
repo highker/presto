@@ -25,5 +25,5 @@ public interface Node
 
     String getVersion();
 
-    boolean isCoordinator();
+    NodeType getNodeType();
 }

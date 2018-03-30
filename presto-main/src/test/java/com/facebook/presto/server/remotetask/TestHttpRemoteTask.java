@@ -87,6 +87,7 @@ import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_CURRENT_STATE;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_MAX_WAIT;
 import static com.facebook.presto.execution.TaskTestUtils.TABLE_SCAN_NODE_ID;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static com.facebook.presto.spi.StandardErrorCode.REMOTE_TASK_ERROR;
 import static com.facebook.presto.spi.StandardErrorCode.REMOTE_TASK_MISMATCH;
 import static com.facebook.presto.testing.assertions.Assert.assertEquals;
@@ -207,7 +208,7 @@ public class TestHttpRemoteTask
         return httpRemoteTaskFactory.createRemoteTask(
                 TEST_SESSION,
                 new TaskId("test", 1, 2),
-                new PrestoNode("node-id", URI.create("http://fake.invalid/"), new NodeVersion("version"), false),
+                new PrestoNode("node-id", URI.create("http://fake.invalid/"), new NodeVersion("version"), WORKER),
                 TaskTestUtils.PLAN_FRAGMENT,
                 ImmutableMultimap.of(),
                 createInitialEmptyOutputBuffers(OutputBuffers.BufferType.BROADCAST),

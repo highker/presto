@@ -54,6 +54,7 @@ import java.util.Set;
 
 import static com.facebook.presto.server.PrestoSystemRequirements.verifyJvmRequirements;
 import static com.facebook.presto.server.PrestoSystemRequirements.verifySystemTimeIsReasonable;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
 import static com.google.common.base.Strings.nullToEmpty;
 import static io.airlift.discovery.client.ServiceAnnouncement.ServiceAnnouncementBuilder;
 import static io.airlift.discovery.client.ServiceAnnouncement.serviceAnnouncement;
@@ -160,7 +161,7 @@ public class PrestoServer
         if (connectorIds.isEmpty()) {
             List<Catalog> catalogs = metadata.getCatalogs();
             // if this is a dedicated coordinator, only add jmx
-            if (serverConfig.isCoordinator() && !schedulerConfig.isIncludeCoordinator()) {
+            if (isCoordinator(serverConfig.getNodeType()) && !schedulerConfig.isIncludeCoordinator()) {
                 catalogs.stream()
                         .map(Catalog::getConnectorId)
                         .filter(connectorId -> connectorId.getCatalogName().equals("jmx"))

@@ -16,6 +16,7 @@ package com.facebook.presto.metadata;
 import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.Node;
+import com.facebook.presto.spi.NodeType;
 
 import java.net.URI;
 
@@ -33,15 +34,15 @@ public class PrestoNode
     private final String nodeIdentifier;
     private final URI httpUri;
     private final NodeVersion nodeVersion;
-    private final boolean coordinator;
+    private final NodeType nodeType;
 
-    public PrestoNode(String nodeIdentifier, URI httpUri, NodeVersion nodeVersion, boolean coordinator)
+    public PrestoNode(String nodeIdentifier, URI httpUri, NodeVersion nodeVersion, NodeType nodeType)
     {
         nodeIdentifier = emptyToNull(nullToEmpty(nodeIdentifier).trim());
         this.nodeIdentifier = requireNonNull(nodeIdentifier, "nodeIdentifier is null or empty");
         this.httpUri = requireNonNull(httpUri, "httpUri is null");
         this.nodeVersion = requireNonNull(nodeVersion, "nodeVersion is null");
-        this.coordinator = coordinator;
+        this.nodeType = requireNonNull(nodeType, "nodeType is null");
     }
 
     @Override
@@ -69,9 +70,9 @@ public class PrestoNode
     }
 
     @Override
-    public boolean isCoordinator()
+    public NodeType getNodeType()
     {
-        return coordinator;
+        return nodeType;
     }
 
     public NodeVersion getNodeVersion()

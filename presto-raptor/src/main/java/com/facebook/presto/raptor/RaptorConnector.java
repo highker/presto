@@ -45,6 +45,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static com.facebook.presto.raptor.util.DatabaseUtil.onDemandDao;
+import static com.facebook.presto.spi.NodeType.isCoordinator;
 import static com.facebook.presto.spi.transaction.IsolationLevel.READ_COMMITTED;
 import static com.facebook.presto.spi.transaction.IsolationLevel.checkConnectorSupports;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -105,7 +106,7 @@ public class RaptorConnector
         this.systemTables = requireNonNull(systemTables, "systemTables is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.dao = onDemandDao(dbi, MetadataDao.class);
-        this.coordinator = nodeManager.getCurrentNode().isCoordinator();
+        this.coordinator = isCoordinator(nodeManager.getCurrentNode().getNodeType());
     }
 
     @PostConstruct

@@ -31,6 +31,7 @@ import java.util.Map;
 
 import static com.facebook.presto.memory.LocalMemoryManager.GENERAL_POOL;
 import static com.facebook.presto.memory.LocalMemoryManager.RESERVED_POOL;
+import static com.facebook.presto.spi.NodeType.WORKER;
 import static io.airlift.units.DataSize.Unit.BYTE;
 
 public class LowMemoryKillerTestingUtils
@@ -46,7 +47,7 @@ public class LowMemoryKillerTestingUtils
             Map<String, Long> reservationByNode = entry.getValue();
 
             for (Map.Entry<String, Long> nodeEntry : reservationByNode.entrySet()) {
-                PrestoNode node = new PrestoNode(nodeEntry.getKey(), URI.create("http://localhost"), new NodeVersion("version"), false);
+                PrestoNode node = new PrestoNode(nodeEntry.getKey(), URI.create("http://localhost"), new NodeVersion("version"), WORKER);
                 long bytes = nodeEntry.getValue();
                 if (bytes == 0) {
                     continue;

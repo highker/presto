@@ -54,9 +54,9 @@ public class ClusterStatsResource
         long blockedQueries = 0;
         long queuedQueries = 0;
 
-        long activeNodes = nodeManager.getNodes(NodeState.ACTIVE).size();
+        long activeNodes = nodeManager.getNodes(NodeState.ACTIVE).size() - nodeManager.getDispatchers().size();
         if (!isIncludeCoordinator) {
-            activeNodes -= 1;
+            activeNodes -= nodeManager.getCoordinators().size();
         }
 
         long runningDrivers = 0;
