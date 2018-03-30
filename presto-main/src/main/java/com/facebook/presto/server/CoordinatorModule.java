@@ -14,6 +14,7 @@
 package com.facebook.presto.server;
 
 import com.facebook.presto.client.QueryResults;
+import com.facebook.presto.execution.AbstractQueryExecution;
 import com.facebook.presto.execution.AddColumnTask;
 import com.facebook.presto.execution.CallTask;
 import com.facebook.presto.execution.CommitTask;
@@ -22,10 +23,13 @@ import com.facebook.presto.execution.CreateTableTask;
 import com.facebook.presto.execution.CreateViewTask;
 import com.facebook.presto.execution.DataDefinitionTask;
 import com.facebook.presto.execution.DeallocateTask;
+import com.facebook.presto.execution.DispatchQueryExecution.DispatchQueryExecutionFactory;
+import com.facebook.presto.execution.DispatchTransactionManager;
 import com.facebook.presto.execution.DropColumnTask;
 import com.facebook.presto.execution.DropSchemaTask;
 import com.facebook.presto.execution.DropTableTask;
 import com.facebook.presto.execution.DropViewTask;
+import com.facebook.presto.execution.ForDispatchTransaction;
 import com.facebook.presto.execution.ForQueryExecution;
 import com.facebook.presto.execution.GrantTask;
 import com.facebook.presto.execution.PrepareTask;
@@ -126,6 +130,7 @@ import static com.facebook.presto.execution.DataDefinitionExecution.DataDefiniti
 import static com.facebook.presto.execution.QueryExecution.QueryExecutionFactory;
 import static com.facebook.presto.execution.SqlQueryExecution.SqlQueryExecutionFactory;
 import static com.google.inject.multibindings.MapBinder.newMapBinder;
+import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.airlift.configuration.ConditionalModule.installModuleIf;
 import static io.airlift.discovery.client.DiscoveryBinder.discoveryBinder;
@@ -134,6 +139,7 @@ import static io.airlift.http.server.HttpServerBinder.httpServerBinder;
 import static io.airlift.jaxrs.JaxrsBinder.jaxrsBinder;
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static java.util.concurrent.Executors.newCachedThreadPool;
+import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.weakref.jmx.ObjectNames.generatedNameOf;
@@ -145,6 +151,9 @@ public class CoordinatorModule
     @Override
     protected void setup(Binder binder)
     {
+        ServerConfig serverConfig = buildConfigObject(ServerConfig.class);
+        boolean isCoordinator = serverConfig.isCoordinator();
+
         httpServerBinder(binder).bindResource("/", "webapp").withWelcomeFile("index.html");
 
         // presto coordinator announcement
@@ -224,48 +233,54 @@ public class CoordinatorModule
 
         binder.bind(SplitSchedulerStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(SplitSchedulerStats.class).withGeneratedName();
-        binder.bind(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(Query.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(Explain.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowCreate.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowColumns.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowStats.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowPartitions.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowFunctions.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowTables.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowSchemas.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowCatalogs.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowSession.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(ShowGrants.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(CreateTableAsSelect.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(Insert.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(Delete.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(DescribeInput.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
-        executionBinder.addBinding(DescribeOutput.class).to(SqlQueryExecutionFactory.class).in(Scopes.SINGLETON);
+        // TODO: update the condition once the dispatcher module is ready
+        if (true) {
+            bindSqlQueryExecutionFactory(binder, SqlQueryExecutionFactory.class, executionBinder);
+        }
+        else {
+            httpClientBinder(binder).bindHttpClient("dispatchTransactionManager", ForDispatchTransaction.class)
+                    .withTracing()
+                    .withConfigDefaults(config -> {
+                        config.setIdleTimeout(new Duration(5, SECONDS));
+                        config.setRequestTimeout(new Duration(10, SECONDS));
+                    });
+            binder.bind(DispatchTransactionManager.class).in(Scopes.SINGLETON);
+
+            binder.bind(ScheduledExecutorService.class).annotatedWith(ForQueryExecution.class)
+                    .toInstance(newScheduledThreadPool(5, daemonThreadsNamed("dispatch-query-execution-%s")));
+
+            httpClientBinder(binder).bindHttpClient("queryExecutionFactory", ForQueryExecution.class)
+                    .withTracing()
+                    .withConfigDefaults(config -> {
+                        config.setIdleTimeout(new Duration(10, SECONDS));
+                        config.setRequestTimeout(new Duration(20, SECONDS));
+                    });
+            bindSqlQueryExecutionFactory(binder, DispatchQueryExecutionFactory.class, executionBinder);
+        }
 
         binder.bind(DataDefinitionExecutionFactory.class).in(Scopes.SINGLETON);
-        bindDataDefinitionTask(binder, executionBinder, CreateSchema.class, CreateSchemaTask.class);
-        bindDataDefinitionTask(binder, executionBinder, DropSchema.class, DropSchemaTask.class);
-        bindDataDefinitionTask(binder, executionBinder, RenameSchema.class, RenameSchemaTask.class);
-        bindDataDefinitionTask(binder, executionBinder, AddColumn.class, AddColumnTask.class);
-        bindDataDefinitionTask(binder, executionBinder, CreateTable.class, CreateTableTask.class);
-        bindDataDefinitionTask(binder, executionBinder, RenameTable.class, RenameTableTask.class);
-        bindDataDefinitionTask(binder, executionBinder, RenameColumn.class, RenameColumnTask.class);
-        bindDataDefinitionTask(binder, executionBinder, DropColumn.class, DropColumnTask.class);
-        bindDataDefinitionTask(binder, executionBinder, DropTable.class, DropTableTask.class);
-        bindDataDefinitionTask(binder, executionBinder, CreateView.class, CreateViewTask.class);
-        bindDataDefinitionTask(binder, executionBinder, DropView.class, DropViewTask.class);
-        bindDataDefinitionTask(binder, executionBinder, Use.class, UseTask.class);
-        bindDataDefinitionTask(binder, executionBinder, SetSession.class, SetSessionTask.class);
-        bindDataDefinitionTask(binder, executionBinder, ResetSession.class, ResetSessionTask.class);
-        bindDataDefinitionTask(binder, executionBinder, StartTransaction.class, StartTransactionTask.class);
-        bindDataDefinitionTask(binder, executionBinder, Commit.class, CommitTask.class);
-        bindDataDefinitionTask(binder, executionBinder, Rollback.class, RollbackTask.class);
-        bindDataDefinitionTask(binder, executionBinder, Call.class, CallTask.class);
-        bindDataDefinitionTask(binder, executionBinder, Grant.class, GrantTask.class);
-        bindDataDefinitionTask(binder, executionBinder, Revoke.class, RevokeTask.class);
-        bindDataDefinitionTask(binder, executionBinder, Prepare.class, PrepareTask.class);
-        bindDataDefinitionTask(binder, executionBinder, Deallocate.class, DeallocateTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, CreateSchema.class, CreateSchemaTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, DropSchema.class, DropSchemaTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, RenameSchema.class, RenameSchemaTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, AddColumn.class, AddColumnTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, CreateTable.class, CreateTableTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, RenameTable.class, RenameTableTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, RenameColumn.class, RenameColumnTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, DropColumn.class, DropColumnTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, DropTable.class, DropTableTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, CreateView.class, CreateViewTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, DropView.class, DropViewTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, Use.class, UseTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, SetSession.class, SetSessionTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, ResetSession.class, ResetSessionTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, StartTransaction.class, StartTransactionTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, Commit.class, CommitTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, Rollback.class, RollbackTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, Call.class, CallTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, Grant.class, GrantTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, Revoke.class, RevokeTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, Prepare.class, PrepareTask.class);
+        bindDataDefinitionTask(isCoordinator, binder, executionBinder, Deallocate.class, DeallocateTask.class);
 
         MapBinder<String, ExecutionPolicy> executionPolicyBinder = newMapBinder(binder, String.class, ExecutionPolicy.class);
         executionPolicyBinder.addBinding("all-at-once").to(AllAtOnceExecutionPolicy.class);
@@ -276,6 +291,7 @@ public class CoordinatorModule
     }
 
     private static <T extends Statement> void bindDataDefinitionTask(
+            boolean isCoordinator,
             Binder binder,
             MapBinder<Class<? extends Statement>, QueryExecutionFactory<?>> executionBinder,
             Class<T> statement,
@@ -285,7 +301,38 @@ public class CoordinatorModule
                 new TypeLiteral<Class<? extends Statement>>() {}, new TypeLiteral<DataDefinitionTask<?>>() {});
 
         taskBinder.addBinding(statement).to(task).in(Scopes.SINGLETON);
-        executionBinder.addBinding(statement).to(DataDefinitionExecutionFactory.class).in(Scopes.SINGLETON);
+        if (isCoordinator) {
+            // execution on the current server
+            executionBinder.addBinding(statement).to(DataDefinitionExecutionFactory.class).in(Scopes.SINGLETON);
+        }
+        else {
+            executionBinder.addBinding(statement).to(DispatchQueryExecutionFactory.class).in(Scopes.SINGLETON);
+        }
+    }
+
+    private static void bindSqlQueryExecutionFactory(
+            Binder binder,
+            Class<? extends QueryExecutionFactory<? extends AbstractQueryExecution>> sqlQueryExecutionFactory,
+            MapBinder<Class<? extends Statement>, QueryExecutionFactory<?>> executionBinder)
+    {
+        binder.bind(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(Query.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(Explain.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowCreate.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowColumns.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowStats.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowPartitions.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowFunctions.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowTables.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowSchemas.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowCatalogs.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowSession.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(ShowGrants.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(CreateTableAsSelect.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(Insert.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(Delete.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(DescribeInput.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
+        executionBinder.addBinding(DescribeOutput.class).to(sqlQueryExecutionFactory).in(Scopes.SINGLETON);
     }
 
     private void bindLowMemoryKiller(String name, Class<? extends LowMemoryKiller> clazz)
