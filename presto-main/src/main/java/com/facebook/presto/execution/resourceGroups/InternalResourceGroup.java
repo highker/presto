@@ -703,6 +703,7 @@ public class InternalResourceGroup
                 group = group.parent.get();
             }
             updateEligibility();
+            // TODO: need to call setTargetCoordinator() before start()
             executor.execute(query::start);
         }
     }
@@ -719,6 +720,7 @@ public class InternalResourceGroup
                 InternalResourceGroup group = this;
                 while (group != null) {
                     try {
+                        // TODO: getTotalCpuTime is now remote
                         group.cpuUsageMillis = Math.addExact(group.cpuUsageMillis, query.getTotalCpuTime().toMillis());
                     }
                     catch (ArithmeticException e) {
@@ -755,6 +757,7 @@ public class InternalResourceGroup
             if (subGroups.isEmpty()) {
                 cachedMemoryUsageBytes = 0;
                 for (QueryExecution query : runningQueries) {
+                    // TODO: getUserMemoryReservation is now remote
                     cachedMemoryUsageBytes += query.getUserMemoryReservation();
                 }
             }

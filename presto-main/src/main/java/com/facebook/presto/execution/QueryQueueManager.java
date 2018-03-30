@@ -26,5 +26,6 @@ import java.util.concurrent.Executor;
 @ThreadSafe
 public interface QueryQueueManager
 {
+    // TODO: each implementation needs to know when to forward which query to which coordinator
     void submit(Statement statement, QueryExecution queryExecution, Executor executor);
 }
