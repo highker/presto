@@ -79,6 +79,23 @@ public class QueryResource
         }
     }
 
+    @GET
+    @Path("{queryId}/dispatch/{done}")
+    public Response dispatchQueryStatus(
+            @PathParam("queryId") QueryId queryId,
+            @PathParam("{done}") boolean done)
+    {
+        requireNonNull(queryId, "queryId is null");
+
+        try {
+            QueryInfo queryInfo = queryManager.dispatchQueryStatus(queryId, done);
+            return Response.ok(new DispatchQueryInfo(queryInfo)).build();
+        }
+        catch (NoSuchElementException e) {
+            return Response.status(Status.GONE).build();
+        }
+    }
+
     @DELETE
     @Path("{queryId}")
     public void cancelQuery(@PathParam("queryId") QueryId queryId)

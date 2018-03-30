@@ -28,6 +28,7 @@ public class TestQueryManagerConfig
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(QueryManagerConfig.class)
                 .setMinQueryExpireAge(new Duration(15, TimeUnit.MINUTES))
+                .setMaxDispatchQueryExpireAge(new Duration(15, TimeUnit.MINUTES))
                 .setMaxQueryHistory(100)
                 .setMaxQueryLength(1_000_000)
                 .setClientTimeout(new Duration(5, TimeUnit.MINUTES))
@@ -54,6 +55,7 @@ public class TestQueryManagerConfig
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("query.client.timeout", "10s")
                 .put("query.min-expire-age", "30s")
+                .put("query.max-dispatch-query-expire-age", "42s")
                 .put("query.max-history", "10")
                 .put("query.max-length", "10000")
                 .put("query.schedule-split-batch-size", "99")
@@ -75,6 +77,7 @@ public class TestQueryManagerConfig
 
         QueryManagerConfig expected = new QueryManagerConfig()
                 .setMinQueryExpireAge(new Duration(30, TimeUnit.SECONDS))
+                .setMaxDispatchQueryExpireAge(new Duration(42, TimeUnit.SECONDS))
                 .setMaxQueryHistory(10)
                 .setMaxQueryLength(10000)
                 .setClientTimeout(new Duration(10, TimeUnit.SECONDS))

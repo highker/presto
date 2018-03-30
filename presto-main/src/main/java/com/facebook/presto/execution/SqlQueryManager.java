@@ -63,6 +63,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
@@ -114,6 +115,7 @@ public class SqlQueryManager
     private final boolean isIncludeCoordinator;
     private final int maxQueryHistory;
     private final Duration minQueryExpireAge;
+    private final Duration maxDispatchQueryExpireAge;
     private final int maxQueryLength;
     private final int initializationRequiredWorkers;
     private final Duration initializationTimeout;
@@ -121,6 +123,7 @@ public class SqlQueryManager
     private final Duration maxQueryCpuTime;
 
     private final ConcurrentMap<QueryId, QueryExecution> queries = new ConcurrentHashMap<>();
+    private final Set<QueryId> dispatchedQueries = ConcurrentHashMap.newKeySet();
     private final Queue<QueryExecution> expirationQueue = new LinkedBlockingQueue<>();
 
     private final Duration clientTimeout;
@@ -183,6 +186,7 @@ public class SqlQueryManager
 
         this.isIncludeCoordinator = nodeSchedulerConfig.isIncludeCoordinator();
         this.minQueryExpireAge = queryManagerConfig.getMinQueryExpireAge();
+        this.maxDispatchQueryExpireAge = queryManagerConfig.getMaxDispatchQueryExpireAge();
         this.maxQueryHistory = queryManagerConfig.getMaxQueryHistory();
         this.clientTimeout = queryManagerConfig.getClientTimeout();
         this.maxQueryLength = queryManagerConfig.getMaxQueryLength();
@@ -317,6 +321,25 @@ public class SqlQueryManager
     public QueryInfo getQueryInfo(QueryId queryId)
     {
         return getQuery(queryId).getQueryInfo();
+    }
+
+    @Override
+    public QueryInfo dispatchQueryStatus(QueryId queryId, boolean done)
+    {
+        if (done) {
+            dispatchedQueries.remove(queryId);
+        }
+        else {
+            dispatchedQueries.add(queryId);
+        }
+
+        try {
+            return getQuery(queryId).getQueryInfo();
+        }
+        catch (Exception e) {
+            dispatchedQueries.remove(queryId);
+            throw e;
+        }
     }
 
     @Override
@@ -602,6 +625,7 @@ public class SqlQueryManager
     private void removeExpiredQueries()
     {
         DateTime timeHorizon = DateTime.now().minus(minQueryExpireAge.toMillis());
+        DateTime monitorHorizon = DateTime.now().minus(maxDispatchQueryExpireAge.toMillis());
 
         // we're willing to keep queries beyond timeHorizon as long as we have fewer than maxQueryHistory
         while (expirationQueue.size() > maxQueryHistory) {
@@ -613,10 +637,16 @@ public class SqlQueryManager
                 return;
             }
 
-            // only expire them if they are older than minQueryExpireAge. We need to keep them
-            // around for a while in case clients come back asking for status
             QueryId queryId = queryInfo.getQueryId();
 
+            if (dispatchedQueries.contains(queryId) && queryInfo.getQueryStats().getEndTime().isAfter(monitorHorizon)) {
+                // the dispatcher is still checking the status of the query
+                log.debug("Remove expired dispatched query %s", queryId);
+                dispatchedQueries.remove(queryId);
+            }
+
+            // Only expire them if they are older than minQueryExpireAge or maxDispatchQueryExpireAge (if applicable).
+            // We need to keep them around for a while in case clients come back asking for status
             log.debug("Remove query %s", queryId);
             queries.remove(queryId);
             expirationQueue.remove();

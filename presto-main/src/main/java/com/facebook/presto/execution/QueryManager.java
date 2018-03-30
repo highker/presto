@@ -37,6 +37,8 @@ public interface QueryManager
 
     QueryInfo getQueryInfo(QueryId queryId);
 
+    QueryInfo dispatchQueryStatus(QueryId queryId, boolean done);
+
     Optional<ResourceGroupId> getQueryResourceGroup(QueryId queryId);
 
     Plan getQueryPlan(QueryId queryId);

@@ -42,6 +42,7 @@ public class QueryManagerConfig
 
     private int initialHashPartitions = 100;
     private Duration minQueryExpireAge = new Duration(15, TimeUnit.MINUTES);
+    private Duration maxDispatchQueryExpireAge = new Duration(15, TimeUnit.MINUTES);
     private int maxQueryHistory = 100;
     private int maxQueryLength = 1_000_000;
     private Duration clientTimeout = new Duration(5, TimeUnit.MINUTES);
@@ -125,6 +126,19 @@ public class QueryManagerConfig
     public QueryManagerConfig setInitialHashPartitions(int initialHashPartitions)
     {
         this.initialHashPartitions = initialHashPartitions;
+        return this;
+    }
+
+    @NotNull
+    public Duration getMaxDispatchQueryExpireAge()
+    {
+        return maxDispatchQueryExpireAge;
+    }
+
+    @Config("query.max-dispatch-query-expire-age")
+    public QueryManagerConfig setMaxDispatchQueryExpireAge(Duration maxDispatchQueryExpireAge)
+    {
+        this.maxDispatchQueryExpireAge = maxDispatchQueryExpireAge;
         return this;
     }
 
