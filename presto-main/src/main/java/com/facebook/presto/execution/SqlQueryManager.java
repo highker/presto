@@ -16,6 +16,7 @@ package com.facebook.presto.execution;
 import com.facebook.presto.ExceededCpuLimitException;
 import com.facebook.presto.Session;
 import com.facebook.presto.SystemSessionProperties;
+import com.facebook.presto.client.QueryResults;
 import com.facebook.presto.event.query.QueryMonitor;
 import com.facebook.presto.execution.QueryExecution.QueryExecutionFactory;
 import com.facebook.presto.execution.QueryExecution.QueryOutputInfo;
@@ -28,6 +29,8 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.server.SessionContext;
 import com.facebook.presto.server.SessionSupplier;
+import com.facebook.presto.server.protocol.Query;
+import com.facebook.presto.server.protocol.Query.QueryFactory;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
@@ -77,6 +80,7 @@ import static com.facebook.presto.SystemSessionProperties.getQueryMaxCpuTime;
 import static com.facebook.presto.execution.AbstractQueryExecution.getSqlQueryType;
 import static com.facebook.presto.execution.ParameterExtractor.getParameterCount;
 import static com.facebook.presto.execution.QueryState.RUNNING;
+import static com.facebook.presto.server.protocol.FailedQuery.failed;
 import static com.facebook.presto.spi.NodeState.ACTIVE;
 import static com.facebook.presto.spi.StandardErrorCode.ABANDONED_QUERY;
 import static com.facebook.presto.spi.StandardErrorCode.EXCEEDED_TIME_LIMIT;
@@ -139,6 +143,7 @@ public class SqlQueryManager
     private final InternalNodeManager internalNodeManager;
 
     private final Map<Class<? extends Statement>, QueryExecutionFactory<?>> executionFactories;
+    private final Map<Class<? extends Statement>, QueryFactory<?>> queryFactories;
 
     private final SqlQueryManagerStats stats = new SqlQueryManagerStats();
 
@@ -157,11 +162,13 @@ public class SqlQueryManager
             SessionSupplier sessionSupplier,
             InternalNodeManager internalNodeManager,
             Map<Class<? extends Statement>, QueryExecutionFactory<?>> executionFactories,
+            Map<Class<? extends Statement>, QueryFactory<?>> queryFactories,
             Metadata metadata)
     {
         this.sqlParser = requireNonNull(sqlParser, "sqlParser is null");
 
         this.executionFactories = requireNonNull(executionFactories, "executionFactories is null");
+        this.queryFactories = requireNonNull(queryFactories, "queryFactories is null");
 
         this.queryExecutor = newCachedThreadPool(threadsNamed("query-scheduler-%s"));
         this.queryExecutorMBean = new ThreadPoolExecutorMBean((ThreadPoolExecutor) queryExecutor);
@@ -306,6 +313,12 @@ public class SqlQueryManager
     }
 
     @Override
+    public void addRedirectResultsListener(QueryId queryId, Consumer<QueryResults> listener)
+    {
+        getQuery(queryId).addRedirectResultsListener(requireNonNull(listener, "listener is null"));
+    }
+
+    @Override
     public ListenableFuture<QueryState> getStateChange(QueryId queryId, QueryState currentState)
     {
         return tryGetQuery(queryId)
@@ -347,7 +360,7 @@ public class SqlQueryManager
     }
 
     @Override
-    public QueryInfo createQuery(QueryId queryId, SessionContext sessionContext, String query)
+    public Query createQuery(QueryId queryId, SessionContext sessionContext, String query)
     {
         requireNonNull(queryId, "queryId is null");
         requireNonNull(sessionContext, "sessionFactory is null");
@@ -358,6 +371,7 @@ public class SqlQueryManager
         Session session = null;
         QueryExecution queryExecution;
         Statement statement;
+        QueryFactory<?> queryFactory;
         try {
             if (!acceptQueries.get()) {
                 int activeWorkerCount = internalNodeManager.getNodes(ACTIVE).size();
@@ -383,7 +397,8 @@ public class SqlQueryManager
             List<Expression> parameters = wrappedStatement instanceof Execute ? ((Execute) wrappedStatement).getParameters() : emptyList();
             validateParameters(statement, parameters);
             QueryExecutionFactory<?> queryExecutionFactory = executionFactories.get(statement.getClass());
-            if (queryExecutionFactory == null) {
+            queryFactory = queryFactories.get(statement.getClass());
+            if (queryExecutionFactory == null || queryFactory == null) {
                 throw new PrestoException(NOT_SUPPORTED, "Unsupported statement type: " + statement.getClass().getSimpleName());
             }
             if (statement instanceof Explain && ((Explain) statement).isAnalyze()) {
@@ -412,11 +427,10 @@ public class SqlQueryManager
             }
             QueryExecution execution = new FailedQueryExecution(queryId, query, resourceGroup, session, self, transactionManager, queryExecutor, metadata, e);
 
-            QueryInfo queryInfo = null;
             try {
                 queries.put(queryId, execution);
 
-                queryInfo = execution.getQueryInfo();
+                QueryInfo queryInfo = execution.getQueryInfo();
                 queryMonitor.queryCreatedEvent(queryInfo);
                 queryMonitor.queryCompletedEvent(queryInfo);
                 stats.queryQueued();
@@ -429,7 +443,7 @@ public class SqlQueryManager
                 expirationQueue.add(execution);
             }
 
-            return queryInfo;
+            return failed(queryId, session, this);
         }
 
         QueryInfo queryInfo = queryExecution.getQueryInfo();
@@ -454,7 +468,7 @@ public class SqlQueryManager
         // start the query in the background
         queueManager.submit(statement, queryExecution, queryExecutor);
 
-        return queryInfo;
+        return queryFactory.create(queryId, session, this);
     }
 
     public static Statement unwrapExecuteStatement(Statement statement, SqlParser sqlParser, Session session)

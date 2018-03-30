@@ -13,9 +13,11 @@
  */
 package com.facebook.presto.execution;
 
+import com.facebook.presto.client.QueryResults;
 import com.facebook.presto.execution.QueryExecution.QueryOutputInfo;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.server.SessionContext;
+import com.facebook.presto.server.protocol.Query;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.resourceGroups.ResourceGroupId;
 import com.facebook.presto.sql.planner.Plan;
@@ -33,6 +35,8 @@ public interface QueryManager
 
     void addStateChangeListener(QueryId queryId, StateChangeListener<QueryState> listener);
 
+    void addRedirectResultsListener(QueryId queryId, Consumer<QueryResults> listener);
+
     ListenableFuture<QueryState> getStateChange(QueryId queryId, QueryState currentState);
 
     QueryInfo getQueryInfo(QueryId queryId);
@@ -45,7 +49,7 @@ public interface QueryManager
 
     void recordHeartbeat(QueryId queryId);
 
-    QueryInfo createQuery(QueryId queryId, SessionContext sessionContext, String query);
+    Query createQuery(QueryId queryId, SessionContext sessionContext, String query);
 
     void failQuery(QueryId queryId, Throwable cause);
 
