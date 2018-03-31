@@ -27,7 +27,7 @@ public final class TpchQueryRunner
     public static void main(String[] args)
             throws Exception
     {
-        boolean dispatcherEnabled = false;
+        boolean dispatcherEnabled = true;
 
         Logging.initialize();
         DistributedQueryRunner queryRunner;
