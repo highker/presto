@@ -1740,68 +1740,6 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
-    private static class TableAndMore
-    {
-        private final Table table;
-        private final Optional<PrincipalPrivileges> principalPrivileges;
-        private final Optional<Path> currentLocation; // unpartitioned table only
-        private final Optional<List<String>> fileNames;
-        private final boolean ignoreExisting;
-
-        public TableAndMore(
-                Table table,
-                Optional<PrincipalPrivileges> principalPrivileges,
-                Optional<Path> currentLocation,
-                Optional<List<String>> fileNames,
-                boolean ignoreExisting)
-        {
-            this.table = requireNonNull(table, "table is null");
-            this.principalPrivileges = requireNonNull(principalPrivileges, "principalPrivileges is null");
-            this.currentLocation = requireNonNull(currentLocation, "currentLocation is null");
-            this.fileNames = requireNonNull(fileNames, "fileNames is null");
-            this.ignoreExisting = ignoreExisting;
-
-            checkArgument(!table.getStorage().getLocation().isEmpty() || !currentLocation.isPresent(), "currentLocation can not be supplied for table without location");
-            checkArgument(!fileNames.isPresent() || currentLocation.isPresent(), "fileNames can be supplied only when currentLocation is supplied");
-        }
-
-        public boolean isIgnoreExisting()
-        {
-            return ignoreExisting;
-        }
-
-        public Table getTable()
-        {
-            return table;
-        }
-
-        public PrincipalPrivileges getPrincipalPrivileges()
-        {
-            checkState(principalPrivileges.isPresent());
-            return principalPrivileges.get();
-        }
-
-        public Optional<Path> getCurrentLocation()
-        {
-            return currentLocation;
-        }
-
-        public Optional<List<String>> getFileNames()
-        {
-            return fileNames;
-        }
-
-        @Override
-        public String toString()
-        {
-            return toStringHelper(this)
-                    .add("table", table)
-                    .add("principalPrivileges", principalPrivileges)
-                    .add("currentLocation", currentLocation)
-                    .toString();
-        }
-    }
-
     public static class PartitionAndMore
     {
         private final Partition partition;

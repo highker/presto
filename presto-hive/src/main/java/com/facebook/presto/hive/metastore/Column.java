@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import javax.annotation.concurrent.Immutable;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -58,6 +59,27 @@ public class Column
     public Optional<String> getComment()
     {
         return comment;
+    }
+
+    @Override
+    public boolean equals(Object other)
+    {
+        if (this == other) {
+            return true;
+        }
+        if (other == null || getClass() != other.getClass()) {
+            return false;
+        }
+        Column otherColumn = (Column) other;
+        return Objects.equals(name, otherColumn.name) &&
+                Objects.equals(type, otherColumn.type) &&
+                Objects.equals(comment, otherColumn.comment);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(name, type, comment);
     }
 
     @Override

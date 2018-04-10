@@ -1,0 +1,97 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.facebook.presto.hive.metastore;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
+import io.airlift.json.JsonCodec;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.TableType;
+import org.testng.annotations.Test;
+
+import java.util.Optional;
+
+import static com.facebook.presto.hive.HiveType.HIVE_STRING;
+import static io.airlift.json.JsonCodec.jsonCodec;
+import static org.testng.Assert.assertEquals;
+
+public class TestTransactionSerde
+{
+    @Test
+    public void testTableAndMoreSerde()
+    {
+        JsonCodec<TableAndMore> codec = jsonCodec(TableAndMore.class);
+
+        TableAndMore tableAndMore = new TableAndMore(
+                table(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                false);
+
+        assertRoundTrip(codec, tableAndMore);
+
+        tableAndMore = new TableAndMore(
+                table(),
+                Optional.of(principalPrivileges()),
+                Optional.of(new Path("hdfs://VOL1:9000/db_name/table_name")),
+                Optional.of(ImmutableList.of("file1", "file2")),
+                false);
+
+        assertRoundTrip(codec, tableAndMore);
+    }
+
+    private <T> void assertRoundTrip(JsonCodec<T> codec, T object)
+    {
+        assertEquals(codec.fromJson(codec.toJson(object)), object);
+    }
+
+    private static Table table()
+    {
+        Table.Builder tableBuilder = Table.builder();
+        tableBuilder.getStorageBuilder()
+                .setStorageFormat(
+                        StorageFormat.create(
+                                "com.facebook.hive.orc.OrcSerde",
+                                "org.apache.hadoop.hive.ql.io.RCFileInputFormat",
+                                "org.apache.hadoop.hive.ql.io.RCFileInputFormat"))
+                .setLocation("hdfs://VOL1:9000/db_name/table_name")
+                .setSkewed(false)
+                .setSorted(false);
+
+        return tableBuilder
+                .setDatabaseName("test_dbname")
+                .setOwner("testOwner")
+                .setTableName("test_table")
+                .setTableType(TableType.MANAGED_TABLE.toString())
+                .setDataColumns(ImmutableList.of(new Column("col1", HIVE_STRING, Optional.empty())))
+                .setParameters(ImmutableMap.of())
+                .setPartitionColumns(ImmutableList.of(new Column("col2", HIVE_STRING, Optional.empty())))
+                .build();
+    }
+
+    private static PrincipalPrivileges principalPrivileges()
+    {
+        Table table = table();
+        return new PrincipalPrivileges(
+                ImmutableMultimap.<String, HivePrivilegeInfo>builder()
+                        .put(table.getOwner(), new HivePrivilegeInfo(HivePrivilegeInfo.HivePrivilege.SELECT, true))
+                        .put(table.getOwner(), new HivePrivilegeInfo(HivePrivilegeInfo.HivePrivilege.INSERT, true))
+                        .put(table.getOwner(), new HivePrivilegeInfo(HivePrivilegeInfo.HivePrivilege.UPDATE, true))
+                        .put(table.getOwner(), new HivePrivilegeInfo(HivePrivilegeInfo.HivePrivilege.DELETE, true))
+                        .build(),
+                ImmutableMultimap.of());
+    }
+}

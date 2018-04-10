@@ -23,6 +23,7 @@ import org.apache.hadoop.hive.metastore.ProtectMode;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 
@@ -30,6 +31,7 @@ import static com.facebook.presto.hive.HiveSplitManager.PRESTO_OFFLINE;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hive.metastore.MetaStoreUtils.typeToThriftType;
 import static org.apache.hadoop.hive.metastore.ProtectMode.getProtectModeFromString;
@@ -245,5 +247,38 @@ public class MetastoreUtil
         if (table.getDataColumns().size() <= 1) {
             throw new PrestoException(NOT_SUPPORTED, "Cannot drop the only non-partition column in a table");
         }
+    }
+
+    public static <T> boolean listEquals(List<T> left, List<T> right)
+    {
+        requireNonNull(left);
+        requireNonNull(right);
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (int i = 0; i < left.size(); i++) {
+            if (!Objects.equals(left, right)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static <K, V> boolean mapEquals(Map<K, V> left, Map<K, V> right)
+    {
+        requireNonNull(left);
+        requireNonNull(right);
+
+        if (left.size() != right.size()) {
+            return false;
+        }
+
+        for (Map.Entry<K, V> leftEntry : left.entrySet()) {
+            K leftKey = leftEntry.getKey();
+            if (!right.containsKey(leftKey) || !Objects.equals(leftEntry.getValue(), right.get(leftKey))) {
+                return false;
+            }
+        }
+        return true;
     }
 }

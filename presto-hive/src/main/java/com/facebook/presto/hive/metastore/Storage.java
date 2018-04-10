@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableMap;
 import javax.annotation.concurrent.Immutable;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
@@ -84,6 +85,30 @@ public class Storage
     public Map<String, String> getSerdeParameters()
     {
         return serdeParameters;
+    }
+
+    @Override
+    public boolean equals(Object other)
+    {
+        if (this == other) {
+            return true;
+        }
+        if (other == null || getClass() != other.getClass()) {
+            return false;
+        }
+        Storage otherStorage = (Storage) other;
+        return Objects.equals(storageFormat, otherStorage.storageFormat) &&
+                Objects.equals(location, otherStorage.location) &&
+                Objects.equals(bucketProperty, otherStorage.bucketProperty) &&
+                sorted == otherStorage.sorted &&
+                skewed == otherStorage.skewed &&
+                Objects.equals(serdeParameters, otherStorage.serdeParameters);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(storageFormat, location, bucketProperty, sorted, skewed, serdeParameters);
     }
 
     public static Builder builder()

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -144,6 +145,34 @@ public class Table
                 .add("databaseName", databaseName)
                 .add("tableName", tableName)
                 .toString();
+    }
+
+    @Override
+    public boolean equals(Object other)
+    {
+        if (this == other) {
+            return true;
+        }
+        if (other == null || getClass() != other.getClass()) {
+            return false;
+        }
+        Table otherTable = (Table) other;
+        return Objects.equals(databaseName, otherTable.databaseName) &&
+                Objects.equals(tableName, otherTable.tableName) &&
+                Objects.equals(owner, otherTable.owner) &&
+                Objects.equals(tableType, otherTable.tableType) &&
+                Objects.equals(storage, otherTable.storage) &&
+                Objects.equals(dataColumns, otherTable.dataColumns) &&
+                Objects.equals(partitionColumns, otherTable.partitionColumns) &&
+                Objects.equals(viewOriginalText, otherTable.viewOriginalText) &&
+                Objects.equals(parameters, otherTable.parameters) &&
+                Objects.equals(viewExpandedText, otherTable.viewExpandedText);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(databaseName, tableName, owner, tableType, storage, dataColumns, partitionColumns, viewOriginalText, parameters, viewExpandedText);
     }
 
     public static Builder builder()

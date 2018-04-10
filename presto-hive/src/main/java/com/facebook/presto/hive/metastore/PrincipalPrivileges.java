@@ -13,34 +13,62 @@
  */
 package com.facebook.presto.hive.metastore;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 
+import javax.annotation.concurrent.Immutable;
+
+import java.util.Objects;
+
 import static java.util.Objects.requireNonNull;
 
+@Immutable
 public class PrincipalPrivileges
 {
     private final SetMultimap<String, HivePrivilegeInfo> userPrivileges;
     private final SetMultimap<String, HivePrivilegeInfo> rolePrivileges;
 
     public PrincipalPrivileges(
-            Multimap<String, HivePrivilegeInfo> userPrivileges,
-            Multimap<String, HivePrivilegeInfo> rolePrivileges)
+            @JsonProperty("userPrivileges") Multimap<String, HivePrivilegeInfo> userPrivileges,
+            @JsonProperty("rolePrivileges") Multimap<String, HivePrivilegeInfo> rolePrivileges)
     {
         this.userPrivileges = ImmutableSetMultimap.copyOf(requireNonNull(userPrivileges, "userPrivileges is null"));
         this.rolePrivileges = ImmutableSetMultimap.copyOf(requireNonNull(rolePrivileges, "rolePrivileges is null"));
     }
 
+    @JsonProperty
     public SetMultimap<String, HivePrivilegeInfo> getUserPrivileges()
     {
         return userPrivileges;
     }
 
+    @JsonProperty
     public SetMultimap<String, HivePrivilegeInfo> getRolePrivileges()
     {
         return rolePrivileges;
+    }
+
+    @Override
+    public boolean equals(Object other)
+    {
+        if (this == other) {
+            return true;
+        }
+        if (other == null || getClass() != other.getClass()) {
+            return false;
+        }
+        PrincipalPrivileges otherPrivileges = (PrincipalPrivileges) other;
+        return Objects.equals(userPrivileges, otherPrivileges.userPrivileges) &&
+                Objects.equals(rolePrivileges, otherPrivileges.rolePrivileges);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(userPrivileges, rolePrivileges);
     }
 
     public static Builder builder()
