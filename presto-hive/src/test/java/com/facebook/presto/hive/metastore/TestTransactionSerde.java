@@ -53,6 +53,26 @@ public class TestTransactionSerde
         assertRoundTrip(codec, tableAndMore);
     }
 
+    @Test
+    public void testPartitionAndMoreSerde()
+    {
+        JsonCodec<PartitionAndMore> codec = jsonCodec(PartitionAndMore.class);
+
+        PartitionAndMore partitionAndMore = new PartitionAndMore(
+                partition(),
+                new Path("hdfs://VOL1:9000/db_name/table_name"),
+                Optional.empty());
+
+        assertRoundTrip(codec, partitionAndMore);
+
+        partitionAndMore = new PartitionAndMore(
+                partition(),
+                new Path("hdfs://VOL1:9000/db_name/table_name"),
+                Optional.of(ImmutableList.of("file1")));
+
+        assertRoundTrip(codec, partitionAndMore);
+    }
+
     private <T> void assertRoundTrip(JsonCodec<T> codec, T object)
     {
         assertEquals(codec.fromJson(codec.toJson(object)), object);
@@ -93,5 +113,27 @@ public class TestTransactionSerde
                         .put(table.getOwner(), new HivePrivilegeInfo(HivePrivilegeInfo.HivePrivilege.DELETE, true))
                         .build(),
                 ImmutableMultimap.of());
+    }
+
+    private static Partition partition()
+    {
+        Partition.Builder partitionBuilder = Partition.builder();
+        partitionBuilder.getStorageBuilder()
+                .setStorageFormat(
+                        StorageFormat.create(
+                                "com.facebook.hive.orc.OrcSerde",
+                                "org.apache.hadoop.hive.ql.io.RCFileInputFormat",
+                                "org.apache.hadoop.hive.ql.io.RCFileInputFormat"))
+                .setLocation("hdfs://VOL1:9000/db_name/table_name")
+                .setSkewed(false)
+                .setSorted(false);
+
+        return partitionBuilder
+                .setDatabaseName("test_dbname")
+                .setTableName("test_table")
+                .setValues(ImmutableList.of("value1", "value2"))
+                .setColumns(ImmutableList.of(new Column("col1", HIVE_STRING, Optional.empty())))
+                .setParameters(ImmutableMap.of("param1", "value1"))
+                .build();
     }
 }

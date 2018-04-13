@@ -24,8 +24,6 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.StandardErrorCode;
 import com.facebook.presto.spi.TableNotFoundException;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -1740,60 +1738,7 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
-    public static class PartitionAndMore
-    {
-        private final Partition partition;
-        private final Path currentLocation;
-        private final Optional<List<String>> fileNames;
-
-        public PartitionAndMore(Partition partition, Path currentLocation, Optional<List<String>> fileNames)
-        {
-            this.partition = requireNonNull(partition, "partition is null");
-            this.currentLocation = requireNonNull(currentLocation, "currentLocation is null");
-            this.fileNames = requireNonNull(fileNames, "fileNames is null");
-        }
-
-        @JsonCreator
-        public PartitionAndMore jsonCreator(@JsonProperty("partition") Partition partition, @JsonProperty("currentLocation") Path currentLocation)
-        {
-            return new PartitionAndMore(partition, currentLocation, Optional.empty());
-        }
-
-        @JsonProperty
-        public Partition getPartition()
-        {
-            return partition;
-        }
-
-        Partition getAugmentedPartitionForInTransactionRead()
-        {
-            // This method augments the location field of the partition to the staging location.
-            // This way, if the partition is accessed in an ongoing transaction, staged data
-            // can be found and accessed.
-            Partition partition = this.partition;
-            String currentLocation = this.currentLocation.toString();
-            if (!currentLocation.equals(partition.getStorage().getLocation())) {
-                partition = Partition.builder(partition)
-                        .withStorage(storage -> storage.setLocation(currentLocation))
-                        .build();
-            }
-            return partition;
-        }
-
-        @JsonProperty
-        public Path getCurrentLocation()
-        {
-            return currentLocation;
-        }
-
-        public List<String> getFileNames()
-        {
-            checkState(fileNames.isPresent());
-            return fileNames.get();
-        }
-    }
-
-    private static class DeclaredIntentionToWrite
+    public static class DeclaredIntentionToWrite
     {
         private final WriteMode mode;
         private final HdfsContext context;
