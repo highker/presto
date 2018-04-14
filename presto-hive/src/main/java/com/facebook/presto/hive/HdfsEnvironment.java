@@ -256,8 +256,8 @@ public class HdfsEnvironment
                 if (!principalClassName.isPresent()) {
                     principal = Optional.empty();
                 }
-                else if (principalClassName.get().equals(BasicPrincipal.class.getSimpleName())){
-                    principal = MAPPER.readValue( MAPPER.treeAsTokens(node.get("identity").get("principal")), new TypeReference<Optional<BasicPrincipal>>() {});
+                else if (principalClassName.get().equals(BasicPrincipal.class.getSimpleName())) {
+                    principal = MAPPER.readValue(MAPPER.treeAsTokens(node.get("identity").get("principal")), new TypeReference<Optional<BasicPrincipal>>() {});
                 }
                 else {
                     throw new UnsupportedOperationException(format("Unsupported principal [%s]", principalClassName.get()));
@@ -267,7 +267,8 @@ public class HdfsEnvironment
             }
         }
 
-        private static Optional<String> getPrincipalClassName(Identity identity) {
+        private static Optional<String> getPrincipalClassName(Identity identity)
+        {
             return identity.getPrincipal().map(principal -> principal.getClass().getSimpleName());
         }
     }

@@ -37,7 +37,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import javax.annotation.concurrent.GuardedBy;
-import javax.annotation.concurrent.Immutable;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -1660,85 +1659,11 @@ public class SemiTransactionalHiveMetastore
         FINISHED,
     }
 
-    public enum WriteMode
-    {
-        STAGE_AND_MOVE_TO_TARGET_DIRECTORY, // common mode for new table or existing table (both new and existing partition)
-        DIRECT_TO_TARGET_NEW_DIRECTORY, // for new table in S3
-        DIRECT_TO_TARGET_EXISTING_DIRECTORY, // for existing table in S3 (both new and existing partition)
-
-        // NOTE: Insert overwrite simulation (partition drops and partition additions in the same
-        // transaction get merged and become one or more partition alterations, and get submitted to
-        // metastore in close succession of each other) is not supported for S3. S3 uses the last
-        // mode for insert into existing table. This is hard to support because the directory
-        // containing the old data cannot be deleted until commit. Nor can the old data be moved
-        // (assuming Hive HDFS directory naming convention shall not be violated). As a result,
-        // subsequent insertion will have to write to directory belonging to existing partition.
-        // This undermines the benefit of having insert overwrite simulation. This also makes
-        // dropping of old partition at commit time hard because data added after the logical
-        // "drop" time was added to the directories to be dropped.
-    }
-
     private enum TableSource
     {
         CREATED_IN_THIS_TRANSACTION,
         PRE_EXISTING_TABLE,
         // RECREATED_IN_THIS_TRANSACTION is a possible case, but it is not supported with the current implementation
-    }
-
-    @Immutable
-    public static class DeclaredIntentionToWrite
-    {
-        private final WriteMode mode;
-        private final HdfsContext context;
-        private final String filePrefix;
-        private final Path rootPath;
-        private final SchemaTableName schemaTableName;
-
-        public DeclaredIntentionToWrite(WriteMode mode, HdfsContext context, Path stagingPathRoot, String filePrefix, SchemaTableName schemaTableName)
-        {
-            this.mode = requireNonNull(mode, "mode is null");
-            this.context = requireNonNull(context, "context is null");
-            this.rootPath = requireNonNull(stagingPathRoot, "stagingPathRoot is null");
-            this.filePrefix = requireNonNull(filePrefix, "filePrefix is null");
-            this.schemaTableName = requireNonNull(schemaTableName, "schemaTableName is null");
-        }
-
-        public WriteMode getMode()
-        {
-            return mode;
-        }
-
-        public HdfsContext getContext()
-        {
-            return context;
-        }
-
-        public String getFilePrefix()
-        {
-            return filePrefix;
-        }
-
-        public Path getRootPath()
-        {
-            return rootPath;
-        }
-
-        public SchemaTableName getSchemaTableName()
-        {
-            return schemaTableName;
-        }
-
-        @Override
-        public String toString()
-        {
-            return toStringHelper(this)
-                    .add("mode", mode)
-                    .add("context", context)
-                    .add("filePrefix", filePrefix)
-                    .add("rootPath", rootPath)
-                    .add("schemaTableName", schemaTableName)
-                    .toString();
-        }
     }
 
     private static class DirectoryCleanUpTask

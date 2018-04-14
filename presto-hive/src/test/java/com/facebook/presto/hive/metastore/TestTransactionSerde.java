@@ -14,6 +14,7 @@
 package com.facebook.presto.hive.metastore;
 
 import com.facebook.presto.hive.HdfsEnvironment.HdfsContext;
+import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.security.BasicPrincipal;
 import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.testing.TestingSession;
@@ -101,6 +102,21 @@ public class TestTransactionSerde
                 new PartitionAndMore(partition(), new Path("hdfs://VOL1:9000/db_name/table_name"), Optional.empty()),
                 context());
         assertRoundTrip(codecPartitionAndMore, partitionAndMoreAction);
+    }
+
+    @Test
+    public void testDeclaredIntentionToWriteSerde()
+    {
+        JsonCodec<DeclaredIntentionToWrite> codec = jsonCodec(DeclaredIntentionToWrite.class);
+
+        DeclaredIntentionToWrite declaredIntentionToWrite = new DeclaredIntentionToWrite(
+                WriteMode.STAGE_AND_MOVE_TO_TARGET_DIRECTORY,
+                context(),
+                new Path("hdfs://VOL1:9000/db_name/table_name"),
+                "prefix",
+                new SchemaTableName("schema", "table"));
+
+        assertRoundTrip(codec, declaredIntentionToWrite);
     }
 
     private <T> void assertRoundTrip(JsonCodec<T> codec, T object)
