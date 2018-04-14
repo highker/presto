@@ -13,9 +13,14 @@
  */
 package com.facebook.presto.hive.metastore;
 
+import com.facebook.presto.hive.HdfsEnvironment.HdfsContext;
+import com.facebook.presto.spi.security.BasicPrincipal;
+import com.facebook.presto.spi.security.Identity;
+import com.facebook.presto.testing.TestingSession;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.reflect.TypeToken;
 import io.airlift.json.JsonCodec;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
@@ -71,6 +76,31 @@ public class TestTransactionSerde
                 Optional.of(ImmutableList.of("file1")));
 
         assertRoundTrip(codec, partitionAndMore);
+    }
+
+    @Test
+    public void testActionSerde()
+    {
+        // no data
+        JsonCodec<Action> codecNothing = jsonCodec(Action.class);
+        Action action = new Action<>(ActionType.DROP, null, context());
+        assertRoundTrip(codecNothing, action);
+
+        // TableAndMore as data
+        JsonCodec<Action<TableAndMore>> codecTableAndMore = jsonCodec(new TypeToken<Action<TableAndMore>>() {});
+        Action<TableAndMore> tableAndMoreAction = new Action<>(
+                ActionType.ADD,
+                new TableAndMore(table(), Optional.empty(), Optional.empty(), Optional.empty(), false),
+                context());
+        assertRoundTrip(codecTableAndMore, tableAndMoreAction);
+
+        // PartitionAndMore as data
+        JsonCodec<Action<PartitionAndMore>> codecPartitionAndMore = jsonCodec(new TypeToken<Action<PartitionAndMore>>() {});
+        Action<PartitionAndMore> partitionAndMoreAction = new Action<>(
+                ActionType.ADD,
+                new PartitionAndMore(partition(), new Path("hdfs://VOL1:9000/db_name/table_name"), Optional.empty()),
+                context());
+        assertRoundTrip(codecPartitionAndMore, partitionAndMoreAction);
     }
 
     private <T> void assertRoundTrip(JsonCodec<T> codec, T object)
@@ -135,5 +165,16 @@ public class TestTransactionSerde
                 .setColumns(ImmutableList.of(new Column("col1", HIVE_STRING, Optional.empty())))
                 .setParameters(ImmutableMap.of("param1", "value1"))
                 .build();
+    }
+
+    private static HdfsContext context()
+    {
+        return new HdfsContext(
+                TestingSession.testSessionBuilder()
+                        .setIdentity(new Identity("user", Optional.of(new BasicPrincipal("principal"))))
+                        .build()
+                        .toConnectorSession(),
+                table().getDatabaseName(),
+                table().getTableName());
     }
 }

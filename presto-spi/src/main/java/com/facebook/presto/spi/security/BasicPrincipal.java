@@ -13,6 +13,9 @@
  */
 package com.facebook.presto.spi.security;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.security.Principal;
 import java.util.Objects;
 
@@ -23,11 +26,13 @@ public final class BasicPrincipal
 {
     private final String name;
 
-    public BasicPrincipal(String name)
+    @JsonCreator
+    public BasicPrincipal(@JsonProperty("name") String name)
     {
         this.name = requireNonNull(name, "name is null");
     }
 
+    @JsonProperty
     @Override
     public String getName()
     {

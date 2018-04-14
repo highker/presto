@@ -13,6 +13,9 @@
  */
 package com.facebook.presto.spi.security;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.security.Principal;
 import java.util.Objects;
 import java.util.Optional;
@@ -24,17 +27,20 @@ public class Identity
     private final String user;
     private final Optional<Principal> principal;
 
-    public Identity(String user, Optional<Principal> principal)
+    @JsonCreator
+    public Identity(@JsonProperty("user") String user, @JsonProperty("principal") Optional<Principal> principal)
     {
         this.user = requireNonNull(user, "user is null");
         this.principal = requireNonNull(principal, "principal is null");
     }
 
+    @JsonProperty
     public String getUser()
     {
         return user;
     }
 
+    @JsonProperty
     public Optional<Principal> getPrincipal()
     {
         return principal;

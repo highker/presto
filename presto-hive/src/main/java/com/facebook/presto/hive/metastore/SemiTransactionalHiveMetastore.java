@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import javax.annotation.concurrent.GuardedBy;
+import javax.annotation.concurrent.Immutable;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -67,7 +68,6 @@ import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.StandardErrorCode.TRANSACTION_CONFLICT;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -1678,14 +1678,6 @@ public class SemiTransactionalHiveMetastore
         // "drop" time was added to the directories to be dropped.
     }
 
-    private enum ActionType
-    {
-        DROP,
-        ADD,
-        ALTER,
-        INSERT_EXISTING
-    }
-
     private enum TableSource
     {
         CREATED_IN_THIS_TRANSACTION,
@@ -1693,51 +1685,7 @@ public class SemiTransactionalHiveMetastore
         // RECREATED_IN_THIS_TRANSACTION is a possible case, but it is not supported with the current implementation
     }
 
-    public static class Action<T>
-    {
-        private final ActionType type;
-        private final T data;
-        private final HdfsContext context;
-
-        public Action(ActionType type, T data, HdfsContext context)
-        {
-            this.type = requireNonNull(type, "type is null");
-            if (type == ActionType.DROP) {
-                checkArgument(data == null, "data is not null");
-            }
-            else {
-                requireNonNull(data, "data is null");
-            }
-            this.data = data;
-            this.context = requireNonNull(context, "context is null");
-        }
-
-        public ActionType getType()
-        {
-            return type;
-        }
-
-        public T getData()
-        {
-            checkState(type != ActionType.DROP);
-            return data;
-        }
-
-        public HdfsContext getContext()
-        {
-            return context;
-        }
-
-        @Override
-        public String toString()
-        {
-            return toStringHelper(this)
-                    .add("type", type)
-                    .add("data", data)
-                    .toString();
-        }
-    }
-
+    @Immutable
     public static class DeclaredIntentionToWrite
     {
         private final WriteMode mode;
