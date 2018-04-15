@@ -21,6 +21,7 @@ import com.facebook.presto.testing.TestingSession;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.reflect.TypeToken;
 import io.airlift.json.JsonCodec;
 import org.apache.hadoop.fs.Path;
@@ -29,7 +30,10 @@ import org.testng.annotations.Test;
 
 import java.util.Optional;
 
+import static com.facebook.presto.hive.HiveType.HIVE_BOOLEAN;
 import static com.facebook.presto.hive.HiveType.HIVE_STRING;
+import static com.facebook.presto.hive.metastore.HivePrivilegeInfo.HivePrivilege.OWNERSHIP;
+import static com.facebook.presto.hive.metastore.PrincipalType.USER;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static org.testng.Assert.assertEquals;
 
@@ -117,6 +121,55 @@ public class TestTransactionSerde
                 new SchemaTableName("schema", "table"));
 
         assertRoundTrip(codec, declaredIntentionToWrite);
+    }
+
+    @Test
+    public void testExclusiveOperationSerde()
+    {
+        assertRoundTrip(
+                jsonCodec(CreateDatabaseOperation.class),
+                new CreateDatabaseOperation(
+                        Database.builder()
+                                .setDatabaseName("db")
+                                .setOwnerName("owner")
+                                .setOwnerType(USER)
+                                .build()));
+
+        assertRoundTrip(jsonCodec(DropDatabaseOperation.class), new DropDatabaseOperation("schema"));
+
+        assertRoundTrip(jsonCodec(RenameDatabaseOperation.class), new RenameDatabaseOperation("from", "to"));
+
+        assertRoundTrip(
+                jsonCodec(ReplaceTableOperation.class),
+                new ReplaceTableOperation("db", "schema", table(), principalPrivileges()));
+
+        assertRoundTrip(
+                jsonCodec(RenameTableOperation.class),
+                new RenameTableOperation("db1", "table1", "db2", "table2"));
+
+        assertRoundTrip(
+                jsonCodec(AddColumnOperation.class),
+                new AddColumnOperation("db1", "table1", "col1", HIVE_BOOLEAN, "comment1"));
+
+        assertRoundTrip(
+                jsonCodec(RenameColumnOperation.class),
+                new RenameColumnOperation("db1", "table1", "col1", "col2"));
+
+        assertRoundTrip(
+                jsonCodec(DropColumnOperation.class),
+                new DropColumnOperation("db1", "table1", "col1"));
+
+        assertRoundTrip(
+                jsonCodec(GrantTablePrivilegesOperation.class),
+                new GrantTablePrivilegesOperation("db1", "table1", "grantee", ImmutableSet.of(new HivePrivilegeInfo(OWNERSHIP, true))));
+
+        assertRoundTrip(
+                jsonCodec(RevokeTablePrivilegesOperation.class),
+                new RevokeTablePrivilegesOperation("db1", "table1", "grantee", ImmutableSet.of(new HivePrivilegeInfo(OWNERSHIP, true))));
+
+        assertRoundTrip(
+                jsonCodec(TruncateUnpartitionedTableOperation.class),
+                new TruncateUnpartitionedTableOperation(new SchemaTableName("schema", "table"), "hdfs://VOL1:9000/db_name/table_name", context()));
     }
 
     private <T> void assertRoundTrip(JsonCodec<T> codec, T object)

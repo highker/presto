@@ -13,14 +13,22 @@
  */
 package com.facebook.presto.hive.metastore;
 
+import com.facebook.presto.hadoop.HadoopFileStatus;
+import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.PartitionOfflineException;
 import com.facebook.presto.hive.TableOfflineException;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.TableNotFoundException;
+import com.google.common.collect.ImmutableList;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.ProtectMode;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +39,7 @@ import static com.facebook.presto.hive.HiveSplitManager.PRESTO_OFFLINE;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static com.google.common.base.Verify.verify;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hive.metastore.MetaStoreUtils.typeToThriftType;
@@ -280,5 +289,127 @@ public class MetastoreUtil
             }
         }
         return true;
+    }
+
+    /**
+     * Attempt to recursively remove eligible files and/or directories in {@code directory}.
+     * <p>
+     * When {@code filePrefixes} is not present, all files (but not necessarily directories) will be
+     * ineligible. If all files shall be deleted, you can use an empty string as {@code filePrefixes}.
+     * <p>
+     * When {@code deleteEmptySubDirectory} is true, any empty directory (including directories that
+     * were originally empty, and directories that become empty after files prefixed with
+     * {@code filePrefixes} are deleted) will be eligible.
+     * <p>
+     * This method will not delete anything that's neither recursiveDeleteFilesa directory nor a file.
+     *
+     * @param filePrefixes prefix of files that should be deleted
+     * @param deleteEmptyDirectories whether empty directories should be deleted
+     */
+    static RecursiveDeleteResult recursiveDeleteFiles(HdfsEnvironment hdfsEnvironment, HdfsEnvironment.HdfsContext context, Path directory, List<String> filePrefixes, boolean deleteEmptyDirectories)
+    {
+        FileSystem fileSystem;
+        try {
+            fileSystem = hdfsEnvironment.getFileSystem(context, directory);
+
+            if (!fileSystem.exists(directory)) {
+                return new RecursiveDeleteResult(true, ImmutableList.of());
+            }
+        }
+        catch (IOException e) {
+            ImmutableList.Builder<String> notDeletedItems = ImmutableList.builder();
+            notDeletedItems.add(directory.toString() + "/**");
+            return new RecursiveDeleteResult(false, notDeletedItems.build());
+        }
+
+        return doRecursiveDeleteFiles(fileSystem, directory, filePrefixes, deleteEmptyDirectories);
+    }
+
+    static RecursiveDeleteResult doRecursiveDeleteFiles(FileSystem fileSystem, Path directory, List<String> filePrefixes, boolean deleteEmptyDirectories)
+    {
+        // don't delete hidden presto directories
+        if (directory.getName().startsWith(".presto")) {
+            return new RecursiveDeleteResult(false, ImmutableList.of());
+        }
+
+        FileStatus[] allFiles;
+        try {
+            allFiles = fileSystem.listStatus(directory);
+        }
+        catch (IOException e) {
+            ImmutableList.Builder<String> notDeletedItems = ImmutableList.builder();
+            notDeletedItems.add(directory.toString() + "/**");
+            return new RecursiveDeleteResult(false, notDeletedItems.build());
+        }
+
+        boolean allDescendentsDeleted = true;
+        ImmutableList.Builder<String> notDeletedEligibleItems = ImmutableList.builder();
+        for (FileStatus fileStatus : allFiles) {
+            if (HadoopFileStatus.isFile(fileStatus)) {
+                Path filePath = fileStatus.getPath();
+                String fileName = filePath.getName();
+                boolean eligible = false;
+                // never delete presto dot files
+                if (!fileName.startsWith(".presto")) {
+                    eligible = filePrefixes.stream().anyMatch(fileName::startsWith);
+                }
+                if (eligible) {
+                    if (!deleteIfExists(fileSystem, filePath, false)) {
+                        allDescendentsDeleted = false;
+                        notDeletedEligibleItems.add(filePath.toString());
+                    }
+                }
+                else {
+                    allDescendentsDeleted = false;
+                }
+            }
+            else if (HadoopFileStatus.isDirectory(fileStatus)) {
+                RecursiveDeleteResult subResult = doRecursiveDeleteFiles(fileSystem, fileStatus.getPath(), filePrefixes, deleteEmptyDirectories);
+                if (!subResult.isDirectoryNoLongerExists()) {
+                    allDescendentsDeleted = false;
+                }
+                if (!subResult.getNotDeletedEligibleItems().isEmpty()) {
+                    notDeletedEligibleItems.addAll(subResult.getNotDeletedEligibleItems());
+                }
+            }
+            else {
+                allDescendentsDeleted = false;
+                notDeletedEligibleItems.add(fileStatus.getPath().toString());
+            }
+        }
+        if (allDescendentsDeleted && deleteEmptyDirectories) {
+            verify(notDeletedEligibleItems.build().isEmpty());
+            if (!deleteIfExists(fileSystem, directory, false)) {
+                return new RecursiveDeleteResult(false, ImmutableList.of(directory.toString() + "/"));
+            }
+            return new RecursiveDeleteResult(true, ImmutableList.of());
+        }
+        return new RecursiveDeleteResult(false, notDeletedEligibleItems.build());
+    }
+
+    /**
+     * Attempts to remove the file or empty directory.
+     *
+     * @return true if the location no longer exists
+     */
+    static boolean deleteIfExists(FileSystem fileSystem, Path path, boolean recursive)
+    {
+        try {
+            // attempt to delete the path
+            if (fileSystem.delete(path, recursive)) {
+                return true;
+            }
+
+            // delete failed
+            // check if path still exists
+            return !fileSystem.exists(path);
+        }
+        catch (FileNotFoundException ignored) {
+            // path was already removed or never existed
+            return true;
+        }
+        catch (IOException ignored) {
+        }
+        return false;
     }
 }

@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.hive.metastore;
 
-import com.facebook.presto.hadoop.HadoopFileStatus;
 import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HdfsEnvironment.HdfsContext;
 import com.facebook.presto.hive.HiveType;
@@ -32,13 +31,11 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import io.airlift.concurrent.MoreFutures;
 import io.airlift.log.Logger;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import javax.annotation.concurrent.GuardedBy;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -62,12 +59,13 @@ import static com.facebook.presto.hive.HiveUtil.toPartitionValues;
 import static com.facebook.presto.hive.HiveWriteUtils.createDirectory;
 import static com.facebook.presto.hive.HiveWriteUtils.pathExists;
 import static com.facebook.presto.hive.metastore.HivePrivilegeInfo.HivePrivilege.OWNERSHIP;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.deleteIfExists;
+import static com.facebook.presto.hive.metastore.MetastoreUtil.recursiveDeleteFiles;
 import static com.facebook.presto.spi.StandardErrorCode.ALREADY_EXISTS;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.StandardErrorCode.TRANSACTION_CONFLICT;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Verify.verify;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.hive.common.FileUtils.makePartName;
@@ -265,17 +263,17 @@ public class SemiTransactionalHiveMetastore
 
     public synchronized void createDatabase(Database database)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.createDatabase(database));
+        setExclusive(new CreateDatabaseOperation(database));
     }
 
     public synchronized void dropDatabase(String schemaName)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.dropDatabase(schemaName));
+        setExclusive(new DropDatabaseOperation(schemaName));
     }
 
     public synchronized void renameDatabase(String source, String target)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.renameDatabase(source, target));
+        setExclusive(new RenameDatabaseOperation(source, target));
     }
 
     /**
@@ -332,27 +330,27 @@ public class SemiTransactionalHiveMetastore
 
     public synchronized void replaceView(String databaseName, String tableName, Table table, PrincipalPrivileges principalPrivileges)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.replaceTable(databaseName, tableName, table, principalPrivileges));
+        setExclusive(new ReplaceTableOperation(databaseName, tableName, table, principalPrivileges));
     }
 
     public synchronized void renameTable(String databaseName, String tableName, String newDatabaseName, String newTableName)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.renameTable(databaseName, tableName, newDatabaseName, newTableName));
+        setExclusive(new RenameTableOperation(databaseName, tableName, newDatabaseName, newTableName));
     }
 
     public synchronized void addColumn(String databaseName, String tableName, String columnName, HiveType columnType, String columnComment)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.addColumn(databaseName, tableName, columnName, columnType, columnComment));
+        setExclusive(new AddColumnOperation(databaseName, tableName, columnName, columnType, columnComment));
     }
 
     public synchronized void renameColumn(String databaseName, String tableName, String oldColumnName, String newColumnName)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.renameColumn(databaseName, tableName, oldColumnName, newColumnName));
+        setExclusive(new RenameColumnOperation(databaseName, tableName, oldColumnName, newColumnName));
     }
 
     public synchronized void dropColumn(String databaseName, String tableName, String columnName)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.dropColumn(databaseName, tableName, columnName));
+        setExclusive(new DropColumnOperation(databaseName, tableName, columnName));
     }
 
     public synchronized void finishInsertIntoExistingTable(ConnectorSession session, String databaseName, String tableName, Path currentLocation, List<String> fileNames)
@@ -403,17 +401,10 @@ public class SemiTransactionalHiveMetastore
             throw new IllegalArgumentException("Table is partitioned");
         }
 
-        Path path = new Path(table.get().getStorage().getLocation());
-        HdfsContext context = new HdfsContext(session, databaseName, tableName);
-        setExclusive((delegate, hdfsEnvironment) -> {
-            RecursiveDeleteResult recursiveDeleteResult = recursiveDeleteFiles(hdfsEnvironment, context, path, ImmutableList.of(""), false);
-            if (!recursiveDeleteResult.getNotDeletedEligibleItems().isEmpty()) {
-                throw new PrestoException(HIVE_FILESYSTEM_ERROR, format(
-                        "Error deleting from unpartitioned table %s. These items can not be deleted: %s",
-                        schemaTableName,
-                        recursiveDeleteResult.getNotDeletedEligibleItems()));
-            }
-        });
+        setExclusive(new TruncateUnpartitionedTableOperation(
+                schemaTableName,
+                table.get().getStorage().getLocation(),
+                new HdfsContext(session, databaseName, tableName)));
     }
 
     public synchronized Optional<List<String>> getPartitionNames(String databaseName, String tableName)
@@ -706,12 +697,12 @@ public class SemiTransactionalHiveMetastore
 
     public synchronized void grantTablePrivileges(String databaseName, String tableName, String grantee, Set<HivePrivilegeInfo> privileges)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.grantTablePrivileges(databaseName, tableName, grantee, privileges));
+        setExclusive(new GrantTablePrivilegesOperation(databaseName, tableName, grantee, privileges));
     }
 
     public synchronized void revokeTablePrivileges(String databaseName, String tableName, String grantee, Set<HivePrivilegeInfo> privileges)
     {
-        setExclusive((delegate, hdfsEnvironment) -> delegate.revokeTablePrivileges(databaseName, tableName, grantee, privileges));
+        setExclusive(new RevokeTablePrivilegesOperation(databaseName, tableName, grantee, privileges));
     }
 
     public synchronized void declareIntentionToWrite(ConnectorSession session, WriteMode writeMode, Path stagingPathRoot, String filePrefix, SchemaTableName schemaTableName)
@@ -1467,128 +1458,6 @@ public class SemiTransactionalHiveMetastore
     }
 
     /**
-     * Attempt to recursively remove eligible files and/or directories in {@code directory}.
-     * <p>
-     * When {@code filePrefixes} is not present, all files (but not necessarily directories) will be
-     * ineligible. If all files shall be deleted, you can use an empty string as {@code filePrefixes}.
-     * <p>
-     * When {@code deleteEmptySubDirectory} is true, any empty directory (including directories that
-     * were originally empty, and directories that become empty after files prefixed with
-     * {@code filePrefixes} are deleted) will be eligible.
-     * <p>
-     * This method will not delete anything that's neither a directory nor a file.
-     *
-     * @param filePrefixes prefix of files that should be deleted
-     * @param deleteEmptyDirectories whether empty directories should be deleted
-     */
-    private static RecursiveDeleteResult recursiveDeleteFiles(HdfsEnvironment hdfsEnvironment, HdfsContext context, Path directory, List<String> filePrefixes, boolean deleteEmptyDirectories)
-    {
-        FileSystem fileSystem;
-        try {
-            fileSystem = hdfsEnvironment.getFileSystem(context, directory);
-
-            if (!fileSystem.exists(directory)) {
-                return new RecursiveDeleteResult(true, ImmutableList.of());
-            }
-        }
-        catch (IOException e) {
-            ImmutableList.Builder<String> notDeletedItems = ImmutableList.builder();
-            notDeletedItems.add(directory.toString() + "/**");
-            return new RecursiveDeleteResult(false, notDeletedItems.build());
-        }
-
-        return doRecursiveDeleteFiles(fileSystem, directory, filePrefixes, deleteEmptyDirectories);
-    }
-
-    private static RecursiveDeleteResult doRecursiveDeleteFiles(FileSystem fileSystem, Path directory, List<String> filePrefixes, boolean deleteEmptyDirectories)
-    {
-        // don't delete hidden presto directories
-        if (directory.getName().startsWith(".presto")) {
-            return new RecursiveDeleteResult(false, ImmutableList.of());
-        }
-
-        FileStatus[] allFiles;
-        try {
-            allFiles = fileSystem.listStatus(directory);
-        }
-        catch (IOException e) {
-            ImmutableList.Builder<String> notDeletedItems = ImmutableList.builder();
-            notDeletedItems.add(directory.toString() + "/**");
-            return new RecursiveDeleteResult(false, notDeletedItems.build());
-        }
-
-        boolean allDescendentsDeleted = true;
-        ImmutableList.Builder<String> notDeletedEligibleItems = ImmutableList.builder();
-        for (FileStatus fileStatus : allFiles) {
-            if (HadoopFileStatus.isFile(fileStatus)) {
-                Path filePath = fileStatus.getPath();
-                String fileName = filePath.getName();
-                boolean eligible = false;
-                // never delete presto dot files
-                if (!fileName.startsWith(".presto")) {
-                    eligible = filePrefixes.stream().anyMatch(fileName::startsWith);
-                }
-                if (eligible) {
-                    if (!deleteIfExists(fileSystem, filePath, false)) {
-                        allDescendentsDeleted = false;
-                        notDeletedEligibleItems.add(filePath.toString());
-                    }
-                }
-                else {
-                    allDescendentsDeleted = false;
-                }
-            }
-            else if (HadoopFileStatus.isDirectory(fileStatus)) {
-                RecursiveDeleteResult subResult = doRecursiveDeleteFiles(fileSystem, fileStatus.getPath(), filePrefixes, deleteEmptyDirectories);
-                if (!subResult.isDirectoryNoLongerExists()) {
-                    allDescendentsDeleted = false;
-                }
-                if (!subResult.getNotDeletedEligibleItems().isEmpty()) {
-                    notDeletedEligibleItems.addAll(subResult.getNotDeletedEligibleItems());
-                }
-            }
-            else {
-                allDescendentsDeleted = false;
-                notDeletedEligibleItems.add(fileStatus.getPath().toString());
-            }
-        }
-        if (allDescendentsDeleted && deleteEmptyDirectories) {
-            verify(notDeletedEligibleItems.build().isEmpty());
-            if (!deleteIfExists(fileSystem, directory, false)) {
-                return new RecursiveDeleteResult(false, ImmutableList.of(directory.toString() + "/"));
-            }
-            return new RecursiveDeleteResult(true, ImmutableList.of());
-        }
-        return new RecursiveDeleteResult(false, notDeletedEligibleItems.build());
-    }
-
-    /**
-     * Attempts to remove the file or empty directory.
-     *
-     * @return true if the location no longer exists
-     */
-    private static boolean deleteIfExists(FileSystem fileSystem, Path path, boolean recursive)
-    {
-        try {
-            // attempt to delete the path
-            if (fileSystem.delete(path, recursive)) {
-                return true;
-            }
-
-            // delete failed
-            // check if path still exists
-            return !fileSystem.exists(path);
-        }
-        catch (FileNotFoundException ignored) {
-            // path was already removed or never existed
-            return true;
-        }
-        catch (IOException ignored) {
-        }
-        return false;
-    }
-
-    /**
      * Attempts to remove the file or empty directory.
      *
      * @return true if the location no longer exists
@@ -2027,32 +1896,5 @@ public class SemiTransactionalHiveMetastore
             createdPartitionValues = partitionsFailedToRollback;
             return partitionsFailedToRollback;
         }
-    }
-
-    private static class RecursiveDeleteResult
-    {
-        private final boolean directoryNoLongerExists;
-        private final List<String> notDeletedEligibleItems;
-
-        public RecursiveDeleteResult(boolean directoryNoLongerExists, List<String> notDeletedEligibleItems)
-        {
-            this.directoryNoLongerExists = directoryNoLongerExists;
-            this.notDeletedEligibleItems = notDeletedEligibleItems;
-        }
-
-        public boolean isDirectoryNoLongerExists()
-        {
-            return directoryNoLongerExists;
-        }
-
-        public List<String> getNotDeletedEligibleItems()
-        {
-            return notDeletedEligibleItems;
-        }
-    }
-
-    private interface ExclusiveOperation
-    {
-        void execute(ExtendedHiveMetastore delegate, HdfsEnvironment hdfsEnvironment);
     }
 }
