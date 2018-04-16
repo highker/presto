@@ -1520,14 +1520,6 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
-    private enum State
-    {
-        EMPTY,
-        SHARED_OPERATION_BUFFERED,
-        EXCLUSIVE_OPERATION_BUFFERED,
-        FINISHED,
-    }
-
     private enum TableSource
     {
         CREATED_IN_THIS_TRANSACTION,

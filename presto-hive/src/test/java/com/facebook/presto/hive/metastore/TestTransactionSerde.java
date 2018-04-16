@@ -34,6 +34,7 @@ import static com.facebook.presto.hive.HiveType.HIVE_BOOLEAN;
 import static com.facebook.presto.hive.HiveType.HIVE_STRING;
 import static com.facebook.presto.hive.metastore.HivePrivilegeInfo.HivePrivilege.OWNERSHIP;
 import static com.facebook.presto.hive.metastore.PrincipalType.USER;
+import static com.facebook.presto.hive.metastore.State.SHARED_OPERATION_BUFFERED;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static org.testng.Assert.assertEquals;
 
@@ -170,6 +171,34 @@ public class TestTransactionSerde
         assertRoundTrip(
                 jsonCodec(TruncateUnpartitionedTableOperation.class),
                 new TruncateUnpartitionedTableOperation(new SchemaTableName("schema", "table"), "hdfs://VOL1:9000/db_name/table_name", context()));
+    }
+
+    @Test
+    public void testSemiTransactionalHiveMetastoreSummarySerde()
+    {
+        SemiTransactionalHiveMetastoreSummary summary = new SemiTransactionalHiveMetastoreSummary(
+                ImmutableMap.of(
+                        new SchemaTableName("schema1", "table1"),
+                        new Action<>(ActionType.ADD, new TableAndMore(table(), Optional.empty(), Optional.empty(), Optional.empty(), false), context())),
+                ImmutableMap.of(
+                        new SchemaTableName("schema1", "table1"),
+                        ImmutableMap.of(
+                                ImmutableList.of("list"),
+                                new Action<>(
+                                        ActionType.ADD,
+                                        new PartitionAndMore(partition(), new Path("hdfs://VOL1:9000/db_name/table_name"), Optional.empty()),
+                                        context()))),
+                ImmutableList.of(
+                        new DeclaredIntentionToWrite(
+                                WriteMode.STAGE_AND_MOVE_TO_TARGET_DIRECTORY,
+                                context(),
+                                new Path("hdfs://VOL1:9000/db_name/table_name"),
+                                "prefix",
+                                new SchemaTableName("schema", "table"))),
+                new DropColumnOperation("db1", "table1", "col1"),
+                SHARED_OPERATION_BUFFERED,
+                true);
+        assertRoundTrip(jsonCodec(SemiTransactionalHiveMetastoreSummary.class), summary);
     }
 
     private <T> void assertRoundTrip(JsonCodec<T> codec, T object)
