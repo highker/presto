@@ -818,6 +818,52 @@ public class TestLogicalPlanner
     }
 
     @Test
+    public void testMergePartitionPreference()
+    {
+        // Test aggregation
+        assertEquals(
+                countOfMatchingNodes(
+                        plan(
+                                "SELECT count(orderdate), custkey FROM (SELECT orderdate, custkey FROM orders GROUP BY orderdate, custkey) GROUP BY custkey",
+                                LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED,
+                                false),
+                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE && ((ExchangeNode) node).getType() == REPARTITION),
+                1);
+
+        // Test mark distinct
+        assertEquals(
+                countOfMatchingNodes(
+                        plan(
+                                "SELECT COUNT(DISTINCT(custkey)), COUNT(DISTINCT(totalprice)), orderdate FROM orders GROUP BY orderdate",
+                                LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED,
+                                false),
+                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE && ((ExchangeNode) node).getType() == REPARTITION),
+                1);
+
+        // Test window
+        assertEquals(
+                countOfMatchingNodes(
+                        plan(
+                                "SELECT COUNT(orderdate), ARBITRARY(rnk), custkey FROM " +
+                                        "(SELECT orderdate, custkey, RANK() OVER (PARTITION BY orderdate, custkey ORDER BY totalprice) AS rnk FROM orders) GROUP BY custkey",
+                                LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED,
+                                false),
+                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE && ((ExchangeNode) node).getType() == REPARTITION),
+                1);
+
+        // Test row number
+        assertEquals(
+                countOfMatchingNodes(
+                        plan(
+                                "SELECT COUNT(orderdate), ARBITRARY(rn), custkey FROM " +
+                                        "(SELECT orderdate, custkey, ROW_NUMBER() OVER (PARTITION BY orderdate, custkey) AS rn FROM orders) GROUP BY custkey",
+                                LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED,
+                                false),
+                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE && ((ExchangeNode) node).getType() == REPARTITION),
+                1);
+    }
+
+    @Test
     public void testBroadcastCorrelatedSubqueryAvoidsRemoteExchangeBeforeAggregation()
     {
         Session broadcastJoin = Session.builder(this.getQueryRunner().getDefaultSession())

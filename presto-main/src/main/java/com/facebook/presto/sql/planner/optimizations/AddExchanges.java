@@ -260,13 +260,14 @@ public class AddExchanges
                         child.getProperties());
             }
             else if (!child.getProperties().isStreamPartitionedOn(partitioningRequirement) && !child.getProperties().isNodePartitionedOn(partitioningRequirement)) {
+                checkState(preferredProperties.getGlobalProperties().isPresent() && preferredProperties.getGlobalProperties().get().getPartitioningProperties().isPresent());
+                Partitioning partitioning = getPreferredPartitioning(preferredProperties.getGlobalProperties().get().getPartitioningProperties().get());
                 child = withDerivedProperties(
                         partitionedExchange(
                                 idAllocator.getNextId(),
                                 selectExchangeScopeForPartitionedRemoteExchange(child.getNode(), false),
                                 child.getNode(),
-                                createPartitioning(node.getGroupingKeys()),
-                                node.getHashVariable()),
+                                new PartitioningScheme(partitioning, child.getNode().getOutputVariables(), node.getHashVariable())),
                         child.getProperties());
             }
             return rebaseAndDeriveProperties(node, child);
@@ -304,13 +305,17 @@ public class AddExchanges
 
             if (child.getProperties().isSingleNode() ||
                     !child.getProperties().isStreamPartitionedOn(node.getDistinctVariables())) {
+                checkState(preferredChildProperties.getGlobalProperties().isPresent() && preferredChildProperties.getGlobalProperties().get().getPartitioningProperties().isPresent());
+                Partitioning partitioning = getPreferredPartitioning(preferredChildProperties.getGlobalProperties().get().getPartitioningProperties().get());
                 child = withDerivedProperties(
                         partitionedExchange(
                                 idAllocator.getNextId(),
                                 selectExchangeScopeForPartitionedRemoteExchange(child.getNode(), false),
                                 child.getNode(),
-                                createPartitioning(node.getDistinctVariables()),
-                                node.getHashVariable()),
+                                new PartitioningScheme(
+                                        partitioning,
+                                        child.getNode().getOutputVariables(),
+                                        node.getHashVariable())),
                         child.getProperties());
             }
 
@@ -329,10 +334,9 @@ public class AddExchanges
                             .map(variable -> new SortingProperty<>(variable, orderingScheme.getOrdering(variable)))
                             .forEach(desiredProperties::add));
 
-            PlanWithProperties child = planChild(
-                    node,
-                    PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(node.getPartitionBy()), desiredProperties)
-                            .mergeWithParent(preferredProperties));
+            PreferredProperties preferredChildProperties = PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(node.getPartitionBy()), desiredProperties)
+                    .mergeWithParent(preferredProperties);
+            PlanWithProperties child = planChild(node, preferredChildProperties);
 
             if (!child.getProperties().isStreamPartitionedOn(node.getPartitionBy()) &&
                     !child.getProperties().isNodePartitionedOn(node.getPartitionBy())) {
@@ -342,13 +346,17 @@ public class AddExchanges
                             child.getProperties());
                 }
                 else {
+                    checkState(preferredChildProperties.getGlobalProperties().isPresent() && preferredChildProperties.getGlobalProperties().get().getPartitioningProperties().isPresent());
+                    Partitioning partitioning = getPreferredPartitioning(preferredChildProperties.getGlobalProperties().get().getPartitioningProperties().get());
                     child = withDerivedProperties(
                             partitionedExchange(
                                     idAllocator.getNextId(),
                                     selectExchangeScopeForPartitionedRemoteExchange(child.getNode(), false),
                                     child.getNode(),
-                                    createPartitioning(node.getPartitionBy()),
-                                    node.getHashVariable()),
+                                    new PartitioningScheme(
+                                            partitioning,
+                                            child.getNode().getOutputVariables(),
+                                            node.getHashVariable())),
                             child.getProperties());
                 }
             }
@@ -371,10 +379,9 @@ public class AddExchanges
                 return rebaseAndDeriveProperties(node, child);
             }
 
-            PlanWithProperties child = planChild(
-                    node,
-                    PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(node.getPartitionBy()), grouped(node.getPartitionBy()))
-                            .mergeWithParent(preferredProperties));
+            PreferredProperties preferredChildProperties = PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(node.getPartitionBy()), grouped(node.getPartitionBy()))
+                    .mergeWithParent(preferredProperties);
+            PlanWithProperties child = planChild(node, preferredChildProperties);
 
             // TODO: add config option/session property to force parallel plan if child is unpartitioned and window has a PARTITION BY clause
             if (!child.getProperties().isStreamPartitionedOn(node.getPartitionBy())
@@ -384,8 +391,10 @@ public class AddExchanges
                                 idAllocator.getNextId(),
                                 selectExchangeScopeForPartitionedRemoteExchange(child.getNode(), false),
                                 child.getNode(),
-                                createPartitioning(node.getPartitionBy()),
-                                node.getHashVariable()),
+                                new PartitioningScheme(
+                                        getPreferredPartitioning(preferredChildProperties.getGlobalProperties().get().getPartitioningProperties().get()),
+                                        child.getNode().getOutputVariables(),
+                                        node.getHashVariable())),
                         child.getProperties());
             }
 
@@ -411,8 +420,10 @@ public class AddExchanges
                         idAllocator.getNextId(),
                         selectExchangeScopeForPartitionedRemoteExchange(partial, false),
                         partial,
-                        createPartitioning(node.getPartitionBy()),
-                        node.getHashVariable());
+                        new PartitioningScheme(
+                                getPreferredPartitioning(preferredChildProperties.getGlobalProperties().get().getPartitioningProperties().get()),
+                                partial.getOutputVariables(),
+                                node.getHashVariable()));
             }
 
             PlanWithProperties child = planChild(node, preferredChildProperties);
@@ -987,16 +998,26 @@ public class AddExchanges
             // Only prefer grouping on join columns if no parent local property preferences
             List<LocalProperty<VariableReferenceExpression>> desiredLocalProperties = preferredProperties.getLocalProperties().isEmpty() ? grouped(joinColumns) : ImmutableList.of();
 
-            PlanWithProperties probeSource = node.getProbeSource().accept(this, PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(joinColumns), desiredLocalProperties)
-                    .mergeWithParent(preferredProperties));
+            PreferredProperties preferredChildProperties = PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(joinColumns), desiredLocalProperties)
+                    .mergeWithParent(preferredProperties);
+            PlanWithProperties probeSource = node.getProbeSource().accept(this, preferredChildProperties);
             ActualProperties probeProperties = probeSource.getProperties();
 
             PlanWithProperties indexSource = node.getIndexSource().accept(this, PreferredProperties.any());
 
             // TODO: allow repartitioning if unpartitioned to increase parallelism
             if (shouldRepartitionForIndexJoin(joinColumns, preferredProperties, probeProperties)) {
+                checkState(preferredChildProperties.getGlobalProperties().isPresent() && preferredChildProperties.getGlobalProperties().get().getPartitioningProperties().isPresent());
+                Partitioning partitioning = getPreferredPartitioning(preferredChildProperties.getGlobalProperties().get().getPartitioningProperties().get());
                 probeSource = withDerivedProperties(
-                        partitionedExchange(idAllocator.getNextId(), REMOTE_STREAMING, probeSource.getNode(), createPartitioning(joinColumns), node.getProbeHashVariable()),
+                        partitionedExchange(
+                                idAllocator.getNextId(),
+                                REMOTE_STREAMING,
+                                probeSource.getNode(),
+                                new PartitioningScheme(
+                                        partitioning,
+                                        probeSource.getNode().getOutputVariables(),
+                                        node.getProbeHashVariable())),
                         probeProperties);
             }
 
@@ -1053,6 +1074,14 @@ public class AddExchanges
         private Function<VariableReferenceExpression, Optional<VariableReferenceExpression>> outputToInputTranslator(UnionNode node, int sourceIndex)
         {
             return variable -> Optional.of(node.getVariableMapping().get(variable).get(sourceIndex));
+        }
+
+        private Partitioning getPreferredPartitioning(PreferredProperties.PartitioningProperties partitioningPreference)
+        {
+            if (partitioningPreference.getPartitioning().isPresent()) {
+                return partitioningPreference.getPartitioning().get();
+            }
+            return Partitioning.create(FIXED_HASH_DISTRIBUTION, ImmutableList.copyOf(partitioningPreference.getPartitioningColumns()));
         }
 
         private Partitioning selectUnionPartitioning(UnionNode node, PartitioningProperties parentPreference)
