@@ -135,6 +135,7 @@ public final class SystemSessionProperties
     public static final String OPTIMIZE_FULL_OUTER_JOIN_WITH_COALESCE = "optimize_full_outer_join_with_coalesce";
     public static final String INDEX_LOADER_TIMEOUT = "index_loader_timeout";
     public static final String OPTIMIZED_REPARTITIONING_ENABLED = "optimized_repartitioning";
+    public static final String MERGE_PARTITION_PREFERENCE = "merge_partiton_preference";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -664,6 +665,11 @@ public final class SystemSessionProperties
                         OPTIMIZED_REPARTITIONING_ENABLED,
                         "Experimental: Use optimized repartitioning",
                         featuresConfig.isOptimizedRepartitioningEnabled(),
+                        false),
+                booleanProperty(
+                        MERGE_PARTITION_PREFERENCE,
+                        "Prefer merging partition preference when possible",
+                        featuresConfig.isMergePartitionPreference(),
                         false));
     }
 
@@ -1022,6 +1028,11 @@ public final class SystemSessionProperties
     public static boolean isLegacyUnnest(Session session)
     {
         return session.getSystemProperty(LEGACY_UNNEST, Boolean.class);
+    }
+
+    public static boolean getMergePartitionPreference(Session session)
+    {
+        return session.getSystemProperty(MERGE_PARTITION_PREFERENCE, Boolean.class);
     }
 
     public static OptionalInt getMaxDriversPerTask(Session session)

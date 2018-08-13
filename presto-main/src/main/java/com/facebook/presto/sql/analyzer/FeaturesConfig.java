@@ -132,6 +132,7 @@ public class FeaturesConfig
     private int filterAndProjectMinOutputPageRowCount = 256;
     private int maxGroupingSets = 2048;
     private boolean legacyUnnestArrayRows;
+    private boolean mergePartitionPreference;
 
     private boolean jsonSerdeCodeGenerationEnabled;
     private int maxConcurrentMaterializations = 3;
@@ -606,6 +607,18 @@ public class FeaturesConfig
     public FeaturesConfig setDictionaryAggregation(boolean dictionaryAggregation)
     {
         this.dictionaryAggregation = dictionaryAggregation;
+        return this;
+    }
+
+    public boolean isMergePartitionPreference()
+    {
+        return mergePartitionPreference;
+    }
+
+    @Config("optimizer.merge-partition-preference")
+    public FeaturesConfig setMergePartitionPreference(boolean mergePartitionPreference)
+    {
+        this.mergePartitionPreference = mergePartitionPreference;
         return this;
     }
 

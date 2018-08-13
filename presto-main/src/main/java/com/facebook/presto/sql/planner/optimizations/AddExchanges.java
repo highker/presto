@@ -95,6 +95,7 @@ import java.util.function.Function;
 
 import static com.facebook.presto.SystemSessionProperties.getExchangeMaterializationStrategy;
 import static com.facebook.presto.SystemSessionProperties.getHashPartitionCount;
+import static com.facebook.presto.SystemSessionProperties.getMergePartitionPreference;
 import static com.facebook.presto.SystemSessionProperties.getPartialMergePushdownStrategy;
 import static com.facebook.presto.SystemSessionProperties.getPartitioningProviderCatalog;
 import static com.facebook.presto.SystemSessionProperties.isColocatedJoinEnabled;
@@ -244,7 +245,7 @@ public class AddExchanges
 
             if (!node.getGroupingKeys().isEmpty()) {
                 preferredProperties = PreferredProperties.partitionedWithLocal(partitioningRequirement, grouped(node.getGroupingKeys()))
-                        .mergeWithParent(parentPreferredProperties);
+                        .mergeWithParent(parentPreferredProperties, getMergePartitionPreference(session));
             }
 
             PlanWithProperties child = planChild(node, preferredProperties);
@@ -300,7 +301,7 @@ public class AddExchanges
         public PlanWithProperties visitMarkDistinct(MarkDistinctNode node, PreferredProperties preferredProperties)
         {
             PreferredProperties preferredChildProperties = PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(node.getDistinctVariables()), grouped(node.getDistinctVariables()))
-                    .mergeWithParent(preferredProperties);
+                    .mergeWithParent(preferredProperties, getMergePartitionPreference(session));
             PlanWithProperties child = node.getSource().accept(this, preferredChildProperties);
 
             if (child.getProperties().isSingleNode() ||
@@ -335,7 +336,7 @@ public class AddExchanges
                             .forEach(desiredProperties::add));
 
             PreferredProperties preferredChildProperties = PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(node.getPartitionBy()), desiredProperties)
-                    .mergeWithParent(preferredProperties);
+                    .mergeWithParent(preferredProperties, getMergePartitionPreference(session));
             PlanWithProperties child = planChild(node, preferredChildProperties);
 
             if (!child.getProperties().isStreamPartitionedOn(node.getPartitionBy()) &&
@@ -380,7 +381,7 @@ public class AddExchanges
             }
 
             PreferredProperties preferredChildProperties = PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(node.getPartitionBy()), grouped(node.getPartitionBy()))
-                    .mergeWithParent(preferredProperties);
+                    .mergeWithParent(preferredProperties, getMergePartitionPreference(session));
             PlanWithProperties child = planChild(node, preferredChildProperties);
 
             // TODO: add config option/session property to force parallel plan if child is unpartitioned and window has a PARTITION BY clause
@@ -415,7 +416,8 @@ public class AddExchanges
             }
             else {
                 preferredChildProperties = PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(node.getPartitionBy()), grouped(node.getPartitionBy()))
-                        .mergeWithParent(preferredProperties);
+                        .mergeWithParent(preferredProperties, getMergePartitionPreference(session));
+                checkState(preferredChildProperties.getGlobalProperties().isPresent() && preferredChildProperties.getGlobalProperties().get().getPartitioningProperties().isPresent());
                 addExchange = partial -> partitionedExchange(
                         idAllocator.getNextId(),
                         selectExchangeScopeForPartitionedRemoteExchange(partial, false),
@@ -999,7 +1001,7 @@ public class AddExchanges
             List<LocalProperty<VariableReferenceExpression>> desiredLocalProperties = preferredProperties.getLocalProperties().isEmpty() ? grouped(joinColumns) : ImmutableList.of();
 
             PreferredProperties preferredChildProperties = PreferredProperties.partitionedWithLocal(ImmutableSet.copyOf(joinColumns), desiredLocalProperties)
-                    .mergeWithParent(preferredProperties);
+                    .mergeWithParent(preferredProperties, getMergePartitionPreference(session));
             PlanWithProperties probeSource = node.getProbeSource().accept(this, preferredChildProperties);
             ActualProperties probeProperties = probeSource.getProperties();
 

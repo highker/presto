@@ -32,8 +32,11 @@ import com.facebook.presto.sql.planner.plan.ExchangeNode;
 import com.facebook.presto.sql.planner.plan.IndexJoinNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LateralJoinNode;
+import com.facebook.presto.sql.planner.plan.MarkDistinctNode;
+import com.facebook.presto.sql.planner.plan.RowNumberNode;
 import com.facebook.presto.sql.planner.plan.SemiJoinNode;
 import com.facebook.presto.sql.planner.plan.StatisticsWriterNode;
+import com.facebook.presto.sql.planner.plan.WindowNode;
 import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.tests.QueryTemplate;
 import com.facebook.presto.util.MorePredicates;
@@ -43,12 +46,14 @@ import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import static com.facebook.presto.SystemSessionProperties.DISTRIBUTED_SORT;
 import static com.facebook.presto.SystemSessionProperties.FORCE_SINGLE_NODE_OUTPUT;
 import static com.facebook.presto.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
+import static com.facebook.presto.SystemSessionProperties.MERGE_PARTITION_PREFERENCE;
 import static com.facebook.presto.SystemSessionProperties.OPTIMIZE_HASH_GENERATION;
 import static com.facebook.presto.spi.StandardErrorCode.SUBQUERY_MULTIPLE_ROWS;
 import static com.facebook.presto.spi.block.SortOrder.ASC_NULLS_LAST;
@@ -818,49 +823,177 @@ public class TestLogicalPlanner
     }
 
     @Test
-    public void testMergePartitionPreference()
+    public void testDisableMergePartitionPreference()
     {
-        // Test aggregation
-        assertEquals(
+        Session disableMergePartitionPreference = Session.builder(this.getQueryRunner().getDefaultSession())
+                .setSystemProperty(MERGE_PARTITION_PREFERENCE, Boolean.toString(false))
+                .build();
+        BiConsumer<Plan, Integer> validateMultipleRemoteRepartitionExchange = (plan, count) -> assertEquals(
                 countOfMatchingNodes(
-                        plan(
-                                "SELECT count(orderdate), custkey FROM (SELECT orderdate, custkey FROM orders GROUP BY orderdate, custkey) GROUP BY custkey",
-                                LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED,
-                                false),
-                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE && ((ExchangeNode) node).getType() == REPARTITION),
-                1);
+                        plan,
+                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE_STREAMING && ((ExchangeNode) node).getType() == REPARTITION),
+                count.intValue());
+        // Test aggregation
+        assertPlanWithSession(
+                "SELECT count(orderdate), custkey FROM (SELECT orderdate, custkey FROM orders GROUP BY orderdate, custkey) GROUP BY custkey",
+                disableMergePartitionPreference,
+                false,
+                anyTree(
+                        node(AggregationNode.class,
+                                anyTree(
+                                        exchange(REMOTE_STREAMING, REPARTITION,
+                                                anyTree(
+                                                        node(AggregationNode.class,
+                                                                node(AggregationNode.class,
+                                                                        anyTree(
+                                                                                exchange(REMOTE_STREAMING, REPARTITION,
+                                                                                        node(AggregationNode.class,
+                                                                                                anyTree(
+                                                                                                        tableScan("orders")))))))))))),
+                plan -> validateMultipleRemoteRepartitionExchange.accept(plan, 2));
 
         // Test mark distinct
-        assertEquals(
-                countOfMatchingNodes(
-                        plan(
-                                "SELECT COUNT(DISTINCT(custkey)), COUNT(DISTINCT(totalprice)), orderdate FROM orders GROUP BY orderdate",
-                                LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED,
-                                false),
-                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE && ((ExchangeNode) node).getType() == REPARTITION),
-                1);
+        assertPlanWithSession(
+                "SELECT COUNT(DISTINCT(orderdate)), COUNT(DISTINCT(totalprice)), custkey FROM orders GROUP BY custkey",
+                disableMergePartitionPreference,
+                false,
+                anyTree(
+                        node(AggregationNode.class,
+                                anyTree(
+                                        exchange(REMOTE_STREAMING, REPARTITION,
+                                                anyTree(
+                                                        node(AggregationNode.class,
+                                                                node(MarkDistinctNode.class,
+                                                                        anyTree(
+                                                                                exchange(REMOTE_STREAMING, REPARTITION,
+                                                                                        node(MarkDistinctNode.class,
+                                                                                                anyTree(
+                                                                                                        exchange(REMOTE_STREAMING, REPARTITION, any
+                                                                                                                (tableScan("orders")))))))))))))),
+                plan -> validateMultipleRemoteRepartitionExchange.accept(plan, 3));
 
         // Test window
-        assertEquals(
-                countOfMatchingNodes(
-                        plan(
-                                "SELECT COUNT(orderdate), ARBITRARY(rnk), custkey FROM " +
-                                        "(SELECT orderdate, custkey, RANK() OVER (PARTITION BY orderdate, custkey ORDER BY totalprice) AS rnk FROM orders) GROUP BY custkey",
-                                LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED,
-                                false),
-                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE && ((ExchangeNode) node).getType() == REPARTITION),
-                1);
+        assertPlanWithSession(
+                "SELECT COUNT(orderdate), ARBITRARY(rnk), custkey FROM " +
+                        "(SELECT orderdate, custkey, RANK() OVER (PARTITION BY orderdate, custkey ORDER BY totalprice) AS rnk FROM orders) GROUP BY custkey",
+                disableMergePartitionPreference,
+                false,
+                anyTree(
+                        node(AggregationNode.class,
+                                anyTree(
+                                        exchange(REMOTE_STREAMING, REPARTITION,
+                                                anyTree(
+                                                        node(AggregationNode.class,
+                                                                anyTree(
+                                                                        node(WindowNode.class,
+                                                                                anyTree(
+                                                                                        exchange(REMOTE_STREAMING, REPARTITION,
+                                                                                                anyTree(
+                                                                                                        tableScan("orders")))))))))))),
+                plan -> validateMultipleRemoteRepartitionExchange.accept(plan, 2));
 
         // Test row number
-        assertEquals(
+        assertPlanWithSession(
+                "SELECT COUNT(orderdate), ARBITRARY(rn), custkey FROM " +
+                        "(SELECT orderdate, custkey, ROW_NUMBER() OVER (PARTITION BY orderdate, custkey) AS rn FROM orders) GROUP BY custkey",
+                disableMergePartitionPreference,
+                false,
+                anyTree(
+                        node(AggregationNode.class,
+                                anyTree(
+                                        exchange(REMOTE_STREAMING, REPARTITION,
+                                                anyTree(
+                                                        node(AggregationNode.class,
+                                                                node(RowNumberNode.class,
+                                                                        anyTree(
+                                                                                exchange(REMOTE_STREAMING, REPARTITION,
+                                                                                        anyTree(
+                                                                                                tableScan("orders"))))))))))),
+                plan -> validateMultipleRemoteRepartitionExchange.accept(plan, 2));
+    }
+
+    @Test
+    public void testMergePartitionPreference()
+    {
+        Session mergePartitionPreference = Session.builder(this.getQueryRunner().getDefaultSession())
+                .setSystemProperty(MERGE_PARTITION_PREFERENCE, Boolean.toString(true))
+                .build();
+        Consumer<Plan> validateSingleRemoteRepartitionExchange = plan -> assertEquals(
                 countOfMatchingNodes(
-                        plan(
-                                "SELECT COUNT(orderdate), ARBITRARY(rn), custkey FROM " +
-                                        "(SELECT orderdate, custkey, ROW_NUMBER() OVER (PARTITION BY orderdate, custkey) AS rn FROM orders) GROUP BY custkey",
-                                LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED,
-                                false),
-                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE && ((ExchangeNode) node).getType() == REPARTITION),
+                        plan,
+                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == REMOTE_STREAMING && ((ExchangeNode) node).getType() == REPARTITION),
                 1);
+        Consumer<Plan> validateSingleLocalExchange = plan -> assertEquals(
+                countOfMatchingNodes(
+                        plan,
+                        node -> node instanceof ExchangeNode && ((ExchangeNode) node).getScope() == LOCAL),
+                1);
+
+        // Test aggregation
+        assertPlanWithSession(
+                "SELECT COUNT(orderdate), custkey FROM (SELECT orderdate, custkey FROM orders GROUP BY orderdate, custkey) GROUP BY custkey",
+                mergePartitionPreference,
+                false,
+                anyTree(
+                        node(AggregationNode.class,
+                                node(AggregationNode.class,
+                                        exchange(LOCAL, GATHER,
+                                                anyTree(
+                                                        exchange(REMOTE_STREAMING, REPARTITION,
+                                                                anyTree(
+                                                                        node(AggregationNode.class,
+                                                                                anyTree(
+                                                                                        tableScan("orders")))))))))),
+                validateSingleRemoteRepartitionExchange.andThen(validateSingleLocalExchange));
+
+        // Test mark distinct
+        assertPlanWithSession(
+                "SELECT COUNT(DISTINCT(orderdate)), COUNT(DISTINCT(totalprice)), custkey FROM orders GROUP BY custkey",
+                mergePartitionPreference,
+                false,
+                anyTree(
+                        node(AggregationNode.class,
+                                node(MarkDistinctNode.class,
+                                        node(MarkDistinctNode.class,
+                                                exchange(LOCAL, GATHER,
+                                                        anyTree(
+                                                                exchange(REMOTE_STREAMING, REPARTITION,
+                                                                        anyTree(
+                                                                                tableScan("orders"))))))))),
+                validateSingleRemoteRepartitionExchange.andThen(validateSingleLocalExchange));
+
+        // Test window
+        assertPlanWithSession(
+                "SELECT COUNT(orderdate), ARBITRARY(rnk), custkey FROM " +
+                        "(SELECT orderdate, custkey, RANK() OVER (PARTITION BY orderdate, custkey ORDER BY totalprice) AS rnk FROM orders) GROUP BY custkey",
+                mergePartitionPreference,
+                false,
+                anyTree(
+                        node(AggregationNode.class,
+                                anyTree(
+                                        node(WindowNode.class,
+                                                exchange(LOCAL, GATHER,
+                                                        anyTree(
+                                                                exchange(REMOTE_STREAMING, REPARTITION,
+                                                                        anyTree(
+                                                                                tableScan("orders"))))))))),
+                validateSingleRemoteRepartitionExchange.andThen(validateSingleLocalExchange));
+
+        // Test row number
+        assertPlanWithSession(
+                "SELECT COUNT(orderdate), ARBITRARY(rn), custkey FROM " +
+                        "(SELECT orderdate, custkey, ROW_NUMBER() OVER (PARTITION BY orderdate, custkey) AS rn FROM orders) GROUP BY custkey",
+                mergePartitionPreference,
+                false,
+                anyTree(
+                        node(AggregationNode.class,
+                                node(RowNumberNode.class,
+                                        exchange(LOCAL, GATHER,
+                                                anyTree(
+                                                        exchange(REMOTE_STREAMING, REPARTITION,
+                                                                anyTree(
+                                                                        tableScan("orders")))))))),
+                validateSingleRemoteRepartitionExchange.andThen(validateSingleLocalExchange));
     }
 
     @Test
