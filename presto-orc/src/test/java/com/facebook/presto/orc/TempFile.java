@@ -31,7 +31,7 @@ class TempFile
     {
         tempDir = createTempDir();
         tempDir.mkdirs();
-        file = new File(tempDir, "data.orc");
+        file = new File("/Users/jamessun/Downloads/table_o2");
     }
 
     public File getFile()

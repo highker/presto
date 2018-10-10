@@ -84,8 +84,10 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 import org.joda.time.DateTimeZone;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
@@ -560,6 +562,28 @@ public class OrcTester
         }
     }
 
+    public static void main(String[] args)
+            throws IOException
+    {
+        Type type = VarcharType.VARCHAR;
+        TempFile tempFile = new TempFile();
+        OrcEncoding orcEncoding = OrcEncoding.ORC;
+
+        long start = System.nanoTime();
+        long bytes = 0;
+        try (OrcRecordReader recordReader = createCustomOrcRecordReader(tempFile, orcEncoding, OrcPredicate.TRUE, type, MAX_BATCH_SIZE)) {
+            assertEquals(recordReader.getReaderPosition(), 0);
+            assertEquals(recordReader.getFilePosition(), 0);
+
+            for (int batchSize = toIntExact(recordReader.nextBatch()); batchSize >= 0; batchSize = toIntExact(recordReader.nextBatch())) {
+                Block block = recordReader.readBlock(type, 0);
+                bytes += block.getRetainedSizeInBytes();
+            }
+        }
+        double megabytesPerSecond = bytes * 1_000_000_000.0 / 1024 / 1024 / (System.nanoTime() - start);
+        System.out.println(Double.toString(megabytesPerSecond) + " MB/s");
+    }
+
     private static void assertColumnValueEquals(Type type, Object actual, Object expected)
     {
         if (actual == null) {
@@ -638,7 +662,7 @@ public class OrcTester
         OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), true);
         OrcReader orcReader = new OrcReader(orcDataSource, orcEncoding, new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), new DataSize(1, MEGABYTE), MAX_BLOCK_SIZE);
 
-        assertEquals(orcReader.getColumnNames(), ImmutableList.of("test"));
+        assertEquals(orcReader.getColumnNames(), ImmutableList.of("comment"));
         assertEquals(orcReader.getFooter().getRowsInRowGroup(), 10_000);
 
         return orcReader.createRecordReader(ImmutableMap.of(0, type), predicate, HIVE_STORAGE_TIME_ZONE, newSimpleAggregatedMemoryContext(), initialBatchSize);

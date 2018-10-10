@@ -107,6 +107,8 @@ public class SliceStreamReader
 
     public static int computeTruncatedLength(Slice slice, int offset, int length, Type type)
     {
+        return length;
+        /*
         // calculate truncated length
         int truncatedLength = length;
         if (isVarcharType(type)) {
@@ -119,6 +121,7 @@ public class SliceStreamReader
             truncatedLength = byteCountWithoutTrailingSpace(slice, offset, length, ((CharType) type).getLength());
         }
         return truncatedLength;
+        */
     }
 
     @Override
