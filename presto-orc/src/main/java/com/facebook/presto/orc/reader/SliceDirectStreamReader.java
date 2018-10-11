@@ -24,7 +24,9 @@ import com.facebook.presto.orc.stream.LongInputStream;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.VariableWidthBlock;
+import com.facebook.presto.spi.type.CharType;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.VarcharType;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
@@ -40,9 +42,11 @@ import java.util.Optional;
 import static com.facebook.presto.orc.metadata.Stream.StreamKind.DATA;
 import static com.facebook.presto.orc.metadata.Stream.StreamKind.LENGTH;
 import static com.facebook.presto.orc.metadata.Stream.StreamKind.PRESENT;
-import static com.facebook.presto.orc.reader.SliceStreamReader.computeTruncatedLength;
 import static com.facebook.presto.orc.stream.MissingInputStreamSource.missingStreamSource;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static com.facebook.presto.spi.type.Chars.byteCountWithoutTrailingSpace;
+import static com.facebook.presto.spi.type.Chars.isCharType;
+import static com.facebook.presto.spi.type.Varchars.isVarcharType;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Verify.verify;
@@ -173,6 +177,7 @@ public class SliceDirectStreamReader
             throw new OrcCorruptionException(streamDescriptor.getOrcDataSourceId(), "Value is not null but data stream is not present");
         }
 
+
         // allocate enough space to read
         byte[] data = new byte[toIntExact(totalLength)];
         Slice slice = Slices.wrappedBuffer(data);
@@ -182,6 +187,7 @@ public class SliceDirectStreamReader
         // * convert original length values in offsetVector into truncated offset values
         int currentLength = offsetVector[0];
         offsetVector[0] = 0;
+        int maxCodePointCount = getMaxCodePointCount(type);
         for (int i = 1; i <= currentBatchSize; i++) {
             int nextLength = offsetVector[i];
             if (isNullVector != null && isNullVector[i - 1]) {
@@ -196,7 +202,10 @@ public class SliceDirectStreamReader
             dataStream.next(data, offset, offset + currentLength);
 
             // adjust offsetVector with truncated length
-            int truncatedLength = computeTruncatedLength(slice, offset, currentLength, type);
+            int truncatedLength = currentLength;
+            if (maxCodePointCount >= 0) {
+                truncatedLength = byteCountWithoutTrailingSpace(slice, offset, currentLength, maxCodePointCount);
+            }
             verify(truncatedLength >= 0);
             offsetVector[i] = offset + truncatedLength;
 
@@ -205,6 +214,18 @@ public class SliceDirectStreamReader
 
         // this can lead to over-retention but unlikely to happen given truncation rarely happens
         return new VariableWidthBlock(currentBatchSize, slice, offsetVector, Optional.ofNullable(isNullVector));
+    }
+
+    private static int getMaxCodePointCount(Type type)
+    {
+        if (isVarcharType(type)) {
+            VarcharType varcharType = (VarcharType) type;
+            return varcharType.isUnbounded() ? -1 : varcharType.getLengthSafe();
+        }
+        else if (isCharType(type)) {
+            return ((CharType) type).getLength();
+        }
+        throw new IllegalArgumentException("Unsupported encoding " + type.getDisplayName());
     }
 
     private void openRowGroup()
