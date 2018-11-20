@@ -38,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -272,8 +273,9 @@ public class Driver
         }
 
         long maxRuntime = duration.roundTo(TimeUnit.NANOSECONDS);
+        Random rand = new Random();
 
-        Optional<ListenableFuture<?>> result = tryWithLock(100, TimeUnit.MILLISECONDS, () -> {
+        Optional<ListenableFuture<?>> result = tryWithLock(10000, TimeUnit.MILLISECONDS, () -> {
             OperationTimer operationTimer = createTimer();
             driverContext.startProcessTimer();
             driverContext.getYieldSignal().setWithDelay(maxRuntime, driverContext.getYieldExecutor());
@@ -286,6 +288,12 @@ public class Driver
                     }
                 }
                 while (System.nanoTime() - start < maxRuntime && !isFinishedInternal());
+                if (rand.nextInt() % 100 == 0) {
+                    Exception exception = new Exception("James test crash");
+                    PrestoException newException = new PrestoException(GENERIC_INTERNAL_ERROR, "Driver was interrupted by James", exception);
+                    driverContext.failed(newException);
+                    throw newException;
+                }
             }
             finally {
                 driverContext.getYieldSignal().reset();

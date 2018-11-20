@@ -308,63 +308,65 @@ public class Console
             return false;
         }
 
-        try (Query query = queryRunner.startQuery(finalSql)) {
-            boolean success = query.renderOutput(System.out, outputFormat, interactive);
+        while (true) {
+            try (Query query = queryRunner.startQuery(finalSql)) {
+                boolean success = query.renderOutput(System.out, outputFormat, interactive);
 
-            ClientSession session = queryRunner.getSession();
+                ClientSession session = queryRunner.getSession();
 
-            // update catalog and schema if present
-            if (query.getSetCatalog().isPresent() || query.getSetSchema().isPresent()) {
-                session = ClientSession.builder(session)
-                        .withCatalog(query.getSetCatalog().orElse(session.getCatalog()))
-                        .withSchema(query.getSetSchema().orElse(session.getSchema()))
-                        .build();
-                schemaChanged.run();
+                // update catalog and schema if present
+                if (query.getSetCatalog().isPresent() || query.getSetSchema().isPresent()) {
+                    session = ClientSession.builder(session)
+                            .withCatalog(query.getSetCatalog().orElse(session.getCatalog()))
+                            .withSchema(query.getSetSchema().orElse(session.getSchema()))
+                            .build();
+                    schemaChanged.run();
+                }
+
+                // update transaction ID if necessary
+                if (query.isClearTransactionId()) {
+                    session = stripTransactionId(session);
+                }
+
+                ClientSession.Builder builder = ClientSession.builder(session);
+
+                if (query.getStartedTransactionId() != null) {
+                    builder = builder.withTransactionId(query.getStartedTransactionId());
+                }
+
+                // update path if present
+                if (query.getSetPath().isPresent()) {
+                    builder = builder.withPath(query.getSetPath().get());
+                }
+
+                // update session properties if present
+                if (!query.getSetSessionProperties().isEmpty() || !query.getResetSessionProperties().isEmpty()) {
+                    Map<String, String> sessionProperties = new HashMap<>(session.getProperties());
+                    sessionProperties.putAll(query.getSetSessionProperties());
+                    sessionProperties.keySet().removeAll(query.getResetSessionProperties());
+                    builder = builder.withProperties(sessionProperties);
+                }
+
+                // update prepared statements if present
+                if (!query.getAddedPreparedStatements().isEmpty() || !query.getDeallocatedPreparedStatements().isEmpty()) {
+                    Map<String, String> preparedStatements = new HashMap<>(session.getPreparedStatements());
+                    preparedStatements.putAll(query.getAddedPreparedStatements());
+                    preparedStatements.keySet().removeAll(query.getDeallocatedPreparedStatements());
+                    builder = builder.withPreparedStatements(preparedStatements);
+                }
+
+                session = builder.build();
+                queryRunner.setSession(session);
+
+                return success;
             }
-
-            // update transaction ID if necessary
-            if (query.isClearTransactionId()) {
-                session = stripTransactionId(session);
+            catch (RuntimeException e) {
+                System.out.println("recover query");
+                System.err.println("Error running command: " + e.getMessage());
+                if (queryRunner.isDebug()) {
+                    e.printStackTrace();
+                }
             }
-
-            ClientSession.Builder builder = ClientSession.builder(session);
-
-            if (query.getStartedTransactionId() != null) {
-                builder = builder.withTransactionId(query.getStartedTransactionId());
-            }
-
-            // update path if present
-            if (query.getSetPath().isPresent()) {
-                builder = builder.withPath(query.getSetPath().get());
-            }
-
-            // update session properties if present
-            if (!query.getSetSessionProperties().isEmpty() || !query.getResetSessionProperties().isEmpty()) {
-                Map<String, String> sessionProperties = new HashMap<>(session.getProperties());
-                sessionProperties.putAll(query.getSetSessionProperties());
-                sessionProperties.keySet().removeAll(query.getResetSessionProperties());
-                builder = builder.withProperties(sessionProperties);
-            }
-
-            // update prepared statements if present
-            if (!query.getAddedPreparedStatements().isEmpty() || !query.getDeallocatedPreparedStatements().isEmpty()) {
-                Map<String, String> preparedStatements = new HashMap<>(session.getPreparedStatements());
-                preparedStatements.putAll(query.getAddedPreparedStatements());
-                preparedStatements.keySet().removeAll(query.getDeallocatedPreparedStatements());
-                builder = builder.withPreparedStatements(preparedStatements);
-            }
-
-            session = builder.build();
-            queryRunner.setSession(session);
-
-            return success;
-        }
-        catch (RuntimeException e) {
-            System.err.println("Error running command: " + e.getMessage());
-            if (queryRunner.isDebug()) {
-                e.printStackTrace();
-            }
-            return false;
         }
     }
 

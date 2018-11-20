@@ -182,7 +182,7 @@ public class Query
         verify(client.isFinished());
         if (client.finalStatusInfo().getError() != null) {
             renderFailure(errorChannel);
-            return false;
+            throw new RuntimeException("restart query....");
         }
 
         return true;
