@@ -20,10 +20,11 @@ import com.facebook.presto.cost.CostProvider;
 import com.facebook.presto.cost.PlanNodeCostEstimate;
 import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.Pattern;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import com.facebook.presto.sql.planner.EqualityInference;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
-import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolsExtractor;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
@@ -355,8 +356,8 @@ public class ReorderJoins
 
         private static EquiJoinClause toEquiJoinClause(ComparisonExpression equality, Set<Symbol> leftSymbols)
         {
-            Symbol leftSymbol = Symbol.from(equality.getLeft());
-            Symbol rightSymbol = Symbol.from(equality.getRight());
+            Symbol leftSymbol = SymbolUtils.from(equality.getLeft());
+            Symbol rightSymbol = SymbolUtils.from(equality.getRight());
             EquiJoinClause equiJoinClause = new EquiJoinClause(leftSymbol, rightSymbol);
             return leftSymbols.contains(leftSymbol) ? equiJoinClause : equiJoinClause.flip();
         }

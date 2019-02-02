@@ -11,15 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.sql.planner;
+package com.facebook.presto.spi.plan;
 
 import com.facebook.presto.spi.type.Type;
-import com.google.common.collect.ImmutableMap;
 
-import java.util.Collections;
 import java.util.Map;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import static com.facebook.presto.spi.plan.Symbol.checkArgument;
+import static java.lang.String.format;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
 
 public class TypeProvider
@@ -33,12 +34,12 @@ public class TypeProvider
 
     public static TypeProvider copyOf(Map<Symbol, Type> types)
     {
-        return new TypeProvider(ImmutableMap.copyOf(types));
+        return new TypeProvider(unmodifiableMap(types));
     }
 
     public static TypeProvider empty()
     {
-        return new TypeProvider(ImmutableMap.of());
+        return new TypeProvider(unmodifiableMap(emptyMap()));
     }
 
     private TypeProvider(Map<Symbol, Type> types)
@@ -51,7 +52,7 @@ public class TypeProvider
         requireNonNull(symbol, "symbol is null");
 
         Type type = types.get(symbol);
-        checkArgument(type != null, "no type found found for symbol '%s'", symbol);
+        checkArgument(type != null, format("no type found found for symbol '%s'", symbol));
 
         return type;
     }
@@ -59,6 +60,6 @@ public class TypeProvider
     public Map<Symbol, Type> allTypes()
     {
         // types may be a HashMap, so creating an ImmutableMap here would add extra cost when allTypes gets called frequently
-        return Collections.unmodifiableMap(types);
+        return unmodifiableMap(types);
     }
 }

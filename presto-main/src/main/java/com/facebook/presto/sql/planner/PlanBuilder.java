@@ -13,6 +13,9 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.planner.plan.PlanNode;
@@ -89,7 +92,7 @@ class PlanBuilder
         return translations;
     }
 
-    public PlanBuilder appendProjections(Iterable<Expression> expressions, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator)
+    public PlanBuilder appendProjections(Iterable<Expression> expressions, ExtendedSymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator)
     {
         TranslationMap translations = copyTranslations();
 
@@ -97,7 +100,7 @@ class PlanBuilder
 
         // add an identity projection for underlying plan
         for (Symbol symbol : getRoot().getOutputSymbols()) {
-            projections.put(symbol, symbol.toSymbolReference());
+            projections.put(symbol, SymbolUtils.toSymbolReference(symbol));
         }
 
         ImmutableMap.Builder<Symbol, Expression> newTranslations = ImmutableMap.builder();

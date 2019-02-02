@@ -16,7 +16,8 @@ package com.facebook.presto.sql.planner.iterative.rule;
 import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.Pattern;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
@@ -126,7 +127,7 @@ public class MultipleDistinctAggregationToMarkDistinct
 
             if (call.isDistinct() && !call.getFilter().isPresent() && !aggregation.getMask().isPresent()) {
                 Set<Symbol> inputs = call.getArguments().stream()
-                        .map(Symbol::from)
+                        .map(SymbolUtils::from)
                         .collect(toSet());
 
                 Symbol marker = markers.get(inputs);

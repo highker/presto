@@ -13,7 +13,10 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.ExpressionRewriter;
 import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
@@ -66,7 +69,7 @@ public class SymbolToInputParameterRewriter
             @Override
             public Expression rewriteSymbolReference(SymbolReference node, Context context, ExpressionTreeRewriter<Context> treeRewriter)
             {
-                Symbol symbol = Symbol.from(node);
+                Symbol symbol = SymbolUtils.from(node);
                 Integer channel = symbolToChannelMapping.get(symbol);
                 if (channel == null) {
                     checkArgument(context.isInLambda(), "Cannot resolve symbol %s", node.getName());

@@ -19,6 +19,11 @@
     <dependencies>
         <dependency>
             <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-ast</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
             <artifactId>presto-plugin-toolkit</artifactId>
         </dependency>
 
@@ -225,12 +230,6 @@
         <dependency>
             <groupId>com.facebook.presto</groupId>
             <artifactId>presto-main</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-ast</artifactId>
             <scope>test</scope>
         </dependency>
 

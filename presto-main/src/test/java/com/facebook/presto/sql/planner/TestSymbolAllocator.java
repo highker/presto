@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.type.BigintType;
 import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
@@ -26,7 +27,7 @@ public class TestSymbolAllocator
     @Test
     public void testUnique()
     {
-        SymbolAllocator allocator = new SymbolAllocator();
+        ExtendedSymbolAllocator allocator = new ExtendedSymbolAllocator();
         Set<Symbol> symbols = ImmutableSet.<Symbol>builder()
                 .add(allocator.newSymbol("foo_1_0", BigintType.BIGINT))
                 .add(allocator.newSymbol("foo", BigintType.BIGINT))

@@ -13,9 +13,10 @@
  */
 package com.facebook.presto.cost;
 
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.plan.Assignments;
-import com.facebook.presto.sql.planner.plan.PlanNodeId;
+import com.facebook.presto.sql.tree.SymbolReference;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
@@ -81,7 +82,7 @@ public class TestSimpleFilterProjectSemiJoinStatsRule
             Symbol c = pb.symbol("c", BIGINT);
             Symbol semiJoinOutput = pb.symbol("sjo", BOOLEAN);
             return pb.filter(
-                    semiJoinOutput.toSymbolReference(),
+                    new SymbolReference(semiJoinOutput.getName()),
                     pb.semiJoin(
                             pb.values(LEFT_SOURCE_ID, a, b),
                             pb.values(RIGHT_SOURCE_ID, c),

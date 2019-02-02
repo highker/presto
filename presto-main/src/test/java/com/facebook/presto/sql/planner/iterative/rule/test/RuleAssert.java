@@ -22,21 +22,21 @@ import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.cost.StatsAndCosts;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.cost.StatsProvider;
-import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.matching.Match;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.security.AccessControl;
+import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.TypeProvider;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.Plan;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
-import com.facebook.presto.sql.planner.SymbolAllocator;
-import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Memo;
 import com.facebook.presto.sql.planner.iterative.PlanNodeMatcher;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.PlanNode;
-import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.collect.ImmutableSet;
 
@@ -159,7 +159,7 @@ public class RuleAssert
 
     private RuleApplication applyRule()
     {
-        SymbolAllocator symbolAllocator = new SymbolAllocator(types.allTypes());
+        ExtendedSymbolAllocator symbolAllocator = new ExtendedSymbolAllocator(types.allTypes());
         Memo memo = new Memo(idAllocator, plan);
         Lookup lookup = Lookup.from(planNode -> Stream.of(memo.resolve(planNode)));
 
@@ -202,7 +202,7 @@ public class RuleAssert
                 });
     }
 
-    private Rule.Context ruleContext(StatsCalculator statsCalculator, CostCalculator costCalculator, SymbolAllocator symbolAllocator, Memo memo, Lookup lookup, Session session)
+    private Rule.Context ruleContext(StatsCalculator statsCalculator, CostCalculator costCalculator, ExtendedSymbolAllocator symbolAllocator, Memo memo, Lookup lookup, Session session)
     {
         StatsProvider statsProvider = new CachingStatsProvider(statsCalculator, Optional.of(memo), lookup, session, symbolAllocator.getTypes());
         CostProvider costProvider = new CachingCostProvider(costCalculator, statsProvider, Optional.of(memo), session, symbolAllocator.getTypes());
@@ -222,7 +222,7 @@ public class RuleAssert
             }
 
             @Override
-            public SymbolAllocator getSymbolAllocator()
+            public ExtendedSymbolAllocator getSymbolAllocator()
             {
                 return symbolAllocator;
             }

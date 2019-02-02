@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.tree.DefaultExpressionTraversalVisitor;
@@ -113,7 +115,7 @@ public final class SymbolsExtractor
         @Override
         protected Void visitSymbolReference(SymbolReference node, ImmutableList.Builder<Symbol> builder)
         {
-            builder.add(Symbol.from(node));
+            builder.add(SymbolUtils.from(node));
             return null;
         }
     }

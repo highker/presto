@@ -105,6 +105,9 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.RecordSet;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.block.SortOrder;
+import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.spi.predicate.NullableValue;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.PartitioningSpillerFactory;
@@ -113,6 +116,7 @@ import com.facebook.presto.spiller.SpillerFactory;
 import com.facebook.presto.split.MappedRecordSet;
 import com.facebook.presto.split.PageSinkManager;
 import com.facebook.presto.split.PageSourceProvider;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.gen.ExpressionCompiler;
 import com.facebook.presto.sql.gen.JoinCompiler;
 import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler;
@@ -141,7 +145,6 @@ import com.facebook.presto.sql.planner.plan.MarkDistinctNode;
 import com.facebook.presto.sql.planner.plan.MetadataDeleteNode;
 import com.facebook.presto.sql.planner.plan.OutputNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
-import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.plan.PlanVisitor;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.planner.plan.RemoteSourceNode;
@@ -220,7 +223,6 @@ import static com.facebook.presto.SystemSessionProperties.getTaskConcurrency;
 import static com.facebook.presto.SystemSessionProperties.getTaskWriterCount;
 import static com.facebook.presto.SystemSessionProperties.isExchangeCompressionEnabled;
 import static com.facebook.presto.SystemSessionProperties.isSpillEnabled;
-import static com.facebook.presto.execution.warnings.WarningCollector.NOOP;
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.operator.DistinctLimitOperator.DistinctLimitOperatorFactory;
 import static com.facebook.presto.operator.NestedLoopBuildOperator.NestedLoopBuildOperatorFactory;
@@ -236,6 +238,7 @@ import static com.facebook.presto.operator.TableWriterOperator.TableWriterOperat
 import static com.facebook.presto.operator.UnnestOperator.UnnestOperatorFactory;
 import static com.facebook.presto.operator.WindowFunctionDefinition.window;
 import static com.facebook.presto.spi.StandardErrorCode.COMPILER_ERROR;
+import static com.facebook.presto.spi.WarningCollector.NOOP;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.TypeUtils.writeNativeValue;
 import static com.facebook.presto.sql.analyzer.ExpressionAnalyzer.getExpressionTypes;
@@ -907,7 +910,7 @@ public class LocalExecutionPlanner
                 Signature signature = entry.getValue().getSignature();
                 ImmutableList.Builder<Integer> arguments = ImmutableList.builder();
                 for (Expression argument : functionCall.getArguments()) {
-                    Symbol argumentSymbol = Symbol.from(argument);
+                    Symbol argumentSymbol = SymbolUtils.from(argument);
                     arguments.add(source.getLayout().get(argumentSymbol));
                 }
                 Symbol symbol = entry.getKey();
@@ -1660,10 +1663,10 @@ public class LocalExecutionPlanner
                 return Optional.of(createSpatialLookupJoin(
                         node,
                         probeNode,
-                        Symbol.from(firstSymbol),
+                        SymbolUtils.from(firstSymbol),
                         buildNode,
-                        Symbol.from(secondSymbol),
-                        radius.map(Symbol::from),
+                        SymbolUtils.from(secondSymbol),
+                        radius.map(SymbolUtils::from),
                         spatialTest(spatialFunction, true, comparisonOperator),
                         filterExpression,
                         context));
@@ -1672,10 +1675,10 @@ public class LocalExecutionPlanner
                 return Optional.of(createSpatialLookupJoin(
                         node,
                         probeNode,
-                        Symbol.from(secondSymbol),
+                        SymbolUtils.from(secondSymbol),
                         buildNode,
-                        Symbol.from(firstSymbol),
-                        radius.map(Symbol::from),
+                        SymbolUtils.from(firstSymbol),
+                        radius.map(SymbolUtils::from),
                         spatialTest(spatialFunction, false, comparisonOperator),
                         filterExpression,
                         context));
@@ -1725,7 +1728,7 @@ public class LocalExecutionPlanner
 
         private Set<SymbolReference> getSymbolReferences(Collection<Symbol> symbols)
         {
-            return symbols.stream().map(Symbol::toSymbolReference).collect(toImmutableSet());
+            return symbols.stream().map(symbol -> SymbolUtils.toSymbolReference(symbol)).collect(toImmutableSet());
         }
 
         private PhysicalOperation createNestedLoopJoin(JoinNode node, LocalExecutionPlanContext context)
@@ -2530,7 +2533,7 @@ public class LocalExecutionPlanner
             List<Integer> valueChannels = new ArrayList<>();
             for (Expression argument : aggregation.getCall().getArguments()) {
                 if (!(argument instanceof LambdaExpression)) {
-                    Symbol argumentSymbol = Symbol.from(argument);
+                    Symbol argumentSymbol = SymbolUtils.from(argument);
                     valueChannels.add(source.getLayout().get(argumentSymbol));
                 }
             }
@@ -2609,7 +2612,7 @@ public class LocalExecutionPlanner
 
                 sortKeys = orderBy.getSortItems().stream()
                         .map(SortItem::getSortKey)
-                        .map(Symbol::from)
+                        .map(SymbolUtils::from)
                         .collect(toImmutableList());
 
                 sortOrders = orderBy.getSortItems().stream()

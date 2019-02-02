@@ -18,10 +18,11 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.TableLayout;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.LocalProperty;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TypeProvider;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.Partitioning.ArgumentBinding;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
 import com.facebook.presto.sql.planner.plan.AssignUniqueId;
@@ -342,7 +343,7 @@ public final class StreamPropertyDerivations
             Map<Symbol, Symbol> inputToOutput = new HashMap<>();
             for (Map.Entry<Symbol, Expression> assignment : assignments.entrySet()) {
                 if (assignment.getValue() instanceof SymbolReference) {
-                    inputToOutput.put(Symbol.from(assignment.getValue()), assignment.getKey());
+                    inputToOutput.put(SymbolUtils.from(assignment.getValue()), assignment.getKey());
                 }
             }
             return inputToOutput;

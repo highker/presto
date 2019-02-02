@@ -16,8 +16,9 @@ package com.facebook.presto.sql.planner.plan;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.operator.aggregation.InternalAggregationFunction;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.QualifiedName;
@@ -58,7 +59,7 @@ public class StatisticAggregations
         return groupingSymbols;
     }
 
-    public Parts createPartialAggregations(SymbolAllocator symbolAllocator, FunctionRegistry functionRegistry)
+    public Parts createPartialAggregations(ExtendedSymbolAllocator symbolAllocator, FunctionRegistry functionRegistry)
     {
         ImmutableMap.Builder<Symbol, Aggregation> partialAggregation = ImmutableMap.builder();
         ImmutableMap.Builder<Symbol, Aggregation> finalAggregation = ImmutableMap.builder();
@@ -72,7 +73,7 @@ public class StatisticAggregations
             partialAggregation.put(partialSymbol, new Aggregation(originalAggregation.getCall(), signature, originalAggregation.getMask()));
             finalAggregation.put(entry.getKey(),
                     new Aggregation(
-                            new FunctionCall(QualifiedName.of(signature.getName()), ImmutableList.of(partialSymbol.toSymbolReference())),
+                            new FunctionCall(QualifiedName.of(signature.getName()), ImmutableList.of(SymbolUtils.toSymbolReference(partialSymbol))),
                             signature,
                             Optional.empty()));
         }

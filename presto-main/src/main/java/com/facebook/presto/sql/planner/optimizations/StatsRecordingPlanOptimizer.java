@@ -14,11 +14,11 @@
 package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.execution.warnings.WarningCollector;
+import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.TypeProvider;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.OptimizerStatsRecorder;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
-import com.facebook.presto.sql.planner.SymbolAllocator;
-import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 
 import static java.util.Objects.requireNonNull;
@@ -40,7 +40,7 @@ public final class StatsRecordingPlanOptimizer
             PlanNode plan,
             Session session,
             TypeProvider types,
-            SymbolAllocator symbolAllocator,
+            ExtendedSymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator,
             WarningCollector warningCollector)
     {

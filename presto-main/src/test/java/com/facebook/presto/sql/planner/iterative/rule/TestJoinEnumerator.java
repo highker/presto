@@ -21,10 +21,10 @@ import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.CostProvider;
 import com.facebook.presto.cost.PlanNodeCostEstimate;
 import com.facebook.presto.cost.StatsProvider;
-import com.facebook.presto.execution.warnings.WarningCollector;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
+import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.JoinEnumerationResult;
@@ -109,7 +109,7 @@ public class TestJoinEnumerator
     private Rule.Context createContext()
     {
         PlanNodeIdAllocator planNodeIdAllocator = new PlanNodeIdAllocator();
-        SymbolAllocator symbolAllocator = new SymbolAllocator();
+        ExtendedSymbolAllocator symbolAllocator = new ExtendedSymbolAllocator();
         CachingStatsProvider statsProvider = new CachingStatsProvider(
                 queryRunner.getStatsCalculator(),
                 Optional.empty(),
@@ -138,7 +138,7 @@ public class TestJoinEnumerator
             }
 
             @Override
-            public SymbolAllocator getSymbolAllocator()
+            public ExtendedSymbolAllocator getSymbolAllocator()
             {
                 return symbolAllocator;
             }

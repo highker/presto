@@ -13,10 +13,10 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.statistics.ColumnStatisticMetadata;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.reflect.TypeToken;
 import io.airlift.json.JsonCodec;
@@ -59,7 +59,7 @@ public class TestStatisticAggregationsDescriptor
     private static StatisticAggregationsDescriptor<Symbol> createTestDescriptor()
     {
         StatisticAggregationsDescriptor.Builder<Symbol> builder = StatisticAggregationsDescriptor.builder();
-        SymbolAllocator symbolAllocator = new SymbolAllocator();
+        ExtendedSymbolAllocator symbolAllocator = new ExtendedSymbolAllocator();
         for (String column : COLUMNS) {
             for (ColumnStatisticType type : ColumnStatisticType.values()) {
                 builder.addColumnStatistic(new ColumnStatisticMetadata(column, type), testSymbol(symbolAllocator));
@@ -70,7 +70,7 @@ public class TestStatisticAggregationsDescriptor
         return builder.build();
     }
 
-    private static Symbol testSymbol(SymbolAllocator allocator)
+    private static Symbol testSymbol(ExtendedSymbolAllocator allocator)
     {
         return allocator.newSymbol("test_symbol", BIGINT);
     }

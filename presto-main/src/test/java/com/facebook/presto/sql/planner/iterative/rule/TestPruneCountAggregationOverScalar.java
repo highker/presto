@@ -15,9 +15,11 @@ package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.metadata.TableHandle;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.type.BigintType;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.planner.iterative.rule.test.BaseRuleTest;
+import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.tree.FunctionCall;
@@ -84,7 +86,7 @@ public class TestPruneCountAggregationOverScalar
                                         ImmutableList.of(BigintType.BIGINT))
                                 .step(AggregationNode.Step.SINGLE)
                                 .globalGrouping()
-                                .source(p.values(ImmutableList.of(p.symbol("orderkey")), ImmutableList.of(p.expressions("1"))))))
+                                .source(p.values(ImmutableList.of(p.symbol("orderkey")), ImmutableList.of(PlanBuilder.expressions("1"))))))
                 .matches(values(ImmutableMap.of("count_1", 0)));
     }
 
@@ -139,7 +141,7 @@ public class TestPruneCountAggregationOverScalar
                             .globalGrouping()
                             .source(
                                     p.project(
-                                            Assignments.of(totalPrice, totalPrice.toSymbolReference()),
+                                            Assignments.of(totalPrice, SymbolUtils.toSymbolReference(totalPrice)),
                                             p.tableScan(
                                                     new TableHandle(
                                                             new ConnectorId("local"),

@@ -14,16 +14,17 @@
 package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.metadata.Signature;
+import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.block.SortOrder;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TypeProvider;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.planner.DeterminismEvaluator;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.OrderingScheme;
 import com.facebook.presto.sql.planner.PartitioningScheme;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
-import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
 import com.facebook.presto.sql.planner.plan.AssignUniqueId;
@@ -108,7 +109,7 @@ public class UnaliasSymbolReferences
         implements PlanOptimizer
 {
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, ExtendedSymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(session, "session is null");
@@ -593,7 +594,7 @@ public class UnaliasSymbolReferences
 
                 if (expression instanceof SymbolReference) {
                     // Always map a trivial symbol projection
-                    Symbol symbol = Symbol.from(expression);
+                    Symbol symbol = SymbolUtils.from(expression);
                     if (!symbol.equals(entry.getKey())) {
                         map(entry.getKey(), symbol);
                     }
@@ -650,8 +651,8 @@ public class UnaliasSymbolReferences
                 @Override
                 public Expression rewriteSymbolReference(SymbolReference node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
                 {
-                    Symbol canonical = canonicalize(Symbol.from(node));
-                    return canonical.toSymbolReference();
+                    Symbol canonical = canonicalize(SymbolUtils.from(node));
+                    return SymbolUtils.toSymbolReference(canonical);
                 }
             }, value);
         }

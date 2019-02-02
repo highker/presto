@@ -15,7 +15,7 @@ package com.facebook.presto.sql.planner.plan;
 
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.matching.Property;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.tree.Expression;
 
 import java.util.List;

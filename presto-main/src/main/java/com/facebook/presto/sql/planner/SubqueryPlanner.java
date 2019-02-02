@@ -15,6 +15,9 @@ package com.facebook.presto.sql.planner;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
@@ -69,7 +72,7 @@ import static java.util.Objects.requireNonNull;
 class SubqueryPlanner
 {
     private final Analysis analysis;
-    private final SymbolAllocator symbolAllocator;
+    private final ExtendedSymbolAllocator symbolAllocator;
     private final PlanNodeIdAllocator idAllocator;
     private final Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap;
     private final Metadata metadata;
@@ -77,7 +80,7 @@ class SubqueryPlanner
 
     SubqueryPlanner(
             Analysis analysis,
-            SymbolAllocator symbolAllocator,
+            ExtendedSymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator,
             Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap,
             Metadata metadata,
@@ -185,10 +188,10 @@ class SubqueryPlanner
         PlanBuilder subqueryPlan = createPlanBuilder(uncoercedValueListSubquery);
 
         subqueryPlan = subqueryPlan.appendProjections(ImmutableList.of(valueListSubquery), symbolAllocator, idAllocator);
-        SymbolReference valueList = subqueryPlan.translate(valueListSubquery).toSymbolReference();
+        SymbolReference valueList = new SymbolReference(subqueryPlan.translate(valueListSubquery).getName());
 
         Symbol rewrittenValue = subPlan.translate(inPredicate.getValue());
-        InPredicate inPredicateSubqueryExpression = new InPredicate(rewrittenValue.toSymbolReference(), valueList);
+        InPredicate inPredicateSubqueryExpression = new InPredicate(SymbolUtils.toSymbolReference(rewrittenValue), valueList);
         Symbol inPredicateSubquerySymbol = symbolAllocator.newSymbol(inPredicateSubqueryExpression, BOOLEAN);
 
         subPlan.getTranslations().put(inPredicate, inPredicateSubquerySymbol);
@@ -380,8 +383,8 @@ class SubqueryPlanner
         QuantifiedComparisonExpression coercedQuantifiedComparison = new QuantifiedComparisonExpression(
                 quantifiedComparison.getOperator(),
                 quantifiedComparison.getQuantifier(),
-                subPlan.translate(quantifiedComparison.getValue()).toSymbolReference(),
-                subqueryPlan.translate(quantifiedSubquery).toSymbolReference());
+                new SymbolReference(subPlan.translate(quantifiedComparison.getValue()).getName()),
+                new SymbolReference(subqueryPlan.translate(quantifiedSubquery).getName()));
 
         Symbol coercedQuantifiedComparisonSymbol = symbolAllocator.newSymbol(coercedQuantifiedComparison, BOOLEAN);
         subPlan.getTranslations().put(quantifiedComparison, coercedQuantifiedComparisonSymbol);

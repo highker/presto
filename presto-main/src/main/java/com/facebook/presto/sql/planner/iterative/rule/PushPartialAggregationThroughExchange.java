@@ -19,9 +19,10 @@ import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.operator.aggregation.InternalAggregationFunction;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.planner.Partitioning;
 import com.facebook.presto.sql.planner.PartitioningScheme;
-import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.optimizations.SymbolMapper;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
@@ -33,6 +34,7 @@ import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.LambdaExpression;
 import com.facebook.presto.sql.tree.QualifiedName;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
@@ -167,7 +169,7 @@ public class PushPartialAggregationThroughExchange
 
             for (Symbol output : aggregation.getOutputSymbols()) {
                 Symbol input = symbolMapper.map(output);
-                assignments.put(output, input.toSymbolReference());
+                assignments.put(output, new SymbolReference(input.getName()));
             }
             partials.add(new ProjectNode(context.getIdAllocator().getNextId(), mappedPartial, assignments.build()));
         }
@@ -215,7 +217,7 @@ public class PushPartialAggregationThroughExchange
                             new FunctionCall(
                                     QualifiedName.of(signature.getName()),
                                     ImmutableList.<Expression>builder()
-                                            .add(intermediateSymbol.toSymbolReference())
+                                            .add(SymbolUtils.toSymbolReference(intermediateSymbol))
                                             .addAll(originalAggregation.getCall().getArguments().stream()
                                                     .filter(LambdaExpression.class::isInstance)
                                                     .collect(toImmutableList()))

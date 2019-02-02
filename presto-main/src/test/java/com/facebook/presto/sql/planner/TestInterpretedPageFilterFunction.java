@@ -18,6 +18,7 @@ import com.facebook.presto.metadata.MetadataManager;
 import com.facebook.presto.operator.project.InterpretedPageFilter;
 import com.facebook.presto.operator.project.SelectedPositions;
 import com.facebook.presto.spi.Page;
+import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.google.common.collect.ImmutableMap;

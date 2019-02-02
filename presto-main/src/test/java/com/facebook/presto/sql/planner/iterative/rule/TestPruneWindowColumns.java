@@ -16,8 +16,8 @@ package com.facebook.presto.sql.planner.iterative.rule;
 import com.facebook.presto.metadata.FunctionKind;
 import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.spi.block.SortOrder;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.OrderingScheme;
-import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.assertions.ExpectedValueProvider;
 import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
 import com.facebook.presto.sql.planner.iterative.rule.test.BaseRuleTest;
@@ -27,6 +27,7 @@ import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.WindowNode;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.QualifiedName;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.facebook.presto.sql.tree.WindowFrame;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -220,7 +221,7 @@ public class TestPruneWindowColumns
                         ImmutableMap.of(
                                 output1,
                                 new WindowNode.Function(
-                                        new FunctionCall(QualifiedName.of("min"), ImmutableList.of(input1.toSymbolReference())),
+                                        new FunctionCall(QualifiedName.of("min"), ImmutableList.of(new SymbolReference(input1.getName()))),
                                         signature,
                                         new WindowNode.Frame(
                                                 WindowFrame.Type.RANGE,
@@ -228,11 +229,11 @@ public class TestPruneWindowColumns
                                                 Optional.of(startValue1),
                                                 CURRENT_ROW,
                                                 Optional.of(endValue1),
-                                                Optional.of(startValue1.toSymbolReference()),
-                                                Optional.of(endValue2.toSymbolReference()))),
+                                                Optional.of(new SymbolReference(startValue1.getName())),
+                                                Optional.of(new SymbolReference(endValue2.getName())))),
                                 output2,
                                 new WindowNode.Function(
-                                        new FunctionCall(QualifiedName.of("min"), ImmutableList.of(input2.toSymbolReference())),
+                                        new FunctionCall(QualifiedName.of("min"), ImmutableList.of(new SymbolReference(input2.getName()))),
                                         signature,
                                         new WindowNode.Frame(
                                                 WindowFrame.Type.RANGE,
@@ -240,8 +241,8 @@ public class TestPruneWindowColumns
                                                 Optional.of(startValue2),
                                                 CURRENT_ROW,
                                                 Optional.of(endValue2),
-                                                Optional.of(startValue2.toSymbolReference()),
-                                                Optional.of(endValue2.toSymbolReference())))),
+                                                Optional.of(new SymbolReference(startValue2.getName())),
+                                                Optional.of(new SymbolReference(endValue2.getName()))))),
                         hash,
                         p.values(
                                 inputs.stream()

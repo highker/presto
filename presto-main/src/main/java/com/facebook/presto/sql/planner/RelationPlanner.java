@@ -18,11 +18,14 @@ import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.spi.ColumnHandle;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.type.ArrayType;
 import com.facebook.presto.spi.type.MapType;
 import com.facebook.presto.spi.type.RowType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.ExpressionUtils;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.Field;
 import com.facebook.presto.sql.analyzer.RelationId;
@@ -99,7 +102,7 @@ class RelationPlanner
         extends DefaultTraversalVisitor<RelationPlan, Void>
 {
     private final Analysis analysis;
-    private final SymbolAllocator symbolAllocator;
+    private final ExtendedSymbolAllocator symbolAllocator;
     private final PlanNodeIdAllocator idAllocator;
     private final Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap;
     private final Metadata metadata;
@@ -108,7 +111,7 @@ class RelationPlanner
 
     RelationPlanner(
             Analysis analysis,
-            SymbolAllocator symbolAllocator,
+            ExtendedSymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator,
             Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap,
             Metadata metadata,
@@ -171,7 +174,7 @@ class RelationPlanner
         List<Symbol> mappings = subPlan.getFieldMappings();
 
         if (node.getColumnNames() != null) {
-            ImmutableList.Builder<Symbol> newMappings = ImmutableList.<Symbol>builder();
+            ImmutableList.Builder<Symbol> newMappings = ImmutableList.builder();
             Assignments.Builder assignments = Assignments.builder();
 
             // project only the visible columns from the underlying relation
@@ -179,7 +182,7 @@ class RelationPlanner
                 Field field = subPlan.getDescriptor().getFieldByIndex(i);
                 if (!field.isHidden()) {
                     Symbol aliasedColumn = symbolAllocator.newSymbol(field);
-                    assignments.put(aliasedColumn, subPlan.getFieldMappings().get(i).toSymbolReference());
+                    assignments.put(aliasedColumn, SymbolUtils.toSymbolReference(aliasedColumn));
                     newMappings.add(aliasedColumn);
                 }
             }
@@ -439,7 +442,7 @@ class RelationPlanner
             Symbol leftOutput = symbolAllocator.newSymbol(identifier, type);
             int leftField = joinAnalysis.getLeftJoinFields().get(i);
             leftCoercions.put(leftOutput, new Cast(
-                    left.getSymbol(leftField).toSymbolReference(),
+                    SymbolUtils.toSymbolReference(leftOutput),
                     type.getTypeSignature().toString(),
                     false,
                     metadata.getTypeManager().isTypeOnlyCoercion(left.getDescriptor().getFieldByIndex(leftField).getType(), type)));
@@ -449,7 +452,7 @@ class RelationPlanner
             Symbol rightOutput = symbolAllocator.newSymbol(identifier, type);
             int rightField = joinAnalysis.getRightJoinFields().get(i);
             rightCoercions.put(rightOutput, new Cast(
-                    right.getSymbol(rightField).toSymbolReference(),
+                    new SymbolReference(right.getSymbol(rightField).getName()),
                     type.getTypeSignature().toString(),
                     false,
                     metadata.getTypeManager().isTypeOnlyCoercion(right.getDescriptor().getFieldByIndex(rightField).getType(), type)));
@@ -485,20 +488,20 @@ class RelationPlanner
             Symbol output = symbolAllocator.newSymbol(column, analysis.getType(column));
             outputs.add(output);
             assignments.put(output, new CoalesceExpression(
-                    leftJoinColumns.get(column).toSymbolReference(),
-                    rightJoinColumns.get(column).toSymbolReference()));
+                    SymbolUtils.toSymbolReference(output),
+                    SymbolUtils.toSymbolReference(output)));
         }
 
         for (int field : joinAnalysis.getOtherLeftFields()) {
             Symbol symbol = left.getFieldMappings().get(field);
             outputs.add(symbol);
-            assignments.put(symbol, symbol.toSymbolReference());
+            assignments.put(symbol, SymbolUtils.toSymbolReference(symbol));
         }
 
         for (int field : joinAnalysis.getOtherRightFields()) {
             Symbol symbol = right.getFieldMappings().get(field);
             outputs.add(symbol);
-            assignments.put(symbol, symbol.toSymbolReference());
+            assignments.put(symbol, SymbolUtils.toSymbolReference(symbol));
         }
 
         return new RelationPlan(
@@ -726,13 +729,13 @@ class RelationPlanner
             Type inputType = symbolAllocator.getTypes().get(inputSymbol);
             Type outputType = targetColumnTypes[i];
             if (!outputType.equals(inputType)) {
-                Expression cast = new Cast(inputSymbol.toSymbolReference(), outputType.getTypeSignature().toString());
+                Expression cast = new Cast(SymbolUtils.toSymbolReference(inputSymbol), outputType.getTypeSignature().toString());
                 Symbol outputSymbol = symbolAllocator.newSymbol(cast, outputType);
                 assignments.put(outputSymbol, cast);
                 newSymbols.add(outputSymbol);
             }
             else {
-                SymbolReference symbolReference = inputSymbol.toSymbolReference();
+                SymbolReference symbolReference = SymbolUtils.toSymbolReference(inputSymbol);
                 Symbol outputSymbol = symbolAllocator.newSymbol(symbolReference, outputType);
                 assignments.put(outputSymbol, symbolReference);
                 newSymbols.add(outputSymbol);

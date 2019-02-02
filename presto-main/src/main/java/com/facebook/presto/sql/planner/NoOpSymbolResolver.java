@@ -13,6 +13,9 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
+
 public class NoOpSymbolResolver
         implements SymbolResolver
 {
@@ -21,6 +24,6 @@ public class NoOpSymbolResolver
     @Override
     public Object getValue(Symbol symbol)
     {
-        return symbol.toSymbolReference();
+        return SymbolUtils.toSymbolReference(symbol);
     }
 }

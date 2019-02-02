@@ -15,7 +15,6 @@ package com.facebook.presto.sql.analyzer;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.SystemSessionProperties;
-import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.OperatorNotFoundException;
@@ -25,7 +24,9 @@ import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.security.DenyAllAccessControl;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.StandardErrorCode;
+import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.function.OperatorType;
+import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.spi.type.CharType;
 import com.facebook.presto.spi.type.DecimalParseResult;
 import com.facebook.presto.spi.type.Decimals;
@@ -34,9 +35,8 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
 import com.facebook.presto.spi.type.VarcharType;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.parser.SqlParser;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.tree.ArithmeticBinaryExpression;
 import com.facebook.presto.sql.tree.ArithmeticUnaryExpression;
 import com.facebook.presto.sql.tree.ArrayConstructor;
@@ -383,7 +383,7 @@ public class ExpressionAnalyzer
                     return setExpressionType(node, resolvedField.get().getType());
                 }
             }
-            Type type = symbolTypes.get(Symbol.from(node));
+            Type type = symbolTypes.get(SymbolUtils.from(node));
             return setExpressionType(node, type);
         }
 
@@ -1341,7 +1341,7 @@ public class ExpressionAnalyzer
             if (typeManager.isTypeOnlyCoercion(type, superType)) {
                 typeOnlyCoercions.add(ref);
             }
-            else if (typeOnlyCoercions.contains(ref)) {
+            else {
                 typeOnlyCoercions.remove(ref);
             }
         }

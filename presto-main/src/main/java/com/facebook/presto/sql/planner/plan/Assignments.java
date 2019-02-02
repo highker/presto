@@ -13,7 +13,8 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.ExpressionRewriter;
 import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
@@ -244,7 +245,7 @@ public class Assignments
 
         public Builder putIdentity(Symbol symbol)
         {
-            put(symbol, symbol.toSymbolReference());
+            put(symbol, SymbolUtils.toSymbolReference(symbol));
             return this;
         }
 

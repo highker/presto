@@ -11,22 +11,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.sql.planner;
+package com.facebook.presto.spi.plan;
 
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.sql.analyzer.Field;
-import com.facebook.presto.sql.tree.Expression;
-import com.facebook.presto.sql.tree.FunctionCall;
-import com.facebook.presto.sql.tree.GroupingOperation;
-import com.facebook.presto.sql.tree.Identifier;
-import com.facebook.presto.sql.tree.SymbolReference;
-import com.google.common.primitives.Ints;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import static com.facebook.presto.spi.plan.Symbol.checkArgument;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
@@ -75,7 +68,7 @@ public class SymbolAllocator
             String tail = nameHint.substring(index + 1);
 
             // only strip if tail is numeric or _ is the last character
-            if (Ints.tryParse(tail) != null || index == nameHint.length() - 1) {
+            if (tryParseInt(tail) != null || index == nameHint.length() - 1) {
                 nameHint = nameHint.substring(0, index);
             }
         }
@@ -96,36 +89,6 @@ public class SymbolAllocator
         return symbol;
     }
 
-    public Symbol newSymbol(Expression expression, Type type)
-    {
-        return newSymbol(expression, type, null);
-    }
-
-    public Symbol newSymbol(Expression expression, Type type, String suffix)
-    {
-        String nameHint = "expr";
-        if (expression instanceof Identifier) {
-            nameHint = ((Identifier) expression).getValue();
-        }
-        else if (expression instanceof FunctionCall) {
-            nameHint = ((FunctionCall) expression).getName().getSuffix();
-        }
-        else if (expression instanceof SymbolReference) {
-            nameHint = ((SymbolReference) expression).getName();
-        }
-        else if (expression instanceof GroupingOperation) {
-            nameHint = "grouping";
-        }
-
-        return newSymbol(nameHint, type, suffix);
-    }
-
-    public Symbol newSymbol(Field field)
-    {
-        String nameHint = field.getName().orElse("field");
-        return newSymbol(nameHint, field.getType());
-    }
-
     public TypeProvider getTypes()
     {
         return TypeProvider.viewOf(symbols);
@@ -134,5 +97,15 @@ public class SymbolAllocator
     private int nextId()
     {
         return nextId++;
+    }
+
+    private Integer tryParseInt(String value)
+    {
+        try {
+            return Integer.parseInt(value);
+        }
+        catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

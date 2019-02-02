@@ -15,7 +15,9 @@ package com.facebook.presto.sql.planner;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.predicate.NullableValue;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -54,7 +56,7 @@ public final class Partitioning
     public static Partitioning create(PartitioningHandle handle, List<Symbol> columns)
     {
         return new Partitioning(handle, columns.stream()
-                .map(Symbol::toSymbolReference)
+                .map(symbol -> SymbolUtils.toSymbolReference(symbol))
                 .map(ArgumentBinding::expressionBinding)
                 .collect(toImmutableList()));
     }
@@ -317,7 +319,7 @@ public final class Partitioning
         public Symbol getColumn()
         {
             verify(expression instanceof SymbolReference, "Expect the expression to be a SymbolReference");
-            return Symbol.from(expression);
+            return SymbolUtils.from(expression);
         }
 
         @JsonProperty
@@ -337,7 +339,7 @@ public final class Partitioning
             if (isConstant()) {
                 return this;
             }
-            return expressionBinding(translator.apply(Symbol.from(expression)).toSymbolReference());
+            return expressionBinding(new SymbolReference(translator.apply(SymbolUtils.from(expression)).getName()));
         }
 
         public Optional<ArgumentBinding> translate(Translator translator)
@@ -348,12 +350,12 @@ public final class Partitioning
 
             if (!isVariable()) {
                 return translator.expressionTranslator.apply(expression)
-                        .map(Symbol::toSymbolReference)
+                        .map(symbol -> SymbolUtils.toSymbolReference(symbol))
                         .map(ArgumentBinding::expressionBinding);
             }
 
-            Optional<ArgumentBinding> newColumn = translator.columnTranslator.apply(Symbol.from(expression))
-                    .map(Symbol::toSymbolReference)
+            Optional<ArgumentBinding> newColumn = translator.columnTranslator.apply(SymbolUtils.from(expression))
+                    .map(symbol -> SymbolUtils.toSymbolReference(symbol))
                     .map(ArgumentBinding::expressionBinding);
             if (newColumn.isPresent()) {
                 return newColumn;
@@ -361,7 +363,7 @@ public final class Partitioning
             // As a last resort, check for a constant mapping for the symbol
             // Note: this MUST be last because we want to favor the symbol representation
             // as it makes further optimizations possible.
-            return translator.constantTranslator.apply(Symbol.from(expression))
+            return translator.constantTranslator.apply(SymbolUtils.from(expression))
                     .map(ArgumentBinding::constantBinding);
         }
 

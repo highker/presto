@@ -13,11 +13,13 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
+import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.SortExpressionContext;
-import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Join;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -330,7 +332,7 @@ public class JoinNode
 
         public ComparisonExpression toExpression()
         {
-            return new ComparisonExpression(ComparisonExpression.Operator.EQUAL, left.toSymbolReference(), right.toSymbolReference());
+            return new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference(left.getName()), new SymbolReference(right.getName()));
         }
 
         public EquiJoinClause flip()

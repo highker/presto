@@ -21,14 +21,14 @@ import com.facebook.presto.cost.CostCalculator;
 import com.facebook.presto.cost.CostProvider;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.cost.StatsProvider;
-import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.matching.Match;
 import com.facebook.presto.matching.Matcher;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
+import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.TypeProvider;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.RuleStatsRecorder;
-import com.facebook.presto.sql.planner.SymbolAllocator;
-import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.google.common.collect.ImmutableList;
@@ -75,7 +75,7 @@ public class IterativeOptimizer
     }
 
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, ExtendedSymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         // only disable new rules if we have legacy rules to fall back to
         if (!SystemSessionProperties.isNewOptimizerEnabled(session) && !legacyRules.isEmpty()) {
@@ -211,7 +211,7 @@ public class IterativeOptimizer
             }
 
             @Override
-            public SymbolAllocator getSymbolAllocator()
+            public ExtendedSymbolAllocator getSymbolAllocator()
             {
                 return context.symbolAllocator;
             }
@@ -253,7 +253,7 @@ public class IterativeOptimizer
         private final Memo memo;
         private final Lookup lookup;
         private final PlanNodeIdAllocator idAllocator;
-        private final SymbolAllocator symbolAllocator;
+        private final ExtendedSymbolAllocator symbolAllocator;
         private final long startTimeInNanos;
         private final long timeoutInMilliseconds;
         private final Session session;
@@ -263,7 +263,7 @@ public class IterativeOptimizer
                 Memo memo,
                 Lookup lookup,
                 PlanNodeIdAllocator idAllocator,
-                SymbolAllocator symbolAllocator,
+                ExtendedSymbolAllocator symbolAllocator,
                 long startTimeInNanos,
                 long timeoutInMilliseconds,
                 Session session,

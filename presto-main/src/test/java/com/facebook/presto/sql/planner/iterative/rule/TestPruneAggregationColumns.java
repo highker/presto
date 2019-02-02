@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.sql.planner.iterative.rule;
 
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.iterative.rule.test.BaseRuleTest;
 import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.plan.Assignments;
@@ -75,7 +75,7 @@ public class TestPruneAggregationColumns
                 planBuilder.aggregation(aggregationBuilder -> aggregationBuilder
                         .source(planBuilder.values(key))
                         .singleGroupingSet(key)
-                        .addAggregation(a, planBuilder.expression("count()"), ImmutableList.of())
-                        .addAggregation(b, planBuilder.expression("count()"), ImmutableList.of())));
+                        .addAggregation(a, PlanBuilder.expression("count()"), ImmutableList.of())
+                        .addAggregation(b, PlanBuilder.expression("count()"), ImmutableList.of())));
     }
 }

@@ -14,12 +14,12 @@
 package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.metadata.FunctionRegistry;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.BooleanType;
 import com.facebook.presto.spi.type.TypeSignature;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.optimizations.PlanNodeDecorrelator.DecorrelatedNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
@@ -34,6 +34,7 @@ import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.QualifiedName;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
@@ -56,12 +57,12 @@ public class ScalarAggregationToJoinRewriter
     private static final QualifiedName COUNT = QualifiedName.of("count");
 
     private final FunctionRegistry functionRegistry;
-    private final SymbolAllocator symbolAllocator;
+    private final ExtendedSymbolAllocator symbolAllocator;
     private final PlanNodeIdAllocator idAllocator;
     private final Lookup lookup;
     private final PlanNodeDecorrelator planNodeDecorrelator;
 
-    public ScalarAggregationToJoinRewriter(FunctionRegistry functionRegistry, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
+    public ScalarAggregationToJoinRewriter(FunctionRegistry functionRegistry, ExtendedSymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
     {
         this.functionRegistry = requireNonNull(functionRegistry, "metadata is null");
         this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
@@ -181,7 +182,7 @@ public class ScalarAggregationToJoinRewriter
                 aggregations.put(symbol, new Aggregation(
                         new FunctionCall(
                                 COUNT,
-                                ImmutableList.of(nonNullableAggregationSourceSymbol.toSymbolReference())),
+                                ImmutableList.of(new SymbolReference(nonNullableAggregationSourceSymbol.getName()))),
                         functionRegistry.resolveFunction(
                                 COUNT,
                                 fromTypeSignatures(scalarAggregationSourceTypeSignatures)),

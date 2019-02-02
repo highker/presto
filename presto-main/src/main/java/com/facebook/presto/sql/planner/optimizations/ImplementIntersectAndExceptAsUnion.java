@@ -14,15 +14,15 @@
 package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.metadata.Signature;
+import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.ExpressionUtils;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
-import com.facebook.presto.sql.planner.TypeProvider;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
 import com.facebook.presto.sql.planner.plan.Assignments;
@@ -54,6 +54,7 @@ import static com.facebook.presto.metadata.FunctionKind.AGGREGATE;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
+import static com.facebook.presto.sql.SymbolUtils.toSymbolReference;
 import static com.facebook.presto.sql.planner.plan.AggregationNode.Step;
 import static com.facebook.presto.sql.planner.plan.AggregationNode.singleGroupingSet;
 import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
@@ -106,7 +107,7 @@ public class ImplementIntersectAndExceptAsUnion
         implements PlanOptimizer
 {
     @Override
-    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
+    public PlanNode optimize(PlanNode plan, Session session, TypeProvider types, ExtendedSymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, WarningCollector warningCollector)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(session, "session is null");
@@ -123,9 +124,9 @@ public class ImplementIntersectAndExceptAsUnion
         private static final String MARKER = "marker";
         private static final Signature COUNT_AGGREGATION = new Signature("count", AGGREGATE, parseTypeSignature(StandardTypes.BIGINT), parseTypeSignature(StandardTypes.BOOLEAN));
         private final PlanNodeIdAllocator idAllocator;
-        private final SymbolAllocator symbolAllocator;
+        private final ExtendedSymbolAllocator symbolAllocator;
 
-        private Rewriter(PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator)
+        private Rewriter(PlanNodeIdAllocator idAllocator, ExtendedSymbolAllocator symbolAllocator)
         {
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
             this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
@@ -236,7 +237,7 @@ public class ImplementIntersectAndExceptAsUnion
             for (int i = 0; i < markers.size(); i++) {
                 Symbol output = aggregationOutputs.get(i);
                 aggregations.put(output, new Aggregation(
-                        new FunctionCall(QualifiedName.of("count"), ImmutableList.of(markers.get(i).toSymbolReference())),
+                        new FunctionCall(QualifiedName.of("count"), ImmutableList.of(toSymbolReference(output))),
                         COUNT_AGGREGATION,
                         Optional.empty()));
             }
@@ -254,7 +255,7 @@ public class ImplementIntersectAndExceptAsUnion
         private FilterNode addFilterForIntersect(AggregationNode aggregation)
         {
             ImmutableList<Expression> predicates = aggregation.getAggregations().keySet().stream()
-                    .map(column -> new ComparisonExpression(GREATER_THAN_OR_EQUAL, column.toSymbolReference(), new GenericLiteral("BIGINT", "1")))
+                    .map(column -> new ComparisonExpression(GREATER_THAN_OR_EQUAL, toSymbolReference(column), new GenericLiteral("BIGINT", "1")))
                     .collect(toImmutableList());
             return new FilterNode(idAllocator.getNextId(), aggregation, ExpressionUtils.and(predicates));
         }
@@ -262,9 +263,9 @@ public class ImplementIntersectAndExceptAsUnion
         private FilterNode addFilterForExcept(AggregationNode aggregation, Symbol firstSource, List<Symbol> remainingSources)
         {
             ImmutableList.Builder<Expression> predicatesBuilder = ImmutableList.builder();
-            predicatesBuilder.add(new ComparisonExpression(GREATER_THAN_OR_EQUAL, firstSource.toSymbolReference(), new GenericLiteral("BIGINT", "1")));
+            predicatesBuilder.add(new ComparisonExpression(GREATER_THAN_OR_EQUAL, toSymbolReference(firstSource), new GenericLiteral("BIGINT", "1")));
             for (Symbol symbol : remainingSources) {
-                predicatesBuilder.add(new ComparisonExpression(EQUAL, symbol.toSymbolReference(), new GenericLiteral("BIGINT", "0")));
+                predicatesBuilder.add(new ComparisonExpression(EQUAL, toSymbolReference(symbol), new GenericLiteral("BIGINT", "0")));
             }
 
             return new FilterNode(idAllocator.getNextId(), aggregation, ExpressionUtils.and(predicatesBuilder.build()));

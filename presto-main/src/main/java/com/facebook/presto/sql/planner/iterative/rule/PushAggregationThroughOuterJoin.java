@@ -17,9 +17,10 @@ import com.facebook.presto.Session;
 import com.facebook.presto.matching.Capture;
 import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.Pattern;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
@@ -215,7 +216,7 @@ public class PushAggregationThroughOuterJoin
     // of an aggregation over a single null row is one or zero rather than null. In order to ensure correct results,
     // we add a coalesce function with the output of the new outer join and the agggregation performed over a single
     // null row.
-    private Optional<PlanNode> coalesceWithNullAggregation(AggregationNode aggregationNode, PlanNode outerJoin, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
+    private Optional<PlanNode> coalesceWithNullAggregation(AggregationNode aggregationNode, PlanNode outerJoin, ExtendedSymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
     {
         // Create an aggregation node over a row of nulls.
         Optional<MappedAggregationInfo> aggregationOverNullInfoResultNode = createAggregationOverNull(
@@ -253,16 +254,16 @@ public class PushAggregationThroughOuterJoin
         Assignments.Builder assignmentsBuilder = Assignments.builder();
         for (Symbol symbol : outerJoin.getOutputSymbols()) {
             if (aggregationNode.getAggregations().containsKey(symbol)) {
-                assignmentsBuilder.put(symbol, new CoalesceExpression(symbol.toSymbolReference(), sourceAggregationToOverNullMapping.get(symbol).toSymbolReference()));
+                assignmentsBuilder.put(symbol, new CoalesceExpression(SymbolUtils.toSymbolReference(symbol), SymbolUtils.toSymbolReference(symbol)));
             }
             else {
-                assignmentsBuilder.put(symbol, symbol.toSymbolReference());
+                assignmentsBuilder.put(symbol, SymbolUtils.toSymbolReference(symbol));
             }
         }
         return Optional.of(new ProjectNode(idAllocator.getNextId(), crossJoin, assignmentsBuilder.build()));
     }
 
-    private Optional<MappedAggregationInfo> createAggregationOverNull(AggregationNode referenceAggregation, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
+    private Optional<MappedAggregationInfo> createAggregationOverNull(AggregationNode referenceAggregation, ExtendedSymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator, Lookup lookup)
     {
         // Create a values node that consists of a single row of nulls.
         // Map the output symbols from the referenceAggregation's source
@@ -275,7 +276,7 @@ public class PushAggregationThroughOuterJoin
             nullLiterals.add(nullLiteral);
             Symbol nullSymbol = symbolAllocator.newSymbol(nullLiteral, symbolAllocator.getTypes().get(sourceSymbol));
             nullSymbols.add(nullSymbol);
-            sourcesSymbolMappingBuilder.put(sourceSymbol, nullSymbol.toSymbolReference());
+            sourcesSymbolMappingBuilder.put(sourceSymbol, new SymbolReference(nullSymbol.getName()));
         }
         ValuesNode nullRow = new ValuesNode(
                 idAllocator.getNextId(),
@@ -299,7 +300,7 @@ public class PushAggregationThroughOuterJoin
             AggregationNode.Aggregation overNullAggregation = new AggregationNode.Aggregation(
                     (FunctionCall) inlineSymbols(sourcesSymbolMapping, aggregation.getCall()),
                     aggregation.getSignature(),
-                    aggregation.getMask().map(x -> Symbol.from(sourcesSymbolMapping.get(x))));
+                    aggregation.getMask().map(x -> SymbolUtils.from(sourcesSymbolMapping.get(x))));
             Symbol overNullSymbol = symbolAllocator.newSymbol(overNullAggregation.getCall(), symbolAllocator.getTypes().get(aggregationSymbol));
             aggregationsOverNullBuilder.put(overNullSymbol, overNullAggregation);
             aggregationsSymbolMappingBuilder.put(aggregationSymbol, overNullSymbol);
@@ -324,7 +325,7 @@ public class PushAggregationThroughOuterJoin
     {
         List<Expression> functionArguments = aggregation.getCall().getArguments();
         return sourceSymbols.stream()
-                .map(Symbol::toSymbolReference)
+                .map(symbol -> SymbolUtils.toSymbolReference(symbol))
                 .anyMatch(functionArguments::contains);
     }
 

@@ -19,6 +19,7 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
 import com.facebook.presto.sql.tree.Expression;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 
@@ -67,7 +68,7 @@ public class ValuesMatcher
         }
 
         return match(SymbolAliases.builder()
-                .putAll(Maps.transformValues(outputSymbolAliases, index -> valuesNode.getOutputSymbols().get(index).toSymbolReference()))
+                .putAll(Maps.transformValues(outputSymbolAliases, index -> new SymbolReference(valuesNode.getOutputSymbols().get(index).getName())))
                 .build());
     }
 

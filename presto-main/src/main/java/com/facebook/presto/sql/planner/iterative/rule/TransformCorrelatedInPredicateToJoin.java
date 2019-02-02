@@ -17,9 +17,10 @@ import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.metadata.FunctionKind;
 import com.facebook.presto.metadata.Signature;
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.SymbolsExtractor;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
@@ -127,7 +128,7 @@ public class TransformCorrelatedInPredicateToJoin
             Symbol inPredicateOutputSymbol,
             Lookup lookup,
             PlanNodeIdAllocator idAllocator,
-            SymbolAllocator symbolAllocator)
+            ExtendedSymbolAllocator symbolAllocator)
     {
         Optional<Decorrelated> decorrelated = new DecorrelatingVisitor(lookup, apply.getCorrelation())
                 .decorrelate(apply.getSubquery());
@@ -153,7 +154,7 @@ public class TransformCorrelatedInPredicateToJoin
             Symbol inPredicateOutputSymbol,
             Decorrelated decorrelated,
             PlanNodeIdAllocator idAllocator,
-            SymbolAllocator symbolAllocator)
+            ExtendedSymbolAllocator symbolAllocator)
     {
         Expression correlationCondition = and(decorrelated.getCorrelatedPredicates());
         PlanNode decorrelatedBuildSource = decorrelated.getDecorrelatedNode();
@@ -172,14 +173,14 @@ public class TransformCorrelatedInPredicateToJoin
                         .put(buildSideKnownNonNull, bigint(0))
                         .build());
 
-        Symbol probeSideSymbol = Symbol.from(inPredicate.getValue());
-        Symbol buildSideSymbol = Symbol.from(inPredicate.getValueList());
+        Symbol probeSideSymbol = SymbolUtils.from(inPredicate.getValue());
+        Symbol buildSideSymbol = SymbolUtils.from(inPredicate.getValueList());
 
         Expression joinExpression = and(
                 or(
-                        new IsNullPredicate(probeSideSymbol.toSymbolReference()),
-                        new ComparisonExpression(ComparisonExpression.Operator.EQUAL, probeSideSymbol.toSymbolReference(), buildSideSymbol.toSymbolReference()),
-                        new IsNullPredicate(buildSideSymbol.toSymbolReference())),
+                        new IsNullPredicate(new SymbolReference(probeSideSymbol.getName())),
+                        new ComparisonExpression(ComparisonExpression.Operator.EQUAL, new SymbolReference(probeSideSymbol.getName()), new SymbolReference(buildSideSymbol.getName())),
+                        new IsNullPredicate(new SymbolReference(buildSideSymbol.getName()))),
                 correlationCondition);
 
         JoinNode leftOuterJoin = leftOuterJoin(idAllocator, probeSide, buildSide, joinExpression);
@@ -249,19 +250,19 @@ public class TransformCorrelatedInPredicateToJoin
                 Optional.of(condition),
                 Optional.empty(),
                 false,
-                ImmutableList.<Expression>of()); /* arguments */
+                ImmutableList.of()); /* arguments */
 
         return new AggregationNode.Aggregation(
                 countCall,
                 new Signature("count", FunctionKind.AGGREGATE, BIGINT.getTypeSignature()),
-                Optional.<Symbol>empty()); /* mask */
+                Optional.empty()); /* mask */
     }
 
     private static Expression isGreaterThan(Symbol symbol, long value)
     {
         return new ComparisonExpression(
                 ComparisonExpression.Operator.GREATER_THAN,
-                symbol.toSymbolReference(),
+                SymbolUtils.toSymbolReference(symbol),
                 bigint(value));
     }
 
@@ -272,7 +273,7 @@ public class TransformCorrelatedInPredicateToJoin
 
     private static Expression isNotNull(Symbol symbol)
     {
-        return new IsNotNullPredicate(symbol.toSymbolReference());
+        return new IsNotNullPredicate(SymbolUtils.toSymbolReference(symbol));
     }
 
     private static Expression bigint(long value)
@@ -323,8 +324,8 @@ public class TransformCorrelatedInPredicateToJoin
                         .flatMap(AstUtils::preOrder)
                         .filter(SymbolReference.class::isInstance)
                         .map(SymbolReference.class::cast)
-                        .filter(symbolReference -> !correlation.contains(Symbol.from(symbolReference)))
-                        .forEach(symbolReference -> assignments.putIdentity(Symbol.from(symbolReference)));
+                        .filter(symbolReference -> !correlation.contains(SymbolUtils.from(symbolReference)))
+                        .forEach(symbolReference -> assignments.putIdentity(SymbolUtils.from(symbolReference)));
 
                 return new Decorrelated(
                         decorrelated.getCorrelatedPredicates(),

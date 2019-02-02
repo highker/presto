@@ -13,12 +13,13 @@
  */
 package com.facebook.presto.sql.planner.assertions;
 
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.OrderBy;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.SortItem;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.facebook.presto.sql.tree.WindowFrame;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
@@ -94,7 +95,7 @@ class FunctionCallProvider
         if (!orderBy.isEmpty()) {
             orderByClause = Optional.of(new OrderBy(orderBy.stream()
                     .map(item -> new SortItem(
-                            Symbol.from(aliases.get(item.getField())).toSymbolReference(),
+                            new SymbolReference(SymbolUtils.from(aliases.get(item.getField())).getName()),
                             item.getOrdering(),
                             item.getNullOrdering()))
                     .collect(Collectors.toList())));

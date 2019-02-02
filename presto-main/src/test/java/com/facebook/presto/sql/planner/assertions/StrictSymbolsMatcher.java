@@ -15,7 +15,8 @@ package com.facebook.presto.sql.planner.assertions;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.google.common.collect.ImmutableSet;
 
@@ -43,7 +44,7 @@ public class StrictSymbolsMatcher
     {
         return expectedAliases.stream()
                 .map(symbolAliases::get)
-                .map(Symbol::from)
+                .map(SymbolUtils::from)
                 .collect(toImmutableSet());
     }
 

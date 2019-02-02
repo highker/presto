@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.ExpressionRewriter;
 import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
@@ -64,7 +66,7 @@ public final class ExpressionSymbolInliner
                 return node;
             }
 
-            Expression expression = mapping.apply(Symbol.from(node));
+            Expression expression = mapping.apply(SymbolUtils.from(node));
             checkState(expression != null, "Cannot resolve symbol %s", node.getName());
             return expression;
         }

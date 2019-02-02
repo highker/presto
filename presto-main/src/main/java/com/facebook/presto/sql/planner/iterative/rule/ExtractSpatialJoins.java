@@ -15,7 +15,6 @@ package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.execution.Lifespan;
-import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.geospatial.KdbTree;
 import com.facebook.presto.geospatial.KdbTreeUtils;
 import com.facebook.presto.matching.Capture;
@@ -31,6 +30,9 @@ import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.Constraint;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.type.ArrayType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeSignature;
@@ -38,8 +40,8 @@ import com.facebook.presto.split.PageSourceManager;
 import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.split.SplitSource;
 import com.facebook.presto.split.SplitSource.SplitBatch;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.parser.SqlParser;
-import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.iterative.Rule.Context;
 import com.facebook.presto.sql.planner.iterative.Rule.Result;
@@ -47,7 +49,6 @@ import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
-import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.planner.plan.SpatialJoinNode;
 import com.facebook.presto.sql.planner.plan.UnnestNode;
@@ -560,7 +561,7 @@ public class ExtractSpatialJoins
 
     private static Expression toExpression(Optional<Symbol> optionalSymbol, Expression defaultExpression)
     {
-        return optionalSymbol.map(symbol -> (Expression) symbol.toSymbolReference()).orElse(defaultExpression);
+        return optionalSymbol.map(symbol -> (Expression) SymbolUtils.toSymbolReference(symbol)).orElse(defaultExpression);
     }
 
     private static Optional<Symbol> newGeometrySymbol(Context context, Expression expression, Metadata metadata)

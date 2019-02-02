@@ -16,10 +16,11 @@ package com.facebook.presto.sql.planner.assertions;
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.StatsProvider;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
 import com.facebook.presto.sql.planner.plan.LateralJoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.facebook.presto.sql.tree.SymbolReference;
 
 import java.util.List;
 
@@ -60,7 +61,8 @@ public class CorrelationMatcher
 
         int i = 0;
         for (String alias : this.correlation) {
-            if (!symbolAliases.get(alias).equals(actualCorrelation.get(i++).toSymbolReference())) {
+            Symbol symbol = actualCorrelation.get(i++);
+            if (!symbolAliases.get(alias).equals(new SymbolReference(symbol.getName()))) {
                 return NO_MATCH;
             }
         }

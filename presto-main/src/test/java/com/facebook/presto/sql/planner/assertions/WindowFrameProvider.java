@@ -16,6 +16,7 @@ package com.facebook.presto.sql.planner.assertions;
 import com.facebook.presto.sql.planner.plan.WindowNode;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FrameBound;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.facebook.presto.sql.tree.WindowFrame;
 
 import java.util.Optional;
@@ -51,8 +52,8 @@ public class WindowFrameProvider
     {
         // synthetize original start/end value to keep the constructor of the frame happy. These are irrelevant for the purpose
         // of testing the plan structure.
-        Optional<Expression> originalStartValue = startValue.map(alias -> alias.toSymbol(aliases).toSymbolReference());
-        Optional<Expression> originalEndValue = endValue.map(alias -> alias.toSymbol(aliases).toSymbolReference());
+        Optional<Expression> originalStartValue = startValue.map(alias -> new SymbolReference(alias.toSymbol(aliases).getName()));
+        Optional<Expression> originalEndValue = endValue.map(alias -> new SymbolReference(alias.toSymbol(aliases).getName()));
 
         return new WindowNode.Frame(
                 type,

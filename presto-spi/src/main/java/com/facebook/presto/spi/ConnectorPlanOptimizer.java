@@ -11,16 +11,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.sql.planner;
+package com.facebook.presto.spi;
 
-import com.facebook.presto.sql.planner.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.SymbolAllocator;
+import com.facebook.presto.spi.plan.TypeProvider;
 
-public class PlanNodeIdAllocator
+public interface ConnectorPlanOptimizer
 {
-    private int nextId;
-
-    public PlanNodeId getNextId()
-    {
-        return new PlanNodeId(Integer.toString(nextId++));
-    }
+    <T> T optimize(T plan,
+            ConnectorSession session,
+            TypeProvider types,
+            SymbolAllocator symbolAllocator,
+            PlanNodeIdAllocator idAllocator,
+            WarningCollector warningCollector);
 }

@@ -13,10 +13,11 @@
  */
 package com.facebook.presto.util;
 
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.planner.Partitioning.ArgumentBinding;
 import com.facebook.presto.sql.planner.PlanFragment;
 import com.facebook.presto.sql.planner.SubPlan;
-import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
@@ -319,7 +320,7 @@ public final class GraphvizPrinter
         public Void visitExchange(ExchangeNode node, Void context)
         {
             List<ArgumentBinding> symbols = node.getOutputSymbols().stream()
-                    .map(Symbol::toSymbolReference)
+                    .map(symbol -> SymbolUtils.toSymbolReference(symbol))
                     .map(ArgumentBinding::expressionBinding)
                     .collect(toImmutableList());
             if (node.getType() == REPARTITION) {
@@ -536,8 +537,8 @@ public final class GraphvizPrinter
             List<Expression> joinExpressions = new ArrayList<>();
             for (IndexJoinNode.EquiJoinClause clause : node.getCriteria()) {
                 joinExpressions.add(new ComparisonExpression(ComparisonExpression.Operator.EQUAL,
-                        clause.getProbe().toSymbolReference(),
-                        clause.getIndex().toSymbolReference()));
+                        new SymbolReference(clause.getProbe().getName()),
+                        new SymbolReference(clause.getIndex().getName())));
             }
 
             String criteria = Joiner.on(" AND ").join(joinExpressions);

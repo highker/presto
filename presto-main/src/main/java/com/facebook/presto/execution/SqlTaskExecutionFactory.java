@@ -20,10 +20,10 @@ import com.facebook.presto.execution.buffer.OutputBuffer;
 import com.facebook.presto.execution.executor.TaskExecutor;
 import com.facebook.presto.memory.QueryContext;
 import com.facebook.presto.operator.TaskContext;
+import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.sql.planner.LocalExecutionPlanner;
 import com.facebook.presto.sql.planner.LocalExecutionPlanner.LocalExecutionPlan;
 import com.facebook.presto.sql.planner.PlanFragment;
-import com.facebook.presto.sql.planner.TypeProvider;
 import io.airlift.concurrent.SetThreadName;
 
 import java.util.List;

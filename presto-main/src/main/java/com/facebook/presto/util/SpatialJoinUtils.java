@@ -13,7 +13,8 @@
  */
 package com.facebook.presto.util;
 
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
@@ -150,15 +151,11 @@ public class SpatialJoinUtils
             return true;
         }
 
-        if (probeSymbols.contains(secondSymbol) && buildSymbols.contains(firstSymbol)) {
-            return true;
-        }
-
-        return false;
+        return probeSymbols.contains(secondSymbol) && buildSymbols.contains(firstSymbol);
     }
 
     private static Set<SymbolReference> getSymbolReferences(Collection<Symbol> symbols)
     {
-        return symbols.stream().map(Symbol::toSymbolReference).collect(toImmutableSet());
+        return symbols.stream().map(symbol -> SymbolUtils.toSymbolReference(symbol)).collect(toImmutableSet());
     }
 }

@@ -13,10 +13,10 @@
  */
 package com.facebook.presto.sql.planner.iterative.rule;
 
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.tree.BindExpression;
 import com.facebook.presto.sql.tree.Identifier;
 import com.facebook.presto.sql.tree.LambdaArgumentDeclaration;
@@ -39,7 +39,7 @@ public class TestLambdaCaptureDesugaringRewriter
     public void testRewriteBasicLambda()
     {
         final Map<Symbol, Type> symbols = ImmutableMap.of(new Symbol("a"), BigintType.BIGINT);
-        final SymbolAllocator allocator = new SymbolAllocator(symbols);
+        final ExtendedSymbolAllocator allocator = new ExtendedSymbolAllocator(symbols);
 
         assertEquals(rewrite(expression("x -> a + x"), allocator.getTypes(), allocator),
                 new BindExpression(

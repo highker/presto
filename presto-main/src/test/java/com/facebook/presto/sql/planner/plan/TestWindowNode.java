@@ -18,15 +18,17 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.server.SliceDeserializer;
 import com.facebook.presto.server.SliceSerializer;
 import com.facebook.presto.spi.block.SortOrder;
+import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.Serialization;
 import com.facebook.presto.sql.parser.SqlParser;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.OrderingScheme;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FrameBound;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.QualifiedName;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.facebook.presto.sql.tree.WindowFrame;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
@@ -47,7 +49,7 @@ import static org.testng.Assert.assertEquals;
 
 public class TestWindowNode
 {
-    private SymbolAllocator symbolAllocator;
+    private ExtendedSymbolAllocator symbolAllocator;
     private ValuesNode sourceNode;
     private Symbol columnA;
     private Symbol columnB;
@@ -73,7 +75,7 @@ public class TestWindowNode
     @BeforeClass
     public void setUp()
     {
-        symbolAllocator = new SymbolAllocator();
+        symbolAllocator = new ExtendedSymbolAllocator();
         columnA = symbolAllocator.newSymbol("a", BIGINT);
         columnB = symbolAllocator.newSymbol("b", BIGINT);
         columnC = symbolAllocator.newSymbol("c", BIGINT);
@@ -97,7 +99,7 @@ public class TestWindowNode
                 BIGINT.getTypeSignature(),
                 ImmutableList.of(BIGINT.getTypeSignature()),
                 false);
-        FunctionCall functionCall = new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(columnC.toSymbolReference()));
+        FunctionCall functionCall = new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(new SymbolReference(columnC.getName())));
         WindowNode.Frame frame = new WindowNode.Frame(
                 WindowFrame.Type.RANGE,
                 FrameBound.Type.UNBOUNDED_PRECEDING,

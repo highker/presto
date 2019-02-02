@@ -17,7 +17,7 @@ import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Signature;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.optimizations.PlanNodeDecorrelator;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
@@ -37,6 +37,7 @@ import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.sql.tree.QualifiedName;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
@@ -122,7 +123,7 @@ public class TransformExistsApplyToLateralNode
 
         Assignments.Builder assignments = Assignments.builder();
         assignments.putIdentities(applyNode.getInput().getOutputSymbols());
-        assignments.put(exists, new CoalesceExpression(ImmutableList.of(subqueryTrue.toSymbolReference(), BooleanLiteral.FALSE_LITERAL)));
+        assignments.put(exists, new CoalesceExpression(ImmutableList.of(new SymbolReference(subqueryTrue.getName()), BooleanLiteral.FALSE_LITERAL)));
 
         PlanNode subquery = new ProjectNode(
                 context.getIdAllocator().getNextId(),
@@ -168,7 +169,7 @@ public class TransformExistsApplyToLateralNode
                                 AggregationNode.Step.SINGLE,
                                 Optional.empty(),
                                 Optional.empty()),
-                        Assignments.of(exists, new ComparisonExpression(GREATER_THAN, count.toSymbolReference(), new Cast(new LongLiteral("0"), BIGINT.toString())))),
+                        Assignments.of(exists, new ComparisonExpression(GREATER_THAN, new SymbolReference(count.getName()), new Cast(new LongLiteral("0"), BIGINT.toString())))),
                 parent.getCorrelation(),
                 INNER,
                 parent.getOriginSubquery());

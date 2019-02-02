@@ -16,11 +16,12 @@ package com.facebook.presto.sql.planner.assertions;
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.StatsProvider;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 
 import java.util.Optional;
 
+import static com.facebook.presto.sql.SymbolUtils.toSymbolReference;
 import static com.facebook.presto.sql.planner.assertions.MatchResult.match;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -56,7 +57,7 @@ public class AliasMatcher
     {
         Optional<Symbol> symbol = matcher.getAssignedSymbol(node, session, metadata, symbolAliases);
         if (symbol.isPresent() && alias.isPresent()) {
-            return match(alias.get(), symbol.get().toSymbolReference());
+            return match(alias.get(), toSymbolReference(symbol.get()));
         }
         return new MatchResult(symbol.isPresent());
     }

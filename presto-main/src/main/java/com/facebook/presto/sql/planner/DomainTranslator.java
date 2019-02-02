@@ -14,10 +14,12 @@
 package com.facebook.presto.sql.planner;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.Signature;
+import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.spi.predicate.DiscreteValues;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Marker;
@@ -31,6 +33,7 @@ import com.facebook.presto.spi.predicate.ValueSet;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.ExpressionUtils;
 import com.facebook.presto.sql.InterpretedFunctionInvoker;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.analyzer.ExpressionAnalyzer;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.AstVisitor;
@@ -102,7 +105,7 @@ public final class DomainTranslator
         Map<Symbol, Domain> domains = tupleDomain.getDomains().get();
         return domains.entrySet().stream()
                 .sorted(comparing(entry -> entry.getKey().getName()))
-                .map(entry -> toPredicate(entry.getValue(), entry.getKey().toSymbolReference()))
+                .map(entry -> toPredicate(entry.getValue(), SymbolUtils.toSymbolReference(entry.getKey())))
                 .collect(collectingAndThen(toImmutableList(), ExpressionUtils::combineConjuncts));
     }
 
@@ -395,7 +398,7 @@ public final class DomainTranslator
 
             Expression symbolExpression = normalized.getSymbolExpression();
             if (symbolExpression instanceof SymbolReference) {
-                Symbol symbol = Symbol.from(symbolExpression);
+                Symbol symbol = SymbolUtils.from(symbolExpression);
                 NullableValue value = normalized.getValue();
                 Type type = value.getType(); // common type for symbol and value
                 return createComparisonExtractionResult(normalized.getComparisonOperator(), symbol, type, value.getValue(), complement);
@@ -719,7 +722,7 @@ public final class DomainTranslator
                 return super.visitIsNullPredicate(node, complement);
             }
 
-            Symbol symbol = Symbol.from(node.getValue());
+            Symbol symbol = SymbolUtils.from(node.getValue());
             Type columnType = checkedTypeLookup(symbol);
             Domain domain = complementIfNecessary(Domain.onlyNull(columnType), complement);
             return new ExtractionResult(
@@ -734,7 +737,7 @@ public final class DomainTranslator
                 return super.visitIsNotNullPredicate(node, complement);
             }
 
-            Symbol symbol = Symbol.from(node.getValue());
+            Symbol symbol = SymbolUtils.from(node.getValue());
             Type columnType = checkedTypeLookup(symbol);
 
             Domain domain = complementIfNecessary(Domain.notNull(columnType), complement);
@@ -746,7 +749,7 @@ public final class DomainTranslator
         @Override
         protected ExtractionResult visitBooleanLiteral(BooleanLiteral node, Boolean complement)
         {
-            boolean value = complement ? !node.getValue() : node.getValue();
+            boolean value = complement != node.getValue();
             return new ExtractionResult(value ? TupleDomain.all() : TupleDomain.none(), TRUE_LITERAL);
         }
 

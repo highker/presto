@@ -18,7 +18,10 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.block.SortOrder;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.Field;
 import com.facebook.presto.sql.analyzer.FieldId;
@@ -91,7 +94,7 @@ import static java.util.Objects.requireNonNull;
 class QueryPlanner
 {
     private final Analysis analysis;
-    private final SymbolAllocator symbolAllocator;
+    private final ExtendedSymbolAllocator symbolAllocator;
     private final PlanNodeIdAllocator idAllocator;
     private final Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap;
     private final Metadata metadata;
@@ -100,7 +103,7 @@ class QueryPlanner
 
     QueryPlanner(
             Analysis analysis,
-            SymbolAllocator symbolAllocator,
+            ExtendedSymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator,
             Map<NodeRef<LambdaArgumentDeclaration>, Symbol> lambdaDeclarationToSymbolMap,
             Metadata metadata,
@@ -333,7 +336,7 @@ class QueryPlanner
         Assignments.Builder projections = Assignments.builder();
         for (Expression expression : expressions) {
             if (expression instanceof SymbolReference) {
-                Symbol symbol = Symbol.from(expression);
+                Symbol symbol = SymbolUtils.from(expression);
                 projections.put(symbol, expression);
                 outputTranslations.put(expression, symbol);
                 continue;
@@ -386,7 +389,7 @@ class QueryPlanner
                 // If this is an identity projection, no need to rewrite it
                 // This is needed because certain synthetic identity expressions such as "group id" introduced when planning GROUPING
                 // don't have a corresponding analysis, so the code below doesn't work for them
-                projections.put(Symbol.from(expression), expression);
+                projections.put(SymbolUtils.from(expression), expression);
                 continue;
             }
 
@@ -532,7 +535,7 @@ class QueryPlanner
         else {
             Assignments.Builder assignments = Assignments.builder();
             aggregationArguments.forEach(assignments::putIdentity);
-            groupingSetMappings.forEach((key, value) -> assignments.put(key, value.toSymbolReference()));
+            groupingSetMappings.forEach((key, value) -> assignments.put(key, new SymbolReference(value.getName())));
 
             ProjectNode project = new ProjectNode(idAllocator.getNextId(), subPlan.getRoot(), assignments.build());
             subPlan = new PlanBuilder(groupingTranslations, project, analysis.getParameters());
@@ -595,7 +598,7 @@ class QueryPlanner
         if (needPostProjectionCoercion) {
             ImmutableList.Builder<Expression> alreadyCoerced = ImmutableList.builder();
             alreadyCoerced.addAll(groupByExpressions);
-            groupIdSymbol.map(Symbol::toSymbolReference).ifPresent(alreadyCoerced::add);
+            groupIdSymbol.map(symbol -> SymbolUtils.toSymbolReference(symbol)).ifPresent(alreadyCoerced::add);
 
             subPlan = explicitCoercionFields(subPlan, alreadyCoerced.build(), analysis.getAggregates(node));
         }
@@ -922,7 +925,7 @@ class QueryPlanner
     private static List<Expression> toSymbolReferences(List<Symbol> symbols)
     {
         return symbols.stream()
-                .map(Symbol::toSymbolReference)
+                .map(symbol -> SymbolUtils.toSymbolReference(symbol))
                 .collect(toImmutableList());
     }
 

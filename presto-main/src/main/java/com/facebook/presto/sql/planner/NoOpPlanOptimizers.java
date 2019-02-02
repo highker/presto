@@ -11,29 +11,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.execution.warnings;
+package com.facebook.presto.sql.planner;
 
-import com.facebook.presto.spi.PrestoWarning;
+import com.facebook.presto.connector.ConnectorId;
+import com.facebook.presto.spi.connector.ConnectorOptimizerProvider;
+import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
 
-public interface WarningCollector
+public class NoOpPlanOptimizers
+        implements PlanOptimizers
 {
-    WarningCollector NOOP =
-            new WarningCollector()
-            {
-                @Override
-                public void add(PrestoWarning warning) {}
+    @Override
+    public List<PlanOptimizer> get()
+    {
+        return ImmutableList.of();
+    }
 
-                @Override
-                public List<PrestoWarning> getWarnings()
-                {
-                    return ImmutableList.of();
-                }
-            };
-
-    void add(PrestoWarning warning);
-
-    List<PrestoWarning> getWarnings();
+    @Override
+    public void addOptimizerProvider(ConnectorId connectorId, ConnectorOptimizerProvider connectorOptimizerProvider)
+    {
+        // no-op
+    }
 }

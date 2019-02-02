@@ -19,11 +19,13 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.operator.aggregation.MaxDataSizeForStats;
 import com.facebook.presto.operator.aggregation.SumDataSizeForStats;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.statistics.ColumnStatisticMetadata;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
 import com.facebook.presto.spi.statistics.TableStatisticType;
 import com.facebook.presto.spi.statistics.TableStatisticsMetadata;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.analyzer.TypeSignatureProvider;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.StatisticAggregations;
@@ -49,10 +51,10 @@ import static java.util.Objects.requireNonNull;
 
 public class StatisticsAggregationPlanner
 {
-    private final SymbolAllocator symbolAllocator;
+    private final ExtendedSymbolAllocator symbolAllocator;
     private final Metadata metadata;
 
-    public StatisticsAggregationPlanner(SymbolAllocator symbolAllocator, Metadata metadata)
+    public StatisticsAggregationPlanner(ExtendedSymbolAllocator symbolAllocator, Metadata metadata)
     {
         this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
@@ -108,19 +110,19 @@ public class StatisticsAggregationPlanner
     {
         switch (statisticType) {
             case MIN_VALUE:
-                return createAggregation(QualifiedName.of("min"), input.toSymbolReference(), inputType, inputType);
+                return createAggregation(QualifiedName.of("min"), SymbolUtils.toSymbolReference(input), inputType, inputType);
             case MAX_VALUE:
-                return createAggregation(QualifiedName.of("max"), input.toSymbolReference(), inputType, inputType);
+                return createAggregation(QualifiedName.of("max"), SymbolUtils.toSymbolReference(input), inputType, inputType);
             case NUMBER_OF_DISTINCT_VALUES:
-                return createAggregation(QualifiedName.of("approx_distinct"), input.toSymbolReference(), inputType, BIGINT);
+                return createAggregation(QualifiedName.of("approx_distinct"), SymbolUtils.toSymbolReference(input), inputType, BIGINT);
             case NUMBER_OF_NON_NULL_VALUES:
-                return createAggregation(QualifiedName.of("count"), input.toSymbolReference(), inputType, BIGINT);
+                return createAggregation(QualifiedName.of("count"), SymbolUtils.toSymbolReference(input), inputType, BIGINT);
             case NUMBER_OF_TRUE_VALUES:
-                return createAggregation(QualifiedName.of("count_if"), input.toSymbolReference(), BOOLEAN, BIGINT);
+                return createAggregation(QualifiedName.of("count_if"), SymbolUtils.toSymbolReference(input), BOOLEAN, BIGINT);
             case TOTAL_SIZE_IN_BYTES:
-                return createAggregation(QualifiedName.of(SumDataSizeForStats.NAME), input.toSymbolReference(), inputType, BIGINT);
+                return createAggregation(QualifiedName.of(SumDataSizeForStats.NAME), SymbolUtils.toSymbolReference(input), inputType, BIGINT);
             case MAX_VALUE_SIZE_IN_BYTES:
-                return createAggregation(QualifiedName.of(MaxDataSizeForStats.NAME), input.toSymbolReference(), inputType, BIGINT);
+                return createAggregation(QualifiedName.of(MaxDataSizeForStats.NAME), SymbolUtils.toSymbolReference(input), inputType, BIGINT);
             default:
                 throw new IllegalArgumentException("Unsupported statistic type: " + statisticType);
         }

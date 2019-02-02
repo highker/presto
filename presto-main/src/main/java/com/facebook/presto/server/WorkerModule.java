@@ -18,6 +18,8 @@ import com.facebook.presto.execution.resourceGroups.NoOpResourceGroupManager;
 import com.facebook.presto.execution.resourceGroups.ResourceGroupManager;
 import com.facebook.presto.failureDetector.FailureDetector;
 import com.facebook.presto.failureDetector.NoOpFailureDetector;
+import com.facebook.presto.sql.planner.NoOpPlanOptimizers;
+import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.transaction.NoOpTransactionManager;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.inject.Binder;
@@ -46,6 +48,9 @@ public class WorkerModule
 
         // Install no-op failure detector on workers, since only coordinators need global node selection.
         binder.bind(FailureDetector.class).to(NoOpFailureDetector.class).in(Scopes.SINGLETON);
+
+        // Install no-op plan optimizers, since only coordinators need query plan optimization.
+        binder.bind(PlanOptimizers.class).to(NoOpPlanOptimizers.class).in(Scopes.SINGLETON);
 
         // HACK: this binding is needed by SystemConnectorModule, but will only be used on the coordinator
         binder.bind(QueryManager.class).toInstance(newProxy(QueryManager.class, (proxy, method, args) -> {

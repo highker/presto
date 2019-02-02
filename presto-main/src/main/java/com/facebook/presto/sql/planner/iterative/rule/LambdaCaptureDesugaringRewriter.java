@@ -14,9 +14,10 @@
 
 package com.facebook.presto.sql.planner.iterative.rule;
 
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.SymbolAllocator;
-import com.facebook.presto.sql.planner.TypeProvider;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TypeProvider;
+import com.facebook.presto.sql.SymbolUtils;
+import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.tree.BindExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.ExpressionRewriter;
@@ -39,7 +40,7 @@ import static java.util.Objects.requireNonNull;
 
 public class LambdaCaptureDesugaringRewriter
 {
-    public static Expression rewrite(Expression expression, TypeProvider symbolTypes, SymbolAllocator symbolAllocator)
+    public static Expression rewrite(Expression expression, TypeProvider symbolTypes, ExtendedSymbolAllocator symbolAllocator)
     {
         return ExpressionTreeRewriter.rewriteWith(new Visitor(symbolTypes, symbolAllocator), expression, new Context());
     }
@@ -50,9 +51,9 @@ public class LambdaCaptureDesugaringRewriter
             extends ExpressionRewriter<Context>
     {
         private final TypeProvider symbolTypes;
-        private final SymbolAllocator symbolAllocator;
+        private final ExtendedSymbolAllocator symbolAllocator;
 
-        public Visitor(TypeProvider symbolTypes, SymbolAllocator symbolAllocator)
+        public Visitor(TypeProvider symbolTypes, ExtendedSymbolAllocator symbolAllocator)
         {
             this.symbolTypes = requireNonNull(symbolTypes, "symbolTypes is null");
             this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
@@ -89,7 +90,7 @@ public class LambdaCaptureDesugaringRewriter
             newLambdaArguments.addAll(node.getArguments());
 
             ImmutableMap<Symbol, Symbol> symbolsMap = captureSymbolToExtraSymbol.build();
-            Function<Symbol, Expression> symbolMapping = symbol -> symbolsMap.getOrDefault(symbol, symbol).toSymbolReference();
+            Function<Symbol, Expression> symbolMapping = symbol -> SymbolUtils.toSymbolReference(symbol);
             Expression rewrittenExpression = new LambdaExpression(newLambdaArguments.build(), inlineSymbols(symbolMapping, rewrittenBody));
 
             if (captureSymbols.size() != 0) {

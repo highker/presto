@@ -13,7 +13,9 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -110,7 +112,7 @@ public abstract class SetOperationNode
     {
         ImmutableMap.Builder<Symbol, SymbolReference> builder = ImmutableMap.builder();
         for (Map.Entry<Symbol, Collection<Symbol>> entry : outputToInputs.asMap().entrySet()) {
-            builder.put(entry.getKey(), Iterables.get(entry.getValue(), sourceIndex).toSymbolReference());
+            builder.put(entry.getKey(), new SymbolReference(Iterables.get(entry.getValue(), sourceIndex).getName()));
         }
 
         return builder.build();
@@ -125,7 +127,7 @@ public abstract class SetOperationNode
         return Multimaps.transformValues(FluentIterable.from(getOutputSymbols())
                 .toMap(outputToSourceSymbolFunction(sourceIndex))
                 .asMultimap()
-                .inverse(), Symbol::toSymbolReference);
+                .inverse(), symbol -> SymbolUtils.toSymbolReference(symbol));
     }
 
     private Function<Symbol, Symbol> outputToSourceSymbolFunction(final int sourceIndex)

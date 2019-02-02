@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner;
 
 import com.facebook.presto.spi.ColumnHandle;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AssignUniqueId;
 import com.facebook.presto.sql.planner.plan.DistinctLimitNode;
@@ -67,11 +68,11 @@ import static java.util.Objects.requireNonNull;
 public class EffectivePredicateExtractor
 {
     private static final Predicate<Map.Entry<Symbol, ? extends Expression>> SYMBOL_MATCHES_EXPRESSION =
-            entry -> entry.getValue().equals(entry.getKey().toSymbolReference());
+            entry -> entry.getValue().equals(new SymbolReference(entry.getKey().getName()));
 
     private static final Function<Map.Entry<Symbol, ? extends Expression>, Expression> ENTRY_TO_EQUALITY =
             entry -> {
-                SymbolReference reference = entry.getKey().toSymbolReference();
+                SymbolReference reference = new SymbolReference(entry.getKey().getName());
                 Expression expression = entry.getValue();
                 // TODO: this is not correct with respect to NULLs ('reference IS NULL' would be correct, rather than 'reference = NULL')
                 // TODO: switch this to 'IS NOT DISTINCT FROM' syntax when EqualityInference properly supports it
@@ -144,7 +145,7 @@ public class EffectivePredicateExtractor
                 for (int i = 0; i < node.getInputs().get(source).size(); i++) {
                     mappings.put(
                             node.getOutputSymbols().get(i),
-                            node.getInputs().get(source).get(i).toSymbolReference());
+                            new SymbolReference(node.getInputs().get(source).get(i).getName()));
                 }
                 return mappings.entrySet();
             });

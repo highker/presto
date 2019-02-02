@@ -22,7 +22,6 @@ import com.facebook.presto.cost.CostProvider;
 import com.facebook.presto.cost.StatsAndCosts;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.cost.StatsProvider;
-import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.NewTableLayout;
 import com.facebook.presto.metadata.QualifiedObjectName;
@@ -32,6 +31,10 @@ import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.spi.statistics.TableStatisticsMetadata;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.analyzer.Analysis;
@@ -71,6 +74,7 @@ import com.facebook.presto.sql.tree.NodeRef;
 import com.facebook.presto.sql.tree.NullLiteral;
 import com.facebook.presto.sql.tree.Query;
 import com.facebook.presto.sql.tree.Statement;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -113,7 +117,7 @@ public class LogicalPlanner
     private final Session session;
     private final List<PlanOptimizer> planOptimizers;
     private final PlanSanityChecker planSanityChecker;
-    private final SymbolAllocator symbolAllocator = new SymbolAllocator();
+    private final ExtendedSymbolAllocator symbolAllocator = new ExtendedSymbolAllocator();
     private final Metadata metadata;
     private final SqlParser sqlParser;
     private final StatisticsAggregationPlanner statisticsAggregationPlanner;
@@ -341,10 +345,10 @@ public class LogicalPlanner
                 Type queryType = symbolAllocator.getTypes().get(input);
 
                 if (queryType.equals(tableType) || metadata.getTypeManager().isTypeOnlyCoercion(queryType, tableType)) {
-                    assignments.put(output, input.toSymbolReference());
+                    assignments.put(output, new SymbolReference(input.getName()));
                 }
                 else {
-                    Expression cast = new Cast(input.toSymbolReference(), tableType.getTypeSignature().toString());
+                    Expression cast = new Cast(new SymbolReference(input.getName()), tableType.getTypeSignature().toString());
                     assignments.put(output, cast);
                 }
             }
@@ -538,7 +542,7 @@ public class LogicalPlanner
         return columns.build();
     }
 
-    private static Map<NodeRef<LambdaArgumentDeclaration>, Symbol> buildLambdaDeclarationToSymbolMap(Analysis analysis, SymbolAllocator symbolAllocator)
+    private static Map<NodeRef<LambdaArgumentDeclaration>, Symbol> buildLambdaDeclarationToSymbolMap(Analysis analysis, ExtendedSymbolAllocator symbolAllocator)
     {
         Map<NodeRef<LambdaArgumentDeclaration>, Symbol> resultMap = new LinkedHashMap<>();
         for (Entry<NodeRef<Expression>, Type> entry : analysis.getTypes().entrySet()) {

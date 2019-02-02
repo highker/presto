@@ -17,10 +17,10 @@ import com.facebook.presto.Session;
 import com.facebook.presto.cost.StatsProvider;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.block.SortOrder;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.sql.parser.ParsingOptions;
 import com.facebook.presto.sql.parser.SqlParser;
-import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.GroupReference;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Step;
@@ -54,6 +54,7 @@ import com.facebook.presto.sql.tree.FrameBound;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.SortItem;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.facebook.presto.sql.tree.WindowFrame;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -717,7 +718,7 @@ public final class PlanMatchPattern
     {
         return aliases
                 .stream()
-                .map(arg -> arg.toSymbol(symbolAliases).toSymbolReference())
+                .map(arg -> new SymbolReference(arg.toSymbol(symbolAliases).getName()))
                 .collect(toImmutableList());
     }
 

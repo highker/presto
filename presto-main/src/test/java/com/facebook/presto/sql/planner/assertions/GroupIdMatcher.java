@@ -16,9 +16,10 @@ package com.facebook.presto.sql.planner.assertions;
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.StatsProvider;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.plan.GroupIdNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.facebook.presto.sql.tree.SymbolReference;
 
 import java.util.List;
 import java.util.Map;
@@ -71,7 +72,7 @@ public class GroupIdMatcher
             return NO_MATCH;
         }
 
-        return match(groupIdAlias, groudIdNode.getGroupIdSymbol().toSymbolReference());
+        return match(groupIdAlias, new SymbolReference(groudIdNode.getGroupIdSymbol().getName()));
     }
 
     @Override

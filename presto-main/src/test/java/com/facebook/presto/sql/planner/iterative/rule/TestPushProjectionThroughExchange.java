@@ -14,8 +14,8 @@
 package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.spi.block.SortOrder;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.OrderingScheme;
-import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.rule.test.BaseRuleTest;
 import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.tree.ArithmeticBinaryExpression;
@@ -60,8 +60,8 @@ public class TestPushProjectionThroughExchange
 
                     return p.project(
                             Assignments.builder()
-                                    .put(a, a.toSymbolReference())
-                                    .put(b, b.toSymbolReference())
+                                    .put(a, new SymbolReference(a.getName()))
+                                    .put(b, new SymbolReference(b.getName()))
                                     .build(),
                             p.exchange(e -> e
                                     .addSource(p.values(a, b, c))

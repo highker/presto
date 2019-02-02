@@ -17,8 +17,8 @@ import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.Signature;
+import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.type.TypeSignature;
-import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
@@ -28,6 +28,7 @@ import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.sql.tree.QualifiedName;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
@@ -107,7 +108,7 @@ public class RewriteSpatialPartitioningAggregation
                 }
                 aggregations.put(entry.getKey(),
                         new Aggregation(
-                                new FunctionCall(name, ImmutableList.of(envelopeSymbol.toSymbolReference(), partitionCountSymbol.toSymbolReference())),
+                                new FunctionCall(name, ImmutableList.of(new SymbolReference(envelopeSymbol.getName()), new SymbolReference(partitionCountSymbol.getName()))),
                                 INTERNAL_SIGNATURE,
                                 aggregation.getMask()));
             }

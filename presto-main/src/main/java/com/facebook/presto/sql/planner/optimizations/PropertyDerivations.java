@@ -15,7 +15,6 @@ package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.SystemSessionProperties;
-import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.TableLayout;
 import com.facebook.presto.metadata.TableLayout.TablePartitioning;
@@ -24,16 +23,18 @@ import com.facebook.presto.spi.ConstantProperty;
 import com.facebook.presto.spi.GroupingProperty;
 import com.facebook.presto.spi.LocalProperty;
 import com.facebook.presto.spi.SortingProperty;
+import com.facebook.presto.spi.WarningCollector;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.spi.predicate.NullableValue;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.DomainTranslator;
 import com.facebook.presto.sql.planner.ExpressionInterpreter;
 import com.facebook.presto.sql.planner.NoOpSymbolResolver;
 import com.facebook.presto.sql.planner.OrderingScheme;
 import com.facebook.presto.sql.planner.Partitioning;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.optimizations.ActualProperties.Global;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
@@ -439,7 +440,7 @@ public class PropertyDerivations
                         for (Symbol column : nodePartitioning.getColumns()) {
                             for (JoinNode.EquiJoinClause equality : node.getCriteria()) {
                                 if (equality.getLeft().equals(column) || equality.getRight().equals(column)) {
-                                    coalesceExpressions.add(new CoalesceExpression(ImmutableList.of(equality.getLeft().toSymbolReference(), equality.getRight().toSymbolReference())));
+                                    coalesceExpressions.add(new CoalesceExpression(ImmutableList.of(SymbolUtils.toSymbolReference(column), SymbolUtils.toSymbolReference(column))));
                                 }
                             }
                         }
@@ -649,7 +650,7 @@ public class PropertyDerivations
                 Object value = optimizer.optimize(NoOpSymbolResolver.INSTANCE);
 
                 if (value instanceof SymbolReference) {
-                    Symbol symbol = Symbol.from((SymbolReference) value);
+                    Symbol symbol = SymbolUtils.from((SymbolReference) value);
                     NullableValue existingConstantValue = constants.get(symbol);
                     if (existingConstantValue != null) {
                         constants.put(assignment.getKey(), new NullableValue(type, value));
@@ -792,7 +793,7 @@ public class PropertyDerivations
             Map<Symbol, Symbol> inputToOutput = new HashMap<>();
             for (Map.Entry<Symbol, Expression> assignment : assignments.entrySet()) {
                 if (assignment.getValue() instanceof SymbolReference) {
-                    inputToOutput.put(Symbol.from(assignment.getValue()), assignment.getKey());
+                    inputToOutput.put(SymbolUtils.from(assignment.getValue()), assignment.getKey());
                 }
             }
             return inputToOutput;
@@ -860,11 +861,11 @@ public class PropertyDerivations
             if (entry.getValue() instanceof CoalesceExpression) {
                 Set<Symbol> symbolsInAssignment = ((CoalesceExpression) entry.getValue()).getOperands().stream()
                         .filter(SymbolReference.class::isInstance)
-                        .map(Symbol::from)
+                        .map(SymbolUtils::from)
                         .collect(toImmutableSet());
                 Set<Symbol> symbolInExpression = ((CoalesceExpression) expression).getOperands().stream()
                         .filter(SymbolReference.class::isInstance)
-                        .map(Symbol::from)
+                        .map(SymbolUtils::from)
                         .collect(toImmutableSet());
                 if (symbolsInAssignment.containsAll(symbolInExpression)) {
                     return Optional.of(entry.getKey());
