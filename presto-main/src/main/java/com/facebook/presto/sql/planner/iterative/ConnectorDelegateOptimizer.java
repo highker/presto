@@ -17,6 +17,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.spi.ConnectorPlanOptimizer;
 import com.facebook.presto.spi.ConnectorSession;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.WarningCollector;
 import com.facebook.presto.spi.connector.ConnectorOptimizerProvider;
 import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
@@ -25,6 +26,8 @@ import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 
+import static com.facebook.presto.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
+import static com.facebook.presto.spi.plan.PlanNodeReference.toReference;
 import static java.util.Objects.requireNonNull;
 
 public class ConnectorDelegateOptimizer
@@ -49,6 +52,12 @@ public class ConnectorDelegateOptimizer
         requireNonNull(session, "session is null");
         requireNonNull(types, "types is null");
         requireNonNull(idAllocator, "idAllocator is null");
-        return optimizer.optimize(plan, connectorSession, types, symbolAllocator, idAllocator, warningCollector);
+        Object optimizedPlan = optimizer.optimize(toReference(plan), connectorSession, types, symbolAllocator, idAllocator, warningCollector);
+        try {
+            return (PlanNode) optimizedPlan;
+        }
+        catch (ClassCastException e) {
+            throw new PrestoException(INVALID_CAST_ARGUMENT, "expect optimized plan to be of type PlanNode", e);
+        }
     }
 }

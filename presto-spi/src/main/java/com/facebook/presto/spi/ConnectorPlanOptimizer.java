@@ -14,12 +14,13 @@
 package com.facebook.presto.spi;
 
 import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.spi.plan.PlanNodeReference;
 import com.facebook.presto.spi.plan.SymbolAllocator;
 import com.facebook.presto.spi.plan.TypeProvider;
 
 public interface ConnectorPlanOptimizer
 {
-    <T> T optimize(T plan,
+    PlanNodeReference optimize(PlanNodeReference plan,
             ConnectorSession session,
             TypeProvider types,
             SymbolAllocator symbolAllocator,
