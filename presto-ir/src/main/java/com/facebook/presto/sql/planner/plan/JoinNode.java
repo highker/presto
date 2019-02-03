@@ -15,7 +15,6 @@ package com.facebook.presto.sql.planner.plan;
 
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.spi.plan.Symbol;
-import com.facebook.presto.sql.planner.SortExpressionContext;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Join;
@@ -34,7 +33,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.facebook.presto.sql.planner.SortExpressionExtractor.extractSortExpression;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.FULL;
@@ -203,13 +201,13 @@ public class JoinNode
                 case CROSS:
                 case IMPLICIT:
                 case INNER:
-                    return Type.INNER;
+                    return INNER;
                 case LEFT:
-                    return Type.LEFT;
+                    return LEFT;
                 case RIGHT:
-                    return Type.RIGHT;
+                    return RIGHT;
                 case FULL:
-                    return Type.FULL;
+                    return FULL;
                 default:
                     throw new UnsupportedOperationException("Unsupported join type: " + joinType);
             }
@@ -244,12 +242,6 @@ public class JoinNode
     public Optional<Expression> getFilter()
     {
         return filter;
-    }
-
-    public Optional<SortExpressionContext> getSortExpressionContext()
-    {
-        return filter
-                .flatMap(filter -> extractSortExpression(ImmutableSet.copyOf(right.getOutputSymbols()), filter));
     }
 
     @JsonProperty("leftHashSymbol")

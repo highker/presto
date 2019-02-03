@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.sql.planner.iterative;
 
+import com.facebook.presto.sql.planner.plan.GroupReference;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 
 import java.util.function.Function;

@@ -16,8 +16,7 @@ package com.facebook.presto.sql;
 import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.SymbolReference;
-
-import static com.google.common.base.Preconditions.checkArgument;
+import com.google.common.base.Preconditions;
 
 public final class SymbolUtils
 {
@@ -25,7 +24,7 @@ public final class SymbolUtils
 
     public static Symbol from(Expression expression)
     {
-        checkArgument(expression instanceof SymbolReference, "Unexpected expression: %s", expression);
+        Preconditions.checkArgument(expression instanceof SymbolReference, "Unexpected expression: %s", expression);
         return new Symbol(((SymbolReference) expression).getName());
     }
 

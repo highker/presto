@@ -24,7 +24,7 @@ import javax.annotation.concurrent.Immutable;
 
 import java.util.List;
 
-import static com.facebook.presto.util.MoreLists.listOfListsCopy;
+import static com.facebook.presto.sql.planner.plan.PlanUtils.listOfListsCopy;
 import static com.google.common.base.Preconditions.checkArgument;
 
 @Immutable

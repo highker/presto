@@ -21,6 +21,7 @@ import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -36,7 +37,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collector;
 
-import static com.google.common.base.Preconditions.checkState;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
@@ -218,7 +218,7 @@ public class Assignments
         {
             if (assignments.containsKey(symbol)) {
                 Expression assignment = assignments.get(symbol);
-                checkState(
+                Preconditions.checkState(
                         assignment.equals(expression),
                         "Symbol %s already has assignment %s, while adding %s",
                         symbol,

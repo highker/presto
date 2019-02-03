@@ -13,15 +13,8 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
-import com.facebook.presto.metadata.FunctionRegistry;
-import com.facebook.presto.metadata.Signature;
-import com.facebook.presto.operator.aggregation.InternalAggregationFunction;
 import com.facebook.presto.spi.plan.Symbol;
-import com.facebook.presto.sql.SymbolUtils;
-import com.facebook.presto.sql.planner.ExtendedSymbolAllocator;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
-import com.facebook.presto.sql.tree.FunctionCall;
-import com.facebook.presto.sql.tree.QualifiedName;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -29,7 +22,6 @@ import com.google.common.collect.ImmutableMap;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -57,31 +49,6 @@ public class StatisticAggregations
     public List<Symbol> getGroupingSymbols()
     {
         return groupingSymbols;
-    }
-
-    public Parts createPartialAggregations(ExtendedSymbolAllocator symbolAllocator, FunctionRegistry functionRegistry)
-    {
-        ImmutableMap.Builder<Symbol, Aggregation> partialAggregation = ImmutableMap.builder();
-        ImmutableMap.Builder<Symbol, Aggregation> finalAggregation = ImmutableMap.builder();
-        ImmutableMap.Builder<Symbol, Symbol> mappings = ImmutableMap.builder();
-        for (Map.Entry<Symbol, Aggregation> entry : aggregations.entrySet()) {
-            Aggregation originalAggregation = entry.getValue();
-            Signature signature = originalAggregation.getSignature();
-            InternalAggregationFunction function = functionRegistry.getAggregateFunctionImplementation(signature);
-            Symbol partialSymbol = symbolAllocator.newSymbol(signature.getName(), function.getIntermediateType());
-            mappings.put(entry.getKey(), partialSymbol);
-            partialAggregation.put(partialSymbol, new Aggregation(originalAggregation.getCall(), signature, originalAggregation.getMask()));
-            finalAggregation.put(entry.getKey(),
-                    new Aggregation(
-                            new FunctionCall(QualifiedName.of(signature.getName()), ImmutableList.of(SymbolUtils.toSymbolReference(partialSymbol))),
-                            signature,
-                            Optional.empty()));
-        }
-        groupingSymbols.forEach(symbol -> mappings.put(symbol, symbol));
-        return new Parts(
-                new StatisticAggregations(partialAggregation.build(), groupingSymbols),
-                new StatisticAggregations(finalAggregation.build(), groupingSymbols),
-                mappings.build());
     }
 
     public static class Parts

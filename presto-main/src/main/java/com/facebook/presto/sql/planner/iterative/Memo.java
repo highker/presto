@@ -16,6 +16,7 @@ package com.facebook.presto.sql.planner.iterative;
 import com.facebook.presto.cost.PlanNodeCostEstimate;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.spi.plan.PlanNodeIdAllocator;
+import com.facebook.presto.sql.planner.plan.GroupReference;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;

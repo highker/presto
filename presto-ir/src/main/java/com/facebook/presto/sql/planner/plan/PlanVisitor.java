@@ -13,8 +13,6 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
-import com.facebook.presto.sql.planner.iterative.GroupReference;
-
 public abstract class PlanVisitor<R, C>
 {
     protected abstract R visitPlan(PlanNode node, C context);

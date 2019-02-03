@@ -359,9 +359,6 @@ import static java.util.concurrent.TimeUnit.HOURS;
 @ThreadSafe
 public class FunctionRegistry
 {
-    private static final String MAGIC_LITERAL_FUNCTION_PREFIX = "$literal$";
-    private static final String OPERATOR_PREFIX = "$operator$";
-
     // hack: java classes for types that can be used with magic literals
     private static final Set<Class<?>> SUPPORTED_LITERAL_TYPES = ImmutableSet.of(long.class, double.class, Slice.class, boolean.class);
 
@@ -739,9 +736,9 @@ public class FunctionRegistry
             message = format("Unexpected parameters (%s) for function %s. Expected: %s", parameters, name, expected);
         }
 
-        if (name.getSuffix().startsWith(MAGIC_LITERAL_FUNCTION_PREFIX)) {
+        if (name.getSuffix().startsWith(Signature.MAGIC_LITERAL_FUNCTION_PREFIX)) {
             // extract type from function name
-            String typeName = name.getSuffix().substring(MAGIC_LITERAL_FUNCTION_PREFIX.length());
+            String typeName = name.getSuffix().substring(Signature.MAGIC_LITERAL_FUNCTION_PREFIX.length());
 
             // lookup the type
             Type type = typeManager.getType(parseTypeSignature(typeName));
@@ -1032,10 +1029,10 @@ public class FunctionRegistry
         }
 
         // TODO: this is a hack and should be removed
-        if (signature.getName().startsWith(MAGIC_LITERAL_FUNCTION_PREFIX)) {
+        if (signature.getName().startsWith(Signature.MAGIC_LITERAL_FUNCTION_PREFIX)) {
             List<TypeSignature> parameterTypes = signature.getArgumentTypes();
             // extract type from function name
-            String typeName = signature.getName().substring(MAGIC_LITERAL_FUNCTION_PREFIX.length());
+            String typeName = signature.getName().substring(Signature.MAGIC_LITERAL_FUNCTION_PREFIX.length());
 
             // lookup the type
             Type type = typeManager.getType(parseTypeSignature(typeName));
@@ -1061,7 +1058,7 @@ public class FunctionRegistry
     public List<SqlFunction> listOperators()
     {
         Set<String> operatorNames = Arrays.asList(OperatorType.values()).stream()
-                .map(FunctionRegistry::mangleOperatorName)
+                .map(Signature::mangleOperatorName)
                 .collect(toImmutableSet());
 
         return functions.list().stream()
@@ -1094,7 +1091,7 @@ public class FunctionRegistry
             throws OperatorNotFoundException
     {
         try {
-            return resolveFunction(QualifiedName.of(mangleOperatorName(operatorType)), fromTypes(argumentTypes));
+            return resolveFunction(QualifiedName.of(Signature.mangleOperatorName(operatorType)), fromTypes(argumentTypes));
         }
         catch (PrestoException e) {
             if (e.getErrorCode().getCode() == FUNCTION_NOT_FOUND.toErrorCode().getCode()) {
@@ -1159,7 +1156,7 @@ public class FunctionRegistry
     {
         TypeSignature argumentType = typeForMagicLiteral(type).getTypeSignature();
 
-        return new Signature(MAGIC_LITERAL_FUNCTION_PREFIX + type.getTypeSignature(),
+        return new Signature(Signature.MAGIC_LITERAL_FUNCTION_PREFIX + type.getTypeSignature(),
                 SCALAR,
                 type.getTypeSignature(),
                 argumentType);
@@ -1170,21 +1167,11 @@ public class FunctionRegistry
         return SUPPORTED_LITERAL_TYPES.contains(type.getJavaType());
     }
 
-    public static String mangleOperatorName(OperatorType operatorType)
-    {
-        return mangleOperatorName(operatorType.name());
-    }
-
-    public static String mangleOperatorName(String operatorName)
-    {
-        return OPERATOR_PREFIX + operatorName;
-    }
-
     @VisibleForTesting
     public static OperatorType unmangleOperator(String mangledName)
     {
-        checkArgument(mangledName.startsWith(OPERATOR_PREFIX), "%s is not a mangled operator name", mangledName);
-        return OperatorType.valueOf(mangledName.substring(OPERATOR_PREFIX.length()));
+        checkArgument(mangledName.startsWith(Signature.OPERATOR_PREFIX), "%s is not a mangled operator name", mangledName);
+        return OperatorType.valueOf(mangledName.substring(Signature.OPERATOR_PREFIX.length()));
     }
 
     public static Optional<List<Type>> toTypes(List<TypeSignatureProvider> typeSignatureProviders, TypeManager typeManager)
@@ -1286,7 +1273,7 @@ public class FunctionRegistry
 
         public MagicLiteralFunction(BlockEncodingSerde blockEncodingSerde)
         {
-            super(new Signature(MAGIC_LITERAL_FUNCTION_PREFIX, FunctionKind.SCALAR, TypeSignature.parseTypeSignature("R"), TypeSignature.parseTypeSignature("T")));
+            super(new Signature(Signature.MAGIC_LITERAL_FUNCTION_PREFIX, FunctionKind.SCALAR, TypeSignature.parseTypeSignature("R"), TypeSignature.parseTypeSignature("T")));
             this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         }
 

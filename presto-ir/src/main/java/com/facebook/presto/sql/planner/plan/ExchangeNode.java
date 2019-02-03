@@ -1,0 +1,155 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.facebook.presto.sql.planner.plan;
+
+import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.sql.planner.OrderingScheme;
+import com.facebook.presto.sql.planner.PartitioningScheme;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
+
+import javax.annotation.concurrent.Immutable;
+
+import java.util.List;
+import java.util.Optional;
+
+import static com.facebook.presto.sql.planner.plan.ExchangeNode.Scope.REMOTE;
+import static com.facebook.presto.sql.planner.plan.PlanUtils.listOfListsCopy;
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
+
+@Immutable
+public class ExchangeNode
+        extends PlanNode
+{
+    public enum Type
+    {
+        GATHER,
+        REPARTITION,
+        REPLICATE
+    }
+
+    public enum Scope
+    {
+        LOCAL,
+        REMOTE
+    }
+
+    private final Type type;
+    private final Scope scope;
+
+    private final List<PlanNode> sources;
+
+    private final PartitioningScheme partitioningScheme;
+
+    // for each source, the list of inputs corresponding to each output
+    private final List<List<Symbol>> inputs;
+
+    private final Optional<OrderingScheme> orderingScheme;
+
+    @JsonCreator
+    public ExchangeNode(
+            @JsonProperty("id") PlanNodeId id,
+            @JsonProperty("type") Type type,
+            @JsonProperty("scope") Scope scope,
+            @JsonProperty("partitioningScheme") PartitioningScheme partitioningScheme,
+            @JsonProperty("sources") List<PlanNode> sources,
+            @JsonProperty("inputs") List<List<Symbol>> inputs,
+            @JsonProperty("orderingScheme") Optional<OrderingScheme> orderingScheme)
+    {
+        super(id);
+
+        requireNonNull(type, "type is null");
+        requireNonNull(scope, "scope is null");
+        requireNonNull(sources, "sources is null");
+        requireNonNull(partitioningScheme, "partitioningScheme is null");
+        requireNonNull(inputs, "inputs is null");
+        requireNonNull(orderingScheme, "orderingScheme is null");
+
+        checkArgument(!inputs.isEmpty(), "inputs is empty");
+        checkArgument(inputs.stream().allMatch(inputSymbols -> inputSymbols.size() == partitioningScheme.getOutputLayout().size()), "Input symbols do not match output symbols");
+        checkArgument(inputs.size() == sources.size(), "Must have same number of input lists as sources");
+        for (int i = 0; i < inputs.size(); i++) {
+            checkArgument(ImmutableSet.copyOf(sources.get(i).getOutputSymbols()).containsAll(inputs.get(i)), "Source does not supply all required input symbols");
+        }
+
+        checkArgument(scope != REMOTE || type == Type.REPARTITION || !partitioningScheme.isReplicateNullsAndAny(), "Only REPARTITION can replicate remotely");
+
+        orderingScheme.ifPresent(ordering -> Preconditions.checkArgument(partitioningScheme.getOutputLayout().containsAll(ordering.getOrderBy()), "Partitioning scheme does not supply all required ordering symbols"));
+        this.type = type;
+        this.sources = sources;
+        this.scope = scope;
+        this.partitioningScheme = partitioningScheme;
+        this.inputs = listOfListsCopy(inputs);
+        this.orderingScheme = orderingScheme;
+    }
+
+    @JsonProperty
+    public Type getType()
+    {
+        return type;
+    }
+
+    @JsonProperty
+    public Scope getScope()
+    {
+        return scope;
+    }
+
+    @Override
+    @JsonProperty
+    public List<PlanNode> getSources()
+    {
+        return sources;
+    }
+
+    @Override
+    public List<Symbol> getOutputSymbols()
+    {
+        return partitioningScheme.getOutputLayout();
+    }
+
+    @JsonProperty
+    public PartitioningScheme getPartitioningScheme()
+    {
+        return partitioningScheme;
+    }
+
+    @JsonProperty
+    public Optional<OrderingScheme> getOrderingScheme()
+    {
+        return orderingScheme;
+    }
+
+    @JsonProperty
+    public List<List<Symbol>> getInputs()
+    {
+        return inputs;
+    }
+
+    @Override
+    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
+    {
+        return visitor.visitExchange(this, context);
+    }
+
+    @Override
+    public PlanNode replaceChildren(List<PlanNode> newChildren)
+    {
+        return new ExchangeNode(getId(), type, scope, partitioningScheme, newChildren, inputs, orderingScheme);
+    }
+}

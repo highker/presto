@@ -416,7 +416,7 @@ public class ActualProperties
 
         private boolean isCompatibleTablePartitioningWith(Partitioning partitioning, boolean nullsAndAnyReplicated, Metadata metadata, Session session)
         {
-            return nodePartitioning.isPresent() && nodePartitioning.get().isCompatibleWith(partitioning, metadata, session) && this.nullsAndAnyReplicated == nullsAndAnyReplicated;
+            return nodePartitioning.isPresent() && isCompatibleWith(nodePartitioning.get(), partitioning, metadata, session) && this.nullsAndAnyReplicated == nullsAndAnyReplicated;
         }
 
         private boolean isCompatibleTablePartitioningWith(
@@ -429,7 +429,7 @@ public class ActualProperties
         {
             return nodePartitioning.isPresent() &&
                     other.nodePartitioning.isPresent() &&
-                    nodePartitioning.get().isCompatibleWith(
+                    isCompatibleWith(nodePartitioning.get(),
                             other.nodePartitioning.get(),
                             symbolMappings,
                             leftConstantMapping,
@@ -471,6 +471,82 @@ public class ActualProperties
                     nodePartitioning.flatMap(partitioning -> partitioning.translate(translator)),
                     streamPartitioning.flatMap(partitioning -> partitioning.translate(translator)),
                     nullsAndAnyReplicated);
+        }
+
+        public static boolean isCompatibleWith(
+                Partitioning left,
+                Partitioning right,
+                Metadata metadata,
+                Session session)
+        {
+            if (!left.getHandle().equals(right.getHandle()) && !metadata.getCommonPartitioning(session, left.getHandle(), right.getHandle()).isPresent()) {
+                return false;
+            }
+
+            return left.getArguments().equals(right.getArguments());
+        }
+
+        public boolean isCompatibleWith(
+                Partitioning left,
+                Partitioning right,
+                Function<Symbol, Set<Symbol>> leftToRightMappings,
+                Function<Symbol, Optional<NullableValue>> leftConstantMapping,
+                Function<Symbol, Optional<NullableValue>> rightConstantMapping,
+                Metadata metadata,
+                Session session)
+        {
+            if (!left.getHandle().equals(right.getHandle()) && !metadata.getCommonPartitioning(session, left.getHandle(), right.getHandle()).isPresent()) {
+                return false;
+            }
+
+            if (left.getArguments().size() != right.getArguments().size()) {
+                return false;
+            }
+
+            for (int i = 0; i < left.getArguments().size(); i++) {
+                Partitioning.ArgumentBinding leftArgument = left.getArguments().get(i);
+                Partitioning.ArgumentBinding rightArgument = right.getArguments().get(i);
+
+                if (!isPartitionedWith(leftArgument, leftConstantMapping, rightArgument, rightConstantMapping, leftToRightMappings)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static boolean isPartitionedWith(
+                Partitioning.ArgumentBinding leftArgument,
+                Function<Symbol, Optional<NullableValue>> leftConstantMapping,
+                Partitioning.ArgumentBinding rightArgument,
+                Function<Symbol, Optional<NullableValue>> rightConstantMapping,
+                Function<Symbol, Set<Symbol>> leftToRightMappings)
+        {
+            if (leftArgument.isVariable()) {
+                if (rightArgument.isVariable()) {
+                    // variable == variable
+                    Set<Symbol> mappedColumns = leftToRightMappings.apply(leftArgument.getColumn());
+                    return mappedColumns.contains(rightArgument.getColumn());
+                }
+                else {
+                    // variable == constant
+                    // Normally, this would be a false condition, but if we happen to have an external
+                    // mapping from the symbol to a constant value and that constant value matches the
+                    // right value, then we are co-partitioned.
+                    Optional<NullableValue> leftConstant = leftConstantMapping.apply(leftArgument.getColumn());
+                    return leftConstant.isPresent() && leftConstant.get().equals(rightArgument.getConstant());
+                }
+            }
+            else {
+                if (rightArgument.isConstant()) {
+                    // constant == constant
+                    return leftArgument.getConstant().equals(rightArgument.getConstant());
+                }
+                else {
+                    // constant == variable
+                    Optional<NullableValue> rightConstant = rightConstantMapping.apply(rightArgument.getColumn());
+                    return rightConstant.isPresent() && rightConstant.get().equals(leftArgument.getConstant());
+                }
+            }
         }
 
         @Override

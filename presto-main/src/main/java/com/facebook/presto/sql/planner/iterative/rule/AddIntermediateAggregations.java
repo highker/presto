@@ -25,6 +25,7 @@ import com.facebook.presto.sql.planner.PartitioningScheme;
 import com.facebook.presto.sql.planner.SymbolsExtractor;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
+import com.facebook.presto.sql.planner.optimizations.ExchangeNodeUtil;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.ExchangeNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
@@ -108,7 +109,7 @@ public class AddIntermediateAggregations
         PlanNode source = rewrittenSource.get();
 
         if (getTaskConcurrency(session) > 1) {
-            source = ExchangeNode.partitionedExchange(
+            source = ExchangeNodeUtil.partitionedExchange(
                     idAllocator.getNextId(),
                     ExchangeNode.Scope.LOCAL,
                     source,
@@ -122,7 +123,7 @@ public class AddIntermediateAggregations
                     AggregationNode.Step.INTERMEDIATE,
                     aggregation.getHashSymbol(),
                     aggregation.getGroupIdSymbol());
-            source = ExchangeNode.gatheringExchange(idAllocator.getNextId(), ExchangeNode.Scope.LOCAL, source);
+            source = ExchangeNodeUtil.gatheringExchange(idAllocator.getNextId(), ExchangeNode.Scope.LOCAL, source);
         }
 
         return Result.ofPlanNode(aggregation.replaceChildren(ImmutableList.of(source)));
@@ -155,7 +156,7 @@ public class AddIntermediateAggregations
     private PlanNode addGatheringIntermediate(AggregationNode aggregation, PlanNodeIdAllocator idAllocator)
     {
         verify(aggregation.getGroupingKeys().isEmpty(), "Should be an un-grouped aggregation");
-        ExchangeNode gatheringExchange = ExchangeNode.gatheringExchange(idAllocator.getNextId(), ExchangeNode.Scope.LOCAL, aggregation);
+        ExchangeNode gatheringExchange = ExchangeNodeUtil.gatheringExchange(idAllocator.getNextId(), ExchangeNode.Scope.LOCAL, aggregation);
         return new AggregationNode(
                 idAllocator.getNextId(),
                 gatheringExchange,

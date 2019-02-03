@@ -13,9 +13,7 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
-import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Signature;
-import com.facebook.presto.operator.aggregation.InternalAggregationFunction;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.tree.FunctionCall;
@@ -203,40 +201,6 @@ public class AggregationNode
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
         return new AggregationNode(getId(), Iterables.getOnlyElement(newChildren), aggregations, groupingSets, preGroupedSymbols, step, hashSymbol, groupIdSymbol);
-    }
-
-    public boolean isDecomposable(FunctionRegistry functionRegistry)
-    {
-        boolean hasOrderBy = getAggregations().values().stream()
-                .map(Aggregation::getCall)
-                .map(FunctionCall::getOrderBy)
-                .anyMatch(Optional::isPresent);
-
-        boolean hasDistinct = getAggregations().values().stream()
-                .map(Aggregation::getCall)
-                .anyMatch(FunctionCall::isDistinct);
-
-        boolean decomposableFunctions = getAggregations().values().stream()
-                .map(Aggregation::getSignature)
-                .map(functionRegistry::getAggregateFunctionImplementation)
-                .allMatch(InternalAggregationFunction::isDecomposable);
-
-        return !hasOrderBy && !hasDistinct && decomposableFunctions;
-    }
-
-    public boolean hasSingleNodeExecutionPreference(FunctionRegistry functionRegistry)
-    {
-        // There are two kinds of aggregations the have single node execution preference:
-        //
-        // 1. aggregations with only empty grouping sets like
-        //
-        // SELECT count(*) FROM lineitem;
-        //
-        // there is no need for distributed aggregation. Single node FINAL aggregation will suffice,
-        // since all input have to be aggregated into one line output.
-        //
-        // 2. aggregations that must produce default output and are not decomposable, we can not distribute them.
-        return (hasEmptyGroupingSet() && !hasNonEmptyGroupingSet()) || (hasDefaultOutput() && !isDecomposable(functionRegistry));
     }
 
     public boolean isStreamable()

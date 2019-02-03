@@ -22,11 +22,14 @@ import com.facebook.presto.cost.CostProvider;
 import com.facebook.presto.cost.StatsAndCosts;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.cost.StatsProvider;
+import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.NewTableLayout;
 import com.facebook.presto.metadata.QualifiedObjectName;
+import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.metadata.TableMetadata;
+import com.facebook.presto.operator.aggregation.InternalAggregationFunction;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorTableMetadata;
@@ -37,6 +40,7 @@ import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.plan.TypeProvider;
 import com.facebook.presto.spi.statistics.TableStatisticsMetadata;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.SymbolUtils;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.Field;
 import com.facebook.presto.sql.analyzer.RelationId;
@@ -66,12 +70,14 @@ import com.facebook.presto.sql.tree.CreateTableAsSelect;
 import com.facebook.presto.sql.tree.Delete;
 import com.facebook.presto.sql.tree.Explain;
 import com.facebook.presto.sql.tree.Expression;
+import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.Identifier;
 import com.facebook.presto.sql.tree.Insert;
 import com.facebook.presto.sql.tree.LambdaArgumentDeclaration;
 import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.sql.tree.NodeRef;
 import com.facebook.presto.sql.tree.NullLiteral;
+import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.Query;
 import com.facebook.presto.sql.tree.Statement;
 import com.facebook.presto.sql.tree.SymbolReference;
@@ -420,7 +426,7 @@ public class LogicalPlanner
 
             TableStatisticAggregation result = statisticsAggregationPlanner.createStatisticsAggregation(statisticsMetadata, columnToSymbolMap);
 
-            StatisticAggregations.Parts aggregations = result.getAggregations().createPartialAggregations(symbolAllocator, metadata.getFunctionRegistry());
+            StatisticAggregations.Parts aggregations = createPartialAggregations(result.getAggregations(), symbolAllocator, metadata.getFunctionRegistry());
 
             // partial aggregation is run within the TableWriteOperator to calculate the statistics for
             // the data consumed by the TableWriteOperator
@@ -556,5 +562,30 @@ public class LogicalPlanner
             resultMap.put(lambdaArgumentDeclaration, symbolAllocator.newSymbol(lambdaArgumentDeclaration.getNode(), entry.getValue()));
         }
         return resultMap;
+    }
+
+    private static StatisticAggregations.Parts createPartialAggregations(StatisticAggregations aggregations, ExtendedSymbolAllocator symbolAllocator, FunctionRegistry functionRegistry)
+    {
+        ImmutableMap.Builder<Symbol, AggregationNode.Aggregation> partialAggregation = ImmutableMap.builder();
+        ImmutableMap.Builder<Symbol, AggregationNode.Aggregation> finalAggregation = ImmutableMap.builder();
+        ImmutableMap.Builder<Symbol, Symbol> mappings = ImmutableMap.builder();
+        for (Map.Entry<Symbol, AggregationNode.Aggregation> entry : aggregations.getAggregations().entrySet()) {
+            AggregationNode.Aggregation originalAggregation = entry.getValue();
+            Signature signature = originalAggregation.getSignature();
+            InternalAggregationFunction function = functionRegistry.getAggregateFunctionImplementation(signature);
+            Symbol partialSymbol = symbolAllocator.newSymbol(signature.getName(), function.getIntermediateType());
+            mappings.put(entry.getKey(), partialSymbol);
+            partialAggregation.put(partialSymbol, new AggregationNode.Aggregation(originalAggregation.getCall(), signature, originalAggregation.getMask()));
+            finalAggregation.put(entry.getKey(),
+                    new AggregationNode.Aggregation(
+                            new FunctionCall(QualifiedName.of(signature.getName()), ImmutableList.of(SymbolUtils.toSymbolReference(partialSymbol))),
+                            signature,
+                            Optional.empty()));
+        }
+        aggregations.getGroupingSymbols().forEach(symbol -> mappings.put(symbol, symbol));
+        return new StatisticAggregations.Parts(
+                new StatisticAggregations(partialAggregation.build(), aggregations.getGroupingSymbols()),
+                new StatisticAggregations(finalAggregation.build(), aggregations.getGroupingSymbols()),
+                mappings.build());
     }
 }

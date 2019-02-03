@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
+import com.facebook.presto.spi.ErrorCodeSupplier;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.sql.planner.OrderingScheme;
@@ -26,8 +28,8 @@ import javax.annotation.concurrent.Immutable;
 import java.util.List;
 
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
-import static com.facebook.presto.util.Failures.checkCondition;
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 @Immutable
@@ -112,5 +114,12 @@ public class TopNNode
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
         return new TopNNode(getId(), Iterables.getOnlyElement(newChildren), count, orderingScheme, step);
+    }
+
+    public static void checkCondition(boolean condition, ErrorCodeSupplier errorCode, String formatString, Object... args)
+    {
+        if (!condition) {
+            throw new PrestoException(errorCode, format(formatString, args));
+        }
     }
 }

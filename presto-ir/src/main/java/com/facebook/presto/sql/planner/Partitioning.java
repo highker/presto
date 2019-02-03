@@ -13,8 +13,6 @@
  */
 package com.facebook.presto.sql.planner;
 
-import com.facebook.presto.Session;
-import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.plan.Symbol;
 import com.facebook.presto.spi.predicate.NullableValue;
 import com.facebook.presto.sql.SymbolUtils;
@@ -95,80 +93,6 @@ public final class Partitioning
                 .filter(ArgumentBinding::isVariable)
                 .map(ArgumentBinding::getColumn)
                 .collect(toImmutableSet());
-    }
-
-    public boolean isCompatibleWith(
-            Partitioning right,
-            Metadata metadata,
-            Session session)
-    {
-        if (!handle.equals(right.handle) && !metadata.getCommonPartitioning(session, handle, right.handle).isPresent()) {
-            return false;
-        }
-
-        return arguments.equals(right.arguments);
-    }
-
-    public boolean isCompatibleWith(
-            Partitioning right,
-            Function<Symbol, Set<Symbol>> leftToRightMappings,
-            Function<Symbol, Optional<NullableValue>> leftConstantMapping,
-            Function<Symbol, Optional<NullableValue>> rightConstantMapping,
-            Metadata metadata,
-            Session session)
-    {
-        if (!handle.equals(right.handle) && !metadata.getCommonPartitioning(session, handle, right.handle).isPresent()) {
-            return false;
-        }
-
-        if (arguments.size() != right.arguments.size()) {
-            return false;
-        }
-
-        for (int i = 0; i < arguments.size(); i++) {
-            ArgumentBinding leftArgument = arguments.get(i);
-            ArgumentBinding rightArgument = right.arguments.get(i);
-
-            if (!isPartitionedWith(leftArgument, leftConstantMapping, rightArgument, rightConstantMapping, leftToRightMappings)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean isPartitionedWith(
-            ArgumentBinding leftArgument,
-            Function<Symbol, Optional<NullableValue>> leftConstantMapping,
-            ArgumentBinding rightArgument,
-            Function<Symbol, Optional<NullableValue>> rightConstantMapping,
-            Function<Symbol, Set<Symbol>> leftToRightMappings)
-    {
-        if (leftArgument.isVariable()) {
-            if (rightArgument.isVariable()) {
-                // variable == variable
-                Set<Symbol> mappedColumns = leftToRightMappings.apply(leftArgument.getColumn());
-                return mappedColumns.contains(rightArgument.getColumn());
-            }
-            else {
-                // variable == constant
-                // Normally, this would be a false condition, but if we happen to have an external
-                // mapping from the symbol to a constant value and that constant value matches the
-                // right value, then we are co-partitioned.
-                Optional<NullableValue> leftConstant = leftConstantMapping.apply(leftArgument.getColumn());
-                return leftConstant.isPresent() && leftConstant.get().equals(rightArgument.getConstant());
-            }
-        }
-        else {
-            if (rightArgument.isConstant()) {
-                // constant == constant
-                return leftArgument.getConstant().equals(rightArgument.getConstant());
-            }
-            else {
-                // constant == variable
-                Optional<NullableValue> rightConstant = rightConstantMapping.apply(rightArgument.getColumn());
-                return rightConstant.isPresent() && rightConstant.get().equals(leftArgument.getConstant());
-            }
-        }
     }
 
     public boolean isPartitionedOn(Collection<Symbol> columns, Set<Symbol> knownConstants)

@@ -26,13 +26,15 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
-import static com.facebook.presto.metadata.FunctionRegistry.mangleOperatorName;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Stream.concat;
 
 public final class Signature
 {
+    public static final String MAGIC_LITERAL_FUNCTION_PREFIX = "$literal$";
+    public static final String OPERATOR_PREFIX = "$operator$";
+
     private final String name;
     private final FunctionKind kind;
     private final List<TypeVariableConstraint> typeVariableConstraints;
@@ -107,6 +109,16 @@ public final class Signature
     public static Signature internalScalarFunction(String name, TypeSignature returnType, List<TypeSignature> argumentTypes)
     {
         return new Signature(name, SCALAR, ImmutableList.of(), ImmutableList.of(), returnType, argumentTypes, false);
+    }
+
+    public static String mangleOperatorName(OperatorType operatorType)
+    {
+        return mangleOperatorName(operatorType.name());
+    }
+
+    public static String mangleOperatorName(String operatorName)
+    {
+        return OPERATOR_PREFIX + operatorName;
     }
 
     public Signature withAlias(String name)

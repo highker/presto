@@ -17,6 +17,7 @@ import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.DefaultMatcher;
 import com.facebook.presto.matching.Match;
 import com.facebook.presto.matching.pattern.WithPattern;
+import com.facebook.presto.sql.planner.plan.GroupReference;
 
 import java.util.Optional;
 import java.util.function.Function;

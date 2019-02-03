@@ -100,15 +100,16 @@ import static com.facebook.presto.sql.planner.SystemPartitioningHandle.SCALED_WR
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static com.facebook.presto.sql.planner.optimizations.ActualProperties.Global.partitionedOn;
 import static com.facebook.presto.sql.planner.optimizations.ActualProperties.Global.singleStreamPartition;
+import static com.facebook.presto.sql.planner.optimizations.AggregationNodeUtil.hasSingleNodeExecutionPreference;
+import static com.facebook.presto.sql.planner.optimizations.ExchangeNodeUtil.gatheringExchange;
+import static com.facebook.presto.sql.planner.optimizations.ExchangeNodeUtil.mergingExchange;
+import static com.facebook.presto.sql.planner.optimizations.ExchangeNodeUtil.partitionedExchange;
+import static com.facebook.presto.sql.planner.optimizations.ExchangeNodeUtil.replicatedExchange;
+import static com.facebook.presto.sql.planner.optimizations.ExchangeNodeUtil.roundRobinExchange;
 import static com.facebook.presto.sql.planner.optimizations.LocalProperties.grouped;
 import static com.facebook.presto.sql.planner.plan.ExchangeNode.Scope.REMOTE;
 import static com.facebook.presto.sql.planner.plan.ExchangeNode.Type.GATHER;
 import static com.facebook.presto.sql.planner.plan.ExchangeNode.Type.REPARTITION;
-import static com.facebook.presto.sql.planner.plan.ExchangeNode.gatheringExchange;
-import static com.facebook.presto.sql.planner.plan.ExchangeNode.mergingExchange;
-import static com.facebook.presto.sql.planner.plan.ExchangeNode.partitionedExchange;
-import static com.facebook.presto.sql.planner.plan.ExchangeNode.replicatedExchange;
-import static com.facebook.presto.sql.planner.plan.ExchangeNode.roundRobinExchange;
 import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -211,7 +212,7 @@ public class AddExchanges
         {
             Set<Symbol> partitioningRequirement = ImmutableSet.copyOf(node.getGroupingKeys());
 
-            boolean preferSingleNode = node.hasSingleNodeExecutionPreference(metadata.getFunctionRegistry());
+            boolean preferSingleNode = hasSingleNodeExecutionPreference(node, metadata.getFunctionRegistry());
             PreferredProperties preferredProperties = preferSingleNode ? PreferredProperties.undistributed() : PreferredProperties.any();
 
             if (!node.getGroupingKeys().isEmpty()) {
