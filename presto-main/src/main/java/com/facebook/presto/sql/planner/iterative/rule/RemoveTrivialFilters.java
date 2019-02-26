@@ -18,11 +18,11 @@ import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
-import com.facebook.presto.sql.tree.Expression;
+import com.facebook.presto.sql.relational.RowExpression;
 
 import static com.facebook.presto.sql.planner.plan.Patterns.filter;
-import static com.facebook.presto.sql.tree.BooleanLiteral.FALSE_LITERAL;
-import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
+import static com.facebook.presto.sql.relational.RowExpressions.FALSE;
+import static com.facebook.presto.sql.relational.RowExpressions.TRUE;
 import static java.util.Collections.emptyList;
 
 public class RemoveTrivialFilters
@@ -39,13 +39,13 @@ public class RemoveTrivialFilters
     @Override
     public Result apply(FilterNode filterNode, Captures captures, Context context)
     {
-        Expression predicate = filterNode.getPredicate();
+        RowExpression predicate = filterNode.getRowPredicate();
 
-        if (predicate.equals(TRUE_LITERAL)) {
+        if (predicate.equals(TRUE)) {
             return Result.ofPlanNode(filterNode.getSource());
         }
 
-        if (predicate.equals(FALSE_LITERAL)) {
+        if (predicate.equals(FALSE)) {
             return Result.ofPlanNode(new ValuesNode(context.getIdAllocator().getNextId(), filterNode.getOutputSymbols(), emptyList()));
         }
 

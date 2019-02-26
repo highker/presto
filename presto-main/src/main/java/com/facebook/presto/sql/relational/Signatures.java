@@ -53,6 +53,8 @@ public final class Signatures
     public static final String TRY = "TRY";
     public static final String DEREFERENCE = "DEREFERENCE";
     public static final String ROW_CONSTRUCTOR = "ROW_CONSTRUCTOR";
+    public static final String AND = "AND";
+    public static final String OR = "OR";
     public static final String BIND = "$INTERNAL$BIND";
 
     private Signatures()

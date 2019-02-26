@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner.plan;
 
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.relational.RowExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -29,7 +30,9 @@ public class FilterNode
         extends PlanNode
 {
     private final PlanNode source;
+    // TODO: gradually replace predicate with rowPredicate
     private final Expression predicate;
+    private RowExpression rowPredicate;
 
     @JsonCreator
     public FilterNode(@JsonProperty("id") PlanNodeId id,
@@ -42,10 +45,27 @@ public class FilterNode
         this.predicate = predicate;
     }
 
+    @JsonCreator
+    public FilterNode(@JsonProperty("id") PlanNodeId id,
+            @JsonProperty("source") PlanNode source,
+            @JsonProperty("predicate") RowExpression rowPredicate)
+    {
+        super(id);
+
+        this.source = source;
+        this.predicate = null;
+        this.rowPredicate = rowPredicate;
+    }
+
     @JsonProperty("predicate")
     public Expression getPredicate()
     {
         return predicate;
+    }
+
+    public RowExpression getRowPredicate()
+    {
+        return rowPredicate;
     }
 
     @Override

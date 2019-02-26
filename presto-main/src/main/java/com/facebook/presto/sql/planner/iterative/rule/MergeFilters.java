@@ -16,13 +16,15 @@ package com.facebook.presto.sql.planner.iterative.rule;
 import com.facebook.presto.matching.Capture;
 import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.Pattern;
+import com.facebook.presto.metadata.FunctionManager;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.FilterNode;
+import com.facebook.presto.sql.relational.RowExpressions;
 
 import static com.facebook.presto.matching.Capture.newCapture;
-import static com.facebook.presto.sql.ExpressionUtils.combineConjuncts;
 import static com.facebook.presto.sql.planner.plan.Patterns.filter;
 import static com.facebook.presto.sql.planner.plan.Patterns.source;
+import static java.util.Objects.requireNonNull;
 
 public class MergeFilters
         implements Rule<FilterNode>
@@ -31,6 +33,13 @@ public class MergeFilters
 
     private static final Pattern<FilterNode> PATTERN = filter()
             .with(source().matching(filter().capturedAs(CHILD)));
+
+    private final RowExpressions rowExpressions;
+
+    public MergeFilters(FunctionManager functionManager)
+    {
+        this.rowExpressions = new RowExpressions(requireNonNull(functionManager, "functionManager is null"));
+    }
 
     @Override
     public Pattern<FilterNode> getPattern()
@@ -47,6 +56,6 @@ public class MergeFilters
                 new FilterNode(
                         parent.getId(),
                         child.getSource(),
-                        combineConjuncts(child.getPredicate(), parent.getPredicate())));
+                        rowExpressions.combineConjuncts(child.getRowPredicate(), parent.getRowPredicate())));
     }
 }

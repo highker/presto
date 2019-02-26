@@ -185,7 +185,7 @@ public class WindowFilterPushDown
             TupleDomain<Symbol> tupleDomain = extractionResult.getTupleDomain();
 
             if (!isEqualRange(tupleDomain, rowNumberSymbol, upperBound)) {
-                return new FilterNode(filterNode.getId(), source, filterNode.getPredicate());
+                return new FilterNode(filterNode.getId(), source, filterNode.getRowPredicate());
             }
 
             // Remove the row number domain because it is absorbed into the node

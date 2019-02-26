@@ -35,6 +35,7 @@ import java.util.Optional;
 import static com.facebook.presto.sql.gen.BytecodeUtils.generateWrite;
 import static com.facebook.presto.sql.gen.BytecodeUtils.loadConstant;
 import static com.facebook.presto.sql.gen.LambdaBytecodeGenerator.generateLambda;
+import static com.facebook.presto.sql.relational.Signatures.AND;
 import static com.facebook.presto.sql.relational.Signatures.BIND;
 import static com.facebook.presto.sql.relational.Signatures.CAST;
 import static com.facebook.presto.sql.relational.Signatures.COALESCE;
@@ -43,6 +44,7 @@ import static com.facebook.presto.sql.relational.Signatures.IF;
 import static com.facebook.presto.sql.relational.Signatures.IN;
 import static com.facebook.presto.sql.relational.Signatures.IS_NULL;
 import static com.facebook.presto.sql.relational.Signatures.NULL_IF;
+import static com.facebook.presto.sql.relational.Signatures.OR;
 import static com.facebook.presto.sql.relational.Signatures.ROW_CONSTRUCTOR;
 import static com.facebook.presto.sql.relational.Signatures.SWITCH;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -125,10 +127,10 @@ public class RowExpressionCompiler
                         generator = new InCodeGenerator(functionManager);
                         break;
                     // optimized implementations (shortcircuiting behavior)
-                    case "AND":
+                    case AND:
                         generator = new AndCodeGenerator();
                         break;
-                    case "OR":
+                    case OR:
                         generator = new OrCodeGenerator();
                         break;
                     case DEREFERENCE:
