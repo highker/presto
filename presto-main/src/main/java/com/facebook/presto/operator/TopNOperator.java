@@ -95,6 +95,7 @@ public class TopNOperator
     private boolean finishing;
 
     private Iterator<Page> outputIterator;
+    private EmitTimer timer = new EmitTimer();
 
     public TopNOperator(
             OperatorContext operatorContext,
@@ -171,9 +172,13 @@ public class TopNOperator
         if (outputIterator.hasNext()) {
             output = outputIterator.next();
         }
+        else if (timer.shouldEmit()) {
+            outputIterator = topNBuilder.buildResult();
+        }
         else {
             outputIterator = emptyIterator();
         }
+
         updateMemoryReservation();
         return output;
     }
@@ -185,6 +190,6 @@ public class TopNOperator
 
     private boolean noMoreOutput()
     {
-        return outputIterator != null && !outputIterator.hasNext();
+        return false;
     }
 }
