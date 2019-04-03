@@ -13,6 +13,12 @@
  */
 package com.facebook.presto.util;
 
+import com.facebook.presto.metadata.FunctionManager;
+import com.facebook.presto.metadata.FunctionMetadata;
+import com.facebook.presto.spi.function.OperatorType;
+import com.facebook.presto.spi.relation.CallExpression;
+import com.facebook.presto.spi.relation.RowExpression;
+import com.facebook.presto.sql.relational.LogicalRowExpressions;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
@@ -20,6 +26,7 @@ import com.facebook.presto.sql.tree.FunctionCall;
 import java.util.List;
 
 import static com.facebook.presto.sql.ExpressionUtils.extractConjuncts;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 
 public class SpatialJoinUtils
@@ -48,9 +55,25 @@ public class SpatialJoinUtils
                 .collect(toImmutableList());
     }
 
+    public static List<CallExpression> extractSupportedSpatialFunctions(RowExpression filterExpression)
+    {
+        return LogicalRowExpressions.extractConjuncts(filterExpression).stream()
+                .filter(CallExpression.class::isInstance)
+                .map(CallExpression.class::cast)
+                .filter(SpatialJoinUtils::isSupportedSpatialFunction)
+                .collect(toImmutableList());
+    }
+
     private static boolean isSupportedSpatialFunction(FunctionCall functionCall)
     {
         String functionName = functionCall.getName().toString();
+        return functionName.equalsIgnoreCase(ST_CONTAINS) || functionName.equalsIgnoreCase(ST_WITHIN)
+                || functionName.equalsIgnoreCase(ST_INTERSECTS);
+    }
+
+    private static boolean isSupportedSpatialFunction(CallExpression call)
+    {
+        String functionName = call.getFunctionHandle().getSignature().getName();
         return functionName.equalsIgnoreCase(ST_CONTAINS) || functionName.equalsIgnoreCase(ST_WITHIN)
                 || functionName.equalsIgnoreCase(ST_INTERSECTS);
     }
@@ -74,6 +97,16 @@ public class SpatialJoinUtils
                 .collect(toImmutableList());
     }
 
+    public static List<CallExpression> extractSupportedSpatialComparisons(RowExpression filterExpression, FunctionManager functionManager)
+    {
+        return LogicalRowExpressions.extractConjuncts(filterExpression).stream()
+                .filter(CallExpression.class::isInstance)
+                .map(CallExpression.class::cast)
+                .filter(call -> functionManager.getFunctionMetadata(call.getFunctionHandle()).getOperatorType().map(OperatorType::isComparisonOperator).orElse(false))
+                .filter(call -> isSupportedSpatialComparison(call, functionManager))
+                .collect(toImmutableList());
+    }
+
     private static boolean isSupportedSpatialComparison(ComparisonExpression expression)
     {
         switch (expression.getOperator()) {
@@ -88,10 +121,35 @@ public class SpatialJoinUtils
         }
     }
 
+    private static boolean isSupportedSpatialComparison(CallExpression expression, FunctionManager functionManager)
+    {
+        FunctionMetadata metadata = functionManager.getFunctionMetadata(expression.getFunctionHandle());
+        checkArgument(metadata.getOperatorType().isPresent() && metadata.getOperatorType().get().isComparisonOperator());
+        switch (metadata.getOperatorType().get()) {
+            case LESS_THAN:
+            case LESS_THAN_OR_EQUAL:
+                return isSTDistance(expression.getArguments().get(0));
+            case GREATER_THAN:
+            case GREATER_THAN_OR_EQUAL:
+                return isSTDistance(expression.getArguments().get(1));
+            default:
+                return false;
+        }
+    }
+
     private static boolean isSTDistance(Expression expression)
     {
         if (expression instanceof FunctionCall) {
             return ((FunctionCall) expression).getName().toString().equalsIgnoreCase(ST_DISTANCE);
+        }
+
+        return false;
+    }
+
+    private static boolean isSTDistance(RowExpression expression)
+    {
+        if (expression instanceof CallExpression) {
+            return ((CallExpression) expression).getFunctionHandle().getSignature().getName().equalsIgnoreCase(ST_DISTANCE);
         }
 
         return false;
