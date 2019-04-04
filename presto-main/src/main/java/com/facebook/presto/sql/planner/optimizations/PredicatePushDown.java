@@ -49,6 +49,7 @@ import com.facebook.presto.sql.planner.plan.TableScanNode;
 import com.facebook.presto.sql.planner.plan.UnionNode;
 import com.facebook.presto.sql.planner.plan.UnnestNode;
 import com.facebook.presto.sql.planner.plan.WindowNode;
+import com.facebook.presto.sql.relational.OriginalExpressionUtils;
 import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
@@ -506,7 +507,7 @@ public class PredicatePushDown
 
             boolean filtersEquivalent =
                     newJoinFilter.isPresent() == node.getFilter().isPresent() &&
-                            (!newJoinFilter.isPresent() || areExpressionsEquivalent(newJoinFilter.get(), node.getFilter().get()));
+                            (!newJoinFilter.isPresent() || areExpressionsEquivalent(newJoinFilter.get(), castToExpression(node.getFilter().get())));
 
             if (leftSource != node.getLeft() ||
                     rightSource != node.getRight() ||
@@ -525,7 +526,7 @@ public class PredicatePushDown
                                 .addAll(leftSource.getOutputSymbols())
                                 .addAll(rightSource.getOutputSymbols())
                                 .build(),
-                        newJoinFilter,
+                        newJoinFilter.map(OriginalExpressionUtils::castToRowExpression),
                         node.getLeftHashSymbol(),
                         node.getRightHashSymbol(),
                         node.getDistributionType());
@@ -888,7 +889,7 @@ public class PredicatePushDown
             for (JoinNode.EquiJoinClause equiJoinClause : joinNode.getCriteria()) {
                 builder.add(JoinNodeUtil.toExpression(equiJoinClause));
             }
-            joinNode.getFilter().ifPresent(builder::add);
+            joinNode.getFilter().map(OriginalExpressionUtils::castToExpression).ifPresent(builder::add);
             return combineConjuncts(builder.build());
         }
 

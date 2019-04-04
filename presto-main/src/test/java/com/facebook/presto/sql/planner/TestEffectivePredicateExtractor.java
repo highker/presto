@@ -38,6 +38,7 @@ import com.facebook.presto.sql.planner.plan.TableScanNode;
 import com.facebook.presto.sql.planner.plan.TopNNode;
 import com.facebook.presto.sql.planner.plan.UnionNode;
 import com.facebook.presto.sql.planner.plan.WindowNode;
+import com.facebook.presto.sql.relational.OriginalExpressionUtils;
 import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
@@ -429,7 +430,7 @@ public class TestEffectivePredicateExtractor
                         .addAll(left.getOutputSymbols())
                         .addAll(right.getOutputSymbols())
                         .build(),
-                Optional.of(lessThanOrEqual(BE, EE)),
+                Optional.of(lessThanOrEqual(BE, EE)).map(OriginalExpressionUtils::castToRowExpression),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());
@@ -497,7 +498,7 @@ public class TestEffectivePredicateExtractor
                         .addAll(leftScan.getOutputSymbols())
                         .addAll(rightScan.getOutputSymbols())
                         .build(),
-                Optional.of(FALSE_LITERAL),
+                Optional.of(FALSE_LITERAL).map(OriginalExpressionUtils::castToRowExpression),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());
