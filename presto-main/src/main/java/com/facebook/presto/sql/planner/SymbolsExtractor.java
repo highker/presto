@@ -13,8 +13,11 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.spi.relation.RowExpression;
+import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.facebook.presto.sql.relational.DefaultRowExpressionTraversalVisitor;
 import com.facebook.presto.sql.tree.DefaultExpressionTraversalVisitor;
 import com.facebook.presto.sql.tree.DefaultTraversalVisitor;
 import com.facebook.presto.sql.tree.DereferenceExpression;
@@ -69,6 +72,11 @@ public final class SymbolsExtractor
         return ImmutableSet.copyOf(extractAll(expression));
     }
 
+    public static Set<Symbol> extractUnique(RowExpression expression)
+    {
+        return ImmutableSet.copyOf(extractAll(expression));
+    }
+
     public static Set<Symbol> extractUnique(Iterable<? extends Expression> expressions)
     {
         ImmutableSet.Builder<Symbol> unique = ImmutableSet.builder();
@@ -82,6 +90,13 @@ public final class SymbolsExtractor
     {
         ImmutableList.Builder<Symbol> builder = ImmutableList.builder();
         new SymbolBuilderVisitor().process(expression, builder);
+        return builder.build();
+    }
+
+    public static List<Symbol> extractAll(RowExpression expression)
+    {
+        ImmutableList.Builder<Symbol> builder = ImmutableList.builder();
+        expression.accept(new VariableBuilderVisitor(), builder);
         return builder.build();
     }
 
@@ -114,6 +129,17 @@ public final class SymbolsExtractor
         protected Void visitSymbolReference(SymbolReference node, ImmutableList.Builder<Symbol> builder)
         {
             builder.add(Symbol.from(node));
+            return null;
+        }
+    }
+
+    private static class VariableBuilderVisitor
+            extends DefaultRowExpressionTraversalVisitor<ImmutableList.Builder<Symbol>>
+    {
+        @Override
+        public Void visitVariableReference(VariableReferenceExpression variable, ImmutableList.Builder<Symbol> builder)
+        {
+            builder.add(new Symbol(variable.getName()));
             return null;
         }
     }
