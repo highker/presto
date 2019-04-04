@@ -44,6 +44,7 @@ import com.facebook.presto.sql.planner.SubPlan;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.iterative.GroupReference;
+import com.facebook.presto.sql.planner.optimizations.JoinNodeUtil;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
 import com.facebook.presto.sql.planner.plan.AssignUniqueId;
@@ -362,7 +363,7 @@ public class PlanPrinter
         {
             List<Expression> joinExpressions = new ArrayList<>();
             for (JoinNode.EquiJoinClause clause : node.getCriteria()) {
-                joinExpressions.add(clause.toExpression());
+                joinExpressions.add(JoinNodeUtil.toExpression(clause));
             }
             node.getFilter().ifPresent(joinExpressions::add);
 
