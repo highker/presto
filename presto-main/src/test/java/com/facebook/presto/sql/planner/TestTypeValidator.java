@@ -20,6 +20,7 @@ import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.sql.parser.SqlParser;
@@ -64,6 +65,7 @@ import static com.facebook.presto.sql.planner.plan.AggregationNode.singleGroupin
 import static com.facebook.presto.sql.planner.plan.WindowNode.Frame.BoundType.UNBOUNDED_FOLLOWING;
 import static com.facebook.presto.sql.planner.plan.WindowNode.Frame.BoundType.UNBOUNDED_PRECEDING;
 import static com.facebook.presto.sql.planner.plan.WindowNode.Frame.WindowType.RANGE;
+import static com.facebook.presto.sql.relational.Expressions.call;
 
 @Test(singleThreaded = true)
 public class TestTypeValidator
@@ -149,7 +151,6 @@ public class TestTypeValidator
     {
         Symbol windowSymbol = symbolAllocator.newSymbol("sum", DOUBLE);
         FunctionHandle functionHandle = FUNCTION_MANAGER.lookupFunction(QualifiedName.of("sum"), fromTypes(DOUBLE));
-        FunctionCall functionCall = new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(columnC.toSymbolReference()));
 
         WindowNode.Frame frame = new WindowNode.Frame(
                 RANGE,
@@ -160,7 +161,7 @@ public class TestTypeValidator
                 Optional.empty(),
                 Optional.empty());
 
-        WindowNode.Function function = new WindowNode.Function(functionCall, functionHandle, frame);
+        WindowNode.Function function = new WindowNode.Function(call("sum", functionHandle, DOUBLE, new VariableReferenceExpression(columnC.getName(), DOUBLE)), frame);
 
         WindowNode.Specification specification = new WindowNode.Specification(ImmutableList.of(), Optional.empty());
 
@@ -274,7 +275,6 @@ public class TestTypeValidator
     {
         Symbol windowSymbol = symbolAllocator.newSymbol("sum", DOUBLE);
         FunctionHandle functionHandle = FUNCTION_MANAGER.lookupFunction(QualifiedName.of("sum"), fromTypes(DOUBLE));
-        FunctionCall functionCall = new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(columnA.toSymbolReference())); // should be columnC
 
         WindowNode.Frame frame = new WindowNode.Frame(
                 RANGE,
@@ -285,7 +285,7 @@ public class TestTypeValidator
                 Optional.empty(),
                 Optional.empty());
 
-        WindowNode.Function function = new WindowNode.Function(functionCall, functionHandle, frame);
+        WindowNode.Function function = new WindowNode.Function(call("sum", functionHandle, BIGINT, new VariableReferenceExpression(columnA.getName(), BIGINT)), frame);
 
         WindowNode.Specification specification = new WindowNode.Specification(ImmutableList.of(), Optional.empty());
 
@@ -306,7 +306,6 @@ public class TestTypeValidator
     {
         Symbol windowSymbol = symbolAllocator.newSymbol("sum", DOUBLE);
         FunctionHandle functionHandle = FUNCTION_MANAGER.lookupFunction(QualifiedName.of("sum"), fromTypes(BIGINT)); // should be DOUBLE
-        FunctionCall functionCall = new FunctionCall(QualifiedName.of("sum"), ImmutableList.of(columnC.toSymbolReference()));
 
         WindowNode.Frame frame = new WindowNode.Frame(
                 RANGE,
@@ -317,7 +316,7 @@ public class TestTypeValidator
                 Optional.empty(),
                 Optional.empty());
 
-        WindowNode.Function function = new WindowNode.Function(functionCall, functionHandle, frame);
+        WindowNode.Function function = new WindowNode.Function(call("sum", functionHandle, BIGINT, new VariableReferenceExpression(columnC.getName(), DOUBLE)), frame);
 
         WindowNode.Specification specification = new WindowNode.Specification(ImmutableList.of(), Optional.empty());
 
