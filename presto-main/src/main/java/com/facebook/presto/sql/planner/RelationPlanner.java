@@ -29,6 +29,7 @@ import com.facebook.presto.sql.analyzer.Field;
 import com.facebook.presto.sql.analyzer.RelationId;
 import com.facebook.presto.sql.analyzer.RelationType;
 import com.facebook.presto.sql.analyzer.Scope;
+import com.facebook.presto.sql.planner.optimizations.JoinNodeUtil;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.planner.plan.ExceptNode;
@@ -322,7 +323,7 @@ class RelationPlanner
         }
 
         PlanNode root = new JoinNode(idAllocator.getNextId(),
-                JoinNode.Type.typeConvert(node.getType()),
+                JoinNodeUtil.typeConvert(node.getType()),
                 leftPlanBuilder.getRoot(),
                 rightPlanBuilder.getRoot(),
                 equiClauses.build(),
@@ -358,7 +359,7 @@ class RelationPlanner
             Expression joinedFilterCondition = ExpressionUtils.and(complexJoinExpressions);
             Expression rewrittenFilterCondition = translationMap.rewrite(joinedFilterCondition);
             root = new JoinNode(idAllocator.getNextId(),
-                    JoinNode.Type.typeConvert(node.getType()),
+                    JoinNodeUtil.typeConvert(node.getType()),
                     leftPlanBuilder.getRoot(),
                     rightPlanBuilder.getRoot(),
                     equiClauses.build(),
@@ -465,7 +466,7 @@ class RelationPlanner
 
         JoinNode join = new JoinNode(
                 idAllocator.getNextId(),
-                JoinNode.Type.typeConvert(node.getType()),
+                JoinNodeUtil.typeConvert(node.getType()),
                 leftCoercion,
                 rightCoercion,
                 clauses.build(),
