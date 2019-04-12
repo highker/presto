@@ -42,7 +42,6 @@ import com.facebook.presto.spi.relation.SpecialFormExpression.Form;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.InterpretedFunctionInvoker;
-import com.facebook.presto.sql.planner.RowExpressionInterpreter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.PeekingIterator;
@@ -627,13 +626,13 @@ public final class RowExpressionDomainTranslator
                 left = leftExpression;
             }
             else {
-                left = new RowExpressionInterpreter(leftExpression, metadata, session, true).optimize();
+                left = leftExpression;
             }
             if (rightExpression instanceof VariableReferenceExpression) {
                 right = rightExpression;
             }
             else {
-                right = new RowExpressionInterpreter(rightExpression, metadata, session, true).optimize();
+                right = rightExpression;
             }
 
             if (left instanceof RowExpression == right instanceof RowExpression) {

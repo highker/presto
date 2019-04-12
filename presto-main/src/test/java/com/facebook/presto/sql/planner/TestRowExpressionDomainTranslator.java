@@ -1328,7 +1328,7 @@ public class TestRowExpressionDomainTranslator
 
     private void testSimpleComparison(RowExpression expression, VariableReferenceExpression input, Domain domain)
     {
-        ExtractionResult result = fromPredicate(expression);
+        ExtractionResult result = fromPredicate(LiteralEncoder.toRowExpression(new RowExpressionInterpreter(expression, metadata, TEST_SESSION, true).optimize(), expression.getType()));
         assertEquals(result.getRemainingExpression(), TRUE);
         TupleDomain<VariableReferenceExpression> actual = result.getTupleDomain();
         TupleDomain<VariableReferenceExpression> expected = withColumnDomains(ImmutableMap.of(input, domain));
