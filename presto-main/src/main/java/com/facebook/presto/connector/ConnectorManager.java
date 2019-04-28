@@ -39,6 +39,7 @@ import com.facebook.presto.spi.connector.ConnectorNodePartitioningProvider;
 import com.facebook.presto.spi.connector.ConnectorPageSinkProvider;
 import com.facebook.presto.spi.connector.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
+import com.facebook.presto.spi.connector.ConnectorRuleProvider;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.procedure.Procedure;
 import com.facebook.presto.spi.relation.DomainTranslator;
@@ -49,6 +50,7 @@ import com.facebook.presto.split.PageSourceManager;
 import com.facebook.presto.split.RecordPageSourceProvider;
 import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.sql.planner.NodePartitioningManager;
+import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.sql.relational.ConnectorRowExpressionService;
 import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.relational.RowExpressionOptimizer;
@@ -100,6 +102,7 @@ public class ConnectorManager
     private final NodeInfo nodeInfo;
     private final TransactionManager transactionManager;
     private final DomainTranslator domainTranslator;
+    private final PlanOptimizers planOptimizers;
 
     @GuardedBy("this")
     private final ConcurrentMap<String, ConnectorFactory> connectorFactories = new ConcurrentHashMap<>();
@@ -118,6 +121,7 @@ public class ConnectorManager
             PageSourceManager pageSourceManager,
             IndexManager indexManager,
             NodePartitioningManager nodePartitioningManager,
+            PlanOptimizers planOptimizers,
             PageSinkManager pageSinkManager,
             HandleResolver handleResolver,
             InternalNodeManager nodeManager,
@@ -135,6 +139,7 @@ public class ConnectorManager
         this.pageSourceManager = pageSourceManager;
         this.indexManager = indexManager;
         this.nodePartitioningManager = nodePartitioningManager;
+        this.planOptimizers = planOptimizers;
         this.pageSinkManager = pageSinkManager;
         this.handleResolver = handleResolver;
         this.nodeManager = nodeManager;
@@ -267,6 +272,9 @@ public class ConnectorManager
         connector.getPartitioningProvider()
                 .ifPresent(partitioningProvider -> nodePartitioningManager.addPartitioningProvider(connectorId, partitioningProvider));
 
+        connector.getOptimizerProvider()
+                .ifPresent(planOptimizers::addOptimizerProvider);
+
         metadataManager.getProcedureRegistry().addProcedures(connectorId, connector.getProcedures());
 
         connector.getAccessControl()
@@ -346,6 +354,7 @@ public class ConnectorManager
         private final Optional<ConnectorIndexProvider> indexProvider;
         private final Optional<ConnectorNodePartitioningProvider> partitioningProvider;
         private final Optional<ConnectorAccessControl> accessControl;
+        private final Optional<ConnectorRuleProvider> optimizerProvider;
         private final List<PropertyMetadata<?>> sessionProperties;
         private final List<PropertyMetadata<?>> tableProperties;
         private final List<PropertyMetadata<?>> schemaProperties;
@@ -415,6 +424,15 @@ public class ConnectorManager
             catch (UnsupportedOperationException ignored) {
             }
             this.partitioningProvider = Optional.ofNullable(partitioningProvider);
+
+            ConnectorRuleProvider optimizerProvider = null;
+            try {
+                optimizerProvider = connector.getConnectorRuleProvider();
+                requireNonNull(optimizerProvider, format("Connector %s returned a null optimizer provider", connectorId));
+            }
+            catch (UnsupportedOperationException ignored) {
+            }
+            this.optimizerProvider = Optional.ofNullable(optimizerProvider);
 
             ConnectorAccessControl accessControl = null;
             try {
@@ -488,6 +506,11 @@ public class ConnectorManager
         public Optional<ConnectorNodePartitioningProvider> getPartitioningProvider()
         {
             return partitioningProvider;
+        }
+
+        public Optional<ConnectorRuleProvider> getOptimizerProvider()
+        {
+            return optimizerProvider;
         }
 
         public Optional<ConnectorAccessControl> getAccessControl()

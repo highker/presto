@@ -22,6 +22,12 @@ import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.client.ServerInfo;
 import com.facebook.presto.connector.ConnectorManager;
 import com.facebook.presto.connector.system.SystemConnectorModule;
+import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.CostCalculatorUsingExchanges;
+import com.facebook.presto.cost.CostCalculatorWithEstimatedExchanges;
+import com.facebook.presto.cost.CostComparator;
+import com.facebook.presto.cost.StatsCalculatorModule;
+import com.facebook.presto.cost.TaskCountEstimator;
 import com.facebook.presto.event.SplitMonitor;
 import com.facebook.presto.execution.ExecutionFailureInfo;
 import com.facebook.presto.execution.ExplainAnalyzeContext;
@@ -115,6 +121,7 @@ import com.facebook.presto.sql.parser.SqlParserOptions;
 import com.facebook.presto.sql.planner.CompilerConfig;
 import com.facebook.presto.sql.planner.LocalExecutionPlanner;
 import com.facebook.presto.sql.planner.NodePartitioningManager;
+import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.sql.relational.RowExpressionDomainTranslator;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
@@ -380,6 +387,17 @@ public class ServerMainModule
 
         // handle resolver
         binder.install(new HandleJsonModule());
+
+        // statistics calculator
+        binder.install(new StatsCalculatorModule());
+
+        // cost calculator
+        binder.bind(TaskCountEstimator.class).in(Scopes.SINGLETON);
+        binder.bind(CostCalculator.class).to(CostCalculatorUsingExchanges.class).in(Scopes.SINGLETON);
+        binder.bind(CostCalculator.class).annotatedWith(CostCalculator.EstimatedExchanges.class).to(CostCalculatorWithEstimatedExchanges.class).in(Scopes.SINGLETON);
+        binder.bind(CostComparator.class).in(Scopes.SINGLETON);
+
+        binder.bind(PlanOptimizers.class).in(Scopes.SINGLETON);
 
         // connector
         binder.bind(ConnectorManager.class).in(Scopes.SINGLETON);

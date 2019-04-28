@@ -14,13 +14,6 @@
 package com.facebook.presto.server;
 
 import com.facebook.presto.client.QueryResults;
-import com.facebook.presto.cost.CostCalculator;
-import com.facebook.presto.cost.CostCalculator.EstimatedExchanges;
-import com.facebook.presto.cost.CostCalculatorUsingExchanges;
-import com.facebook.presto.cost.CostCalculatorWithEstimatedExchanges;
-import com.facebook.presto.cost.CostComparator;
-import com.facebook.presto.cost.StatsCalculatorModule;
-import com.facebook.presto.cost.TaskCountEstimator;
 import com.facebook.presto.event.QueryMonitor;
 import com.facebook.presto.event.QueryMonitorConfig;
 import com.facebook.presto.execution.AddColumnTask;
@@ -92,7 +85,6 @@ import com.facebook.presto.spi.resourceGroups.QueryType;
 import com.facebook.presto.spi.security.SelectedRole;
 import com.facebook.presto.sql.analyzer.QueryExplainer;
 import com.facebook.presto.sql.planner.PlanFragmenter;
-import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.sql.tree.AddColumn;
 import com.facebook.presto.sql.tree.Call;
 import com.facebook.presto.sql.tree.Commit;
@@ -237,21 +229,11 @@ public class CoordinatorModule
         // node monitor
         binder.bind(ClusterSizeMonitor.class).in(Scopes.SINGLETON);
 
-        // statistics calculator
-        binder.install(new StatsCalculatorModule());
-
-        // cost calculator
-        binder.bind(TaskCountEstimator.class).in(Scopes.SINGLETON);
-        binder.bind(CostCalculator.class).to(CostCalculatorUsingExchanges.class).in(Scopes.SINGLETON);
-        binder.bind(CostCalculator.class).annotatedWith(EstimatedExchanges.class).to(CostCalculatorWithEstimatedExchanges.class).in(Scopes.SINGLETON);
-        binder.bind(CostComparator.class).in(Scopes.SINGLETON);
-
         // cluster statistics
         jaxrsBinder(binder).bind(ClusterStatsResource.class);
 
         // planner
         binder.bind(PlanFragmenter.class).in(Scopes.SINGLETON);
-        binder.bind(PlanOptimizers.class).in(Scopes.SINGLETON);
 
         // query explainer
         binder.bind(QueryExplainer.class).in(Scopes.SINGLETON);

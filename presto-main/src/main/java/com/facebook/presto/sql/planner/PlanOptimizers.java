@@ -13,12 +13,17 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostCalculator;
 import com.facebook.presto.cost.CostCalculator.EstimatedExchanges;
 import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.cost.TaskCountEstimator;
+import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.spi.ConnectorRule;
+import com.facebook.presto.spi.connector.ConnectorRuleProvider;
+import com.facebook.presto.spi.plan.PlanNode;
 import com.facebook.presto.split.PageSourceManager;
 import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
@@ -129,12 +134,13 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 public class PlanOptimizers
 {
-    private final List<PlanOptimizer> optimizers;
+    private final List<PlanOptimizer> optimizers = new ArrayList<>();
     private final RuleStatsRecorder ruleStats = new RuleStatsRecorder();
     private final OptimizerStatsRecorder optimizerStats = new OptimizerStatsRecorder();
     private final MBeanExporter exporter;
@@ -521,11 +527,48 @@ public class PlanOptimizers
                 costCalculator,
                 new TranslateExpressions(metadata, sqlParser).rules()));
 
-        this.optimizers = builder.build();
+        this.optimizers.addAll(builder.build());
     }
 
     public List<PlanOptimizer> get()
     {
         return optimizers;
+    }
+
+    public void addOptimizerProvider(ConnectorRuleProvider connectorRuleProvider)
+    {
+        Set<ConnectorRule> connectorRules = connectorRuleProvider.createRuleSet();
+        for (ConnectorRule connectorRule : connectorRules) {
+            optimizers.add(new ConnectorPlanOptimizer(connectorRule));
+        }
+    }
+
+    public static final class ConnectorPlanOptimizer
+            implements PlanOptimizer
+    {
+        private final ConnectorRule connectorRule;
+
+        public ConnectorPlanOptimizer(ConnectorRule connectorRule)
+        {
+            this.connectorRule = connectorRule;
+        }
+
+        @Override
+        public PlanNode optimize(PlanNode plan,
+                Session session,
+                TypeProvider types,
+                SymbolAllocator symbolAllocator,
+                PlanNodeIdAllocator idAllocator,
+                WarningCollector warningCollector)
+        {
+            if (connectorRule.match(plan)) {
+                return connectorRule.apply(plan);
+            }
+            ImmutableList.Builder<PlanNode> children = ImmutableList.builder();
+            for (PlanNode child : plan.getSources()) {
+                children.add(optimize(child, session, types, symbolAllocator, idAllocator, warningCollector));
+            }
+            return plan.replaceChildren(children.build());
+        }
     }
 }
