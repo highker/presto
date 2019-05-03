@@ -65,7 +65,7 @@ public class TestValidateAggregationsWithDefaultValues
         ConnectorId connectorId = getCurrentConnectorId();
         TpchTableHandle nationTpchTableHandle = new TpchTableHandle("nation", 1.0);
         TableHandle nationTableHandle = new TableHandle(
-                connectorId,
+                connectorId.getCatalogName(),
                 nationTpchTableHandle,
                 TestingTransactionHandle.create(),
                 Optional.of(new TpchTableLayoutHandle(nationTpchTableHandle, TupleDomain.all())));

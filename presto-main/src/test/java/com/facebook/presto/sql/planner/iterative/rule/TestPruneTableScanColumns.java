@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.sql.planner.iterative.rule;
 
-import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
@@ -51,7 +50,7 @@ public class TestPruneTableScanColumns
                             Assignments.of(p.symbol("x"), totalprice.toSymbolReference()),
                             p.tableScan(
                                     new TableHandle(
-                                            new ConnectorId("local"),
+                                            "local",
                                             new TpchTableHandle("orders", TINY_SCALE_FACTOR),
                                             TestingTransactionHandle.create(),
                                             Optional.empty()),

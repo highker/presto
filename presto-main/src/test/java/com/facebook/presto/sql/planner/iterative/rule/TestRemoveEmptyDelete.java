@@ -39,7 +39,7 @@ public class TestRemoveEmptyDelete
                         new SchemaTableName("sch", "tab"),
                         p.tableScan(
                                 new TableHandle(
-                                        CONNECTOR_ID,
+                                        CONNECTOR_ID.getCatalogName(),
                                         new TpchTableHandle("nation", 1.0),
                                         TestingTransactionHandle.create(),
                                         Optional.empty()),

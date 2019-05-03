@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.execution.scheduler;
 
-import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.cost.StatsAndCosts;
 import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.operator.StageExecutionDescriptor;
@@ -186,7 +185,7 @@ public class TestPhasedExecutionSchedule
         PlanNode tableScan = new TableScanNode(
                 new PlanNodeId(name),
                 new TableHandle(
-                        new ConnectorId("test"),
+                        "test",
                         new TestingTableHandle(),
                         TestingTransactionHandle.create(),
                         Optional.empty()),
@@ -240,7 +239,7 @@ public class TestPhasedExecutionSchedule
         PlanNode planNode = new TableScanNode(
                 new PlanNodeId(name),
                 new TableHandle(
-                        new ConnectorId("test"),
+                        "test",
                         new TestingTableHandle(),
                         TestingTransactionHandle.create(),
                         Optional.empty()),

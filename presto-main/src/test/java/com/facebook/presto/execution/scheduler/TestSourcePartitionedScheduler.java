@@ -455,7 +455,7 @@ public class TestSourcePartitionedScheduler
         // table scan with splitCount splits
         TableScanNode tableScan = new TableScanNode(
                 TABLE_SCAN_NODE_ID,
-                new TableHandle(CONNECTOR_ID, new TestingTableHandle(), TestingTransactionHandle.create(), Optional.empty()),
+                new TableHandle(CONNECTOR_ID.getCatalogName(), new TestingTableHandle(), TestingTransactionHandle.create(), Optional.empty()),
                 ImmutableList.of(symbol),
                 ImmutableMap.of(symbol, new TestingColumnHandle("column")),
                 false);

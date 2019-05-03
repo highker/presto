@@ -40,6 +40,11 @@ public final class ConnectorId
         return catalogName;
     }
 
+    public static ConnectorId fromCatalogName(String catalogName)
+    {
+        return new ConnectorId(catalogName);
+    }
+
     @Override
     public boolean equals(Object o)
     {

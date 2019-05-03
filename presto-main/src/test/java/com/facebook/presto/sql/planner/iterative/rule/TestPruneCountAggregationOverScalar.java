@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.sql.planner.iterative.rule;
 
-import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.rule.test.BaseRuleTest;
@@ -148,7 +147,7 @@ public class TestPruneCountAggregationOverScalar
                                             Assignments.of(totalPrice, totalPrice.toSymbolReference()),
                                             p.tableScan(
                                                     new TableHandle(
-                                                            new ConnectorId("local"),
+                                                            "local",
                                                             new TpchTableHandle("orders", TINY_SCALE_FACTOR),
                                                             TestingTransactionHandle.create(),
                                                             Optional.empty()),

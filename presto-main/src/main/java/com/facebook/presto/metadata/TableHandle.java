@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.metadata;
 
-import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
@@ -28,7 +27,7 @@ import static java.util.Objects.requireNonNull;
 
 public final class TableHandle
 {
-    private final ConnectorId connectorId;
+    private final String catalog;
     private final ConnectorTableHandle connectorHandle;
     private final ConnectorTransactionHandle transaction;
 
@@ -38,21 +37,21 @@ public final class TableHandle
 
     @JsonCreator
     public TableHandle(
-            @JsonProperty("connectorId") ConnectorId connectorId,
+            @JsonProperty("catalog") String catalog,
             @JsonProperty("connectorHandle") ConnectorTableHandle connectorHandle,
             @JsonProperty("transaction") ConnectorTransactionHandle transaction,
             @JsonProperty("connectorTableLayout") Optional<ConnectorTableLayoutHandle> layout)
     {
-        this.connectorId = requireNonNull(connectorId, "connectorId is null");
+        this.catalog = requireNonNull(catalog, "catalog is null");
         this.connectorHandle = requireNonNull(connectorHandle, "connectorHandle is null");
         this.transaction = requireNonNull(transaction, "transaction is null");
         this.layout = requireNonNull(layout, "layout is null");
     }
 
     @JsonProperty
-    public ConnectorId getConnectorId()
+    public String getCatalog()
     {
-        return connectorId;
+        return catalog;
     }
 
     @JsonProperty
@@ -87,7 +86,7 @@ public final class TableHandle
         // Since equals method is not implemented for ConnectorTableLayoutHandle in some connectors, comparing layout might cause iterative optimizer fail to converge.
         // Instead, for now we compare the existence of layout in table handles.
         // This works for now since the engine only pushdown filter to connector once during optimization.
-        return Objects.equals(connectorId, other.connectorId) &&
+        return Objects.equals(catalog, other.catalog) &&
                 Objects.equals(connectorHandle, other.connectorHandle) &&
                 Objects.equals(transaction, other.transaction) &&
                 Objects.equals(layout.isPresent(), other.layout.isPresent());
@@ -96,14 +95,14 @@ public final class TableHandle
     @Override
     public int hashCode()
     {
-        return Objects.hash(connectorId, connectorHandle, transaction, layout);
+        return Objects.hash(catalog, connectorHandle, transaction, layout);
     }
 
     @Override
     public String toString()
     {
         return toStringHelper(this)
-                .add("connectorId", connectorId)
+                .add("catalog", catalog)
                 .add("connectorHandle", connectorHandle)
                 .add("layout", layout)
                 .toString();

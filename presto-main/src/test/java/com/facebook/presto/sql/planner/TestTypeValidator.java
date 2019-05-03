@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.sql.planner;
 
-import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.metadata.FunctionManager;
 import com.facebook.presto.metadata.TableHandle;
@@ -72,7 +71,7 @@ import static com.facebook.presto.sql.relational.Expressions.call;
 public class TestTypeValidator
 {
     private static final TableHandle TEST_TABLE_HANDLE = new TableHandle(
-            new ConnectorId("test"),
+            "test",
             new TestingTableHandle(),
             TestingTransactionHandle.create(),
             Optional.empty());

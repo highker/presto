@@ -275,7 +275,7 @@ public class LogicalPlanner
 
         TableStatisticsMetadata tableStatisticsMetadata = metadata.getStatisticsCollectionMetadata(
                 session,
-                targetTable.getConnectorId().getCatalogName(),
+                targetTable.getCatalog(),
                 tableMetadata.getMetadata());
 
         TableStatisticAggregation tableStatisticAggregation = statisticsAggregationPlanner.createStatisticsAggregation(tableStatisticsMetadata, columnNameToSymbol.build());
@@ -381,7 +381,7 @@ public class LogicalPlanner
         plan = new RelationPlan(projectNode, scope, projectNode.getOutputSymbols());
 
         Optional<NewTableLayout> newTableLayout = metadata.getInsertLayout(session, insert.getTarget());
-        String catalogName = insert.getTarget().getConnectorId().getCatalogName();
+        String catalogName = insert.getTarget().getCatalog();
         TableStatisticsMetadata statisticsMetadata = metadata.getStatisticsCollectionMetadataForWrite(session, catalogName, tableMetadata.getMetadata());
 
         return createTableWriterPlan(

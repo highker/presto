@@ -62,12 +62,12 @@ public class TestPickTableLayout
         TpchTableHandle orderTpchTableHandle = new TpchTableHandle("orders", 1.0);
 
         nationTableHandle = new TableHandle(
-                connectorId,
+                connectorId.getCatalogName(),
                 nationTpchTableHandle,
                 TestingTransactionHandle.create(),
                 Optional.of(new TpchTableLayoutHandle(nationTpchTableHandle, TupleDomain.all())));
         ordersTableHandle = new TableHandle(
-                connectorId,
+                connectorId.getCatalogName(),
                 orderTpchTableHandle,
                 TestingTransactionHandle.create(),
                 Optional.of(new TpchTableLayoutHandle(orderTpchTableHandle, TupleDomain.all())));
@@ -141,7 +141,7 @@ public class TestPickTableLayout
         tester().assertThat(pickTableLayout.pickTableLayoutWithoutPredicate())
                 .on(p -> p.tableScan(
                         new TableHandle(
-                                connectorId,
+                                connectorId.getCatalogName(),
                                 new TpchTableHandle("nation", 1.0),
                                 TestingTransactionHandle.create(),
                                 Optional.empty()),
