@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import java.util.Optional;
 
-import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public final class TableHandle
@@ -101,10 +100,12 @@ public final class TableHandle
     @Override
     public String toString()
     {
-        return toStringHelper(this)
-                .add("catalog", catalog)
-                .add("connectorHandle", connectorHandle)
-                .add("layout", layout)
-                .toString();
+        StringBuilder stringBuilder = new StringBuilder(this.getClass().getSimpleName());
+        stringBuilder.append(" {");
+        stringBuilder.append("catalog='").append(catalog).append('\'');
+        stringBuilder.append(", connectorHandle='").append(connectorHandle).append('\'');
+        stringBuilder.append(", layout='").append(layout).append('\'');
+        stringBuilder.append('}');
+        return stringBuilder.toString();
     }
 }
