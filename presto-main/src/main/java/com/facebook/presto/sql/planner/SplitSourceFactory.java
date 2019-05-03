@@ -47,6 +47,7 @@ import com.facebook.presto.sql.planner.plan.StatisticsWriterNode;
 import com.facebook.presto.sql.planner.plan.TableFinishNode;
 import com.facebook.presto.sql.planner.plan.TableScanNode;
 import com.facebook.presto.sql.planner.plan.TableWriterNode;
+import com.facebook.presto.sql.planner.plan.TemporaryTableScanNode;
 import com.facebook.presto.sql.planner.plan.TopNNode;
 import com.facebook.presto.sql.planner.plan.TopNRowNumberNode;
 import com.facebook.presto.sql.planner.plan.UnionNode;
@@ -122,17 +123,32 @@ public class SplitSourceFactory
         @Override
         public Map<PlanNodeId, SplitSource> visitTableScan(TableScanNode node, Void context)
         {
-            // get dataSource for table
-            Supplier<SplitSource> splitSourceSupplier = () -> splitSourceProvider.getSplits(
-                    session,
-                    node.getTable(),
-                    stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_SCHEDULING : UNGROUPED_SCHEDULING);
-
-            SplitSource splitSource = node.isTemporaryTable() ? new LazySplitSource(splitSourceSupplier) : splitSourceSupplier.get();
+            SplitSource splitSource = getSplitSourceSupplier(node).get();
 
             splitSources.add(splitSource);
 
             return ImmutableMap.of(node.getId(), splitSource);
+        }
+
+        @Override
+        public Map<PlanNodeId, SplitSource> visitTemporaryTableScan(TemporaryTableScanNode node, Void context)
+        {
+            SplitSource splitSource = new LazySplitSource(getSplitSourceSupplier(node));
+
+            splitSources.add(splitSource);
+
+            return ImmutableMap.of(node.getId(), splitSource);
+        }
+
+        /**
+         * Get dataSource for table
+         */
+        private Supplier<SplitSource> getSplitSourceSupplier(TableScanNode node)
+        {
+            return () -> splitSourceProvider.getSplits(
+                    session,
+                    node.getTable(),
+                    stageExecutionDescriptor.isScanGroupedExecution(node.getId()) ? GROUPED_SCHEDULING : UNGROUPED_SCHEDULING);
         }
 
         @Override
