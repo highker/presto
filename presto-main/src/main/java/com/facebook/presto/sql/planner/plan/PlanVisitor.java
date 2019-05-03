@@ -63,6 +63,11 @@ public abstract class PlanVisitor<R, C>
         return visitPlan(node, context);
     }
 
+    public R visitTemporaryTableScan(TemporaryTableScanNode node, C context)
+    {
+        return visitTableScan(node, context);
+    }
+
     public R visitExplainAnalyze(ExplainAnalyzeNode node, C context)
     {
         return visitPlan(node, context);

@@ -62,6 +62,7 @@ import com.facebook.presto.sql.planner.plan.TableFinishNode;
 import com.facebook.presto.sql.planner.plan.TableScanNode;
 import com.facebook.presto.sql.planner.plan.TableWriterNode;
 import com.facebook.presto.sql.planner.plan.TableWriterNode.InsertHandle;
+import com.facebook.presto.sql.planner.plan.TemporaryTableScanNode;
 import com.facebook.presto.sql.planner.plan.TopNRowNumberNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
 import com.facebook.presto.sql.planner.plan.WindowNode;
@@ -464,7 +465,7 @@ public class PlanFragmenter
                     ImmutableList.copyOf(symbolToColumnMap.values()),
                     Optional.of(partitioningMetadata));
 
-            TableScanNode scan = createTemporaryTableScan(
+            TemporaryTableScanNode scan = createTemporaryTableScan(
                     temporaryTableHandle,
                     exchange.getOutputSymbols(),
                     symbolToColumnMap,
@@ -525,7 +526,7 @@ public class PlanFragmenter
             return result.build();
         }
 
-        private TableScanNode createTemporaryTableScan(
+        private TemporaryTableScanNode createTemporaryTableScan(
                 TableHandle tableHandle,
                 List<Symbol> outputSymbols,
                 Map<Symbol, ColumnMetadata> symbolToColumnMap,
@@ -552,14 +553,7 @@ public class PlanFragmenter
             Map<Symbol, ColumnHandle> assignments = outputSymbols.stream()
                     .collect(toImmutableMap(identity(), symbol -> columnHandles.get(outputColumns.get(symbol).getName())));
 
-            return new TableScanNode(
-                    idAllocator.getNextId(),
-                    selectedLayout.getLayout().getNewTableHandle(),
-                    outputSymbols,
-                    assignments,
-                    TupleDomain.all(),
-                    TupleDomain.all(),
-                    true);
+            return new TemporaryTableScanNode(idAllocator.getNextId(), selectedLayout.getLayout().getNewTableHandle(), outputSymbols, assignments);
         }
 
         private TableFinishNode createTemporaryTableWrite(
@@ -1066,10 +1060,7 @@ public class PlanFragmenter
         @Override
         public PlanNode visitTableScan(TableScanNode node, RewriteContext<Void> context)
         {
-            PartitioningHandle partitioning = metadata.getLayout(session, node.getTable())
-                    .getTablePartitioning()
-                    .map(TablePartitioning::getPartitioningHandle)
-                    .orElse(SOURCE_DISTRIBUTION);
+            PartitioningHandle partitioning = getPartitioningHandle(node);
 
             if (partitioning.equals(fragmentPartitioningHandle)) {
                 // do nothing if the current scan node's partitioning matches the fragment's
@@ -1083,8 +1074,29 @@ public class PlanFragmenter
                     node.getOutputSymbols(),
                     node.getAssignments(),
                     node.getCurrentConstraint(),
-                    node.getEnforcedConstraint(),
-                    node.isTemporaryTable());
+                    node.getEnforcedConstraint());
+        }
+
+        @Override
+        public PlanNode visitTemporaryTableScan(TemporaryTableScanNode node, RewriteContext<Void> context)
+        {
+            PartitioningHandle partitioning = getPartitioningHandle(node);
+
+            if (partitioning.equals(fragmentPartitioningHandle)) {
+                // do nothing if the current scan node's partitioning matches the fragment's
+                return node;
+            }
+
+            TableHandle newTableHandle = metadata.getAlternativeTableHandle(session, node.getTable(), fragmentPartitioningHandle);
+            return new TemporaryTableScanNode(node.getId(), newTableHandle, node.getOutputSymbols(), node.getAssignments());
+        }
+
+        private PartitioningHandle getPartitioningHandle(TableScanNode node)
+        {
+            return metadata.getLayout(session, node.getTable())
+                    .getTablePartitioning()
+                    .map(TablePartitioning::getPartitioningHandle)
+                    .orElse(SOURCE_DISTRIBUTION);
         }
     }
 
