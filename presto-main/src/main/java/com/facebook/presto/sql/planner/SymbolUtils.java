@@ -13,14 +13,23 @@
  */
 package com.facebook.presto.sql.planner;
 
-public class NoOpSymbolResolver
-        implements SymbolResolver
-{
-    public static final NoOpSymbolResolver INSTANCE = new NoOpSymbolResolver();
+import com.facebook.presto.sql.tree.Expression;
+import com.facebook.presto.sql.tree.SymbolReference;
 
-    @Override
-    public Object getValue(Symbol symbol)
+import static com.google.common.base.Preconditions.checkArgument;
+
+public class SymbolUtils
+{
+    private SymbolUtils() {}
+
+    public static Symbol from(Expression expression)
     {
-        return SymbolUtils.toSymbolReference(symbol);
+        checkArgument(expression instanceof SymbolReference, "Unexpected expression: %s", expression);
+        return new Symbol(((SymbolReference) expression).getName());
+    }
+
+    public static SymbolReference toSymbolReference(Symbol symbol)
+    {
+        return new SymbolReference(symbol.getName());
     }
 }

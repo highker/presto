@@ -1746,7 +1746,7 @@ public class LocalExecutionPlanner
 
         private Set<SymbolReference> getSymbolReferences(Collection<Symbol> symbols)
         {
-            return symbols.stream().map(Symbol::toSymbolReference).collect(toImmutableSet());
+            return symbols.stream().map(SymbolUtils::toSymbolReference).collect(toImmutableSet());
         }
 
         private PhysicalOperation createNestedLoopJoin(JoinNode node, LocalExecutionPlanContext context)
@@ -2527,7 +2527,7 @@ public class LocalExecutionPlanner
             List<Integer> valueChannels = new ArrayList<>();
             for (Expression argument : aggregation.getCall().getArguments()) {
                 if (!(argument instanceof LambdaExpression)) {
-                    Symbol argumentSymbol = Symbol.from(argument);
+                    Symbol argumentSymbol = SymbolUtils.from(argument);
                     valueChannels.add(source.getLayout().get(argumentSymbol));
                 }
             }
@@ -2606,7 +2606,7 @@ public class LocalExecutionPlanner
 
                 sortKeys = orderBy.getSortItems().stream()
                         .map(SortItem::getSortKey)
-                        .map(Symbol::from)
+                        .map(SymbolUtils::from)
                         .collect(toImmutableList());
 
                 sortOrders = orderBy.getSortItems().stream()

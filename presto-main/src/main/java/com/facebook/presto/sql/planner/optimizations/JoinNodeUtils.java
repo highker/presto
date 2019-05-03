@@ -18,6 +18,7 @@ import com.facebook.presto.sql.planner.plan.JoinNode.EquiJoinClause;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Join;
 
+import static com.facebook.presto.sql.planner.SymbolUtils.toSymbolReference;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.FULL;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.LEFT;
@@ -30,7 +31,7 @@ public final class JoinNodeUtils
 
     public static ComparisonExpression toExpression(EquiJoinClause clause)
     {
-        return new ComparisonExpression(EQUAL, clause.getLeft().toSymbolReference(), clause.getRight().toSymbolReference());
+        return new ComparisonExpression(EQUAL, toSymbolReference(clause.getLeft()), toSymbolReference(clause.getRight()));
     }
 
     public static JoinNode.Type typeConvert(Join.Type joinType)

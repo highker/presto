@@ -32,6 +32,7 @@ import com.facebook.presto.sql.planner.PartitioningScheme;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
+import com.facebook.presto.sql.planner.SymbolUtils;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.optimizations.PreferredProperties.PartitioningProperties;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
@@ -103,7 +104,6 @@ import static com.facebook.presto.SystemSessionProperties.isForceSingleNodeOutpu
 import static com.facebook.presto.SystemSessionProperties.isRedistributeWrites;
 import static com.facebook.presto.SystemSessionProperties.isScaleWriters;
 import static com.facebook.presto.SystemSessionProperties.preferStreamingOperators;
-import static com.facebook.presto.sql.analyzer.FeaturesConfig.PartialMergePushdownStrategy.PUSH_THROUGH_LOW_MEMORY_OPERATORS;
 import static com.facebook.presto.sql.planner.FragmentTableScanCounter.getNumberOfTableScans;
 import static com.facebook.presto.sql.planner.FragmentTableScanCounter.hasMultipleTableScans;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.FIXED_ARBITRARY_DISTRIBUTION;
@@ -1349,7 +1349,7 @@ public class AddExchanges
         Map<Symbol, Symbol> outputToInput = new HashMap<>();
         for (Map.Entry<Symbol, Expression> assignment : assignments.getMap().entrySet()) {
             if (assignment.getValue() instanceof SymbolReference) {
-                outputToInput.put(assignment.getKey(), Symbol.from(assignment.getValue()));
+                outputToInput.put(assignment.getKey(), SymbolUtils.from(assignment.getValue()));
             }
         }
         return outputToInput;

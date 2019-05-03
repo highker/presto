@@ -19,6 +19,7 @@ import com.facebook.presto.sql.planner.Partitioning.ArgumentBinding;
 import com.facebook.presto.sql.planner.PlanFragment;
 import com.facebook.presto.sql.planner.SubPlan;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.SymbolUtils;
 import com.facebook.presto.sql.planner.optimizations.JoinNodeUtils;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
@@ -547,8 +548,8 @@ public final class GraphvizPrinter
             List<Expression> joinExpressions = new ArrayList<>();
             for (IndexJoinNode.EquiJoinClause clause : node.getCriteria()) {
                 joinExpressions.add(new ComparisonExpression(ComparisonExpression.Operator.EQUAL,
-                        clause.getProbe().toSymbolReference(),
-                        clause.getIndex().toSymbolReference()));
+                        SymbolUtils.toSymbolReference(clause.getProbe()),
+                        SymbolUtils.toSymbolReference(clause.getIndex())));
             }
 
             String criteria = Joiner.on(" AND ").join(joinExpressions);

@@ -36,6 +36,7 @@ import com.facebook.presto.sql.planner.LiteralInterpreter;
 import com.facebook.presto.sql.planner.NoOpSymbolResolver;
 import com.facebook.presto.sql.planner.RowExpressionInterpreter;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.SymbolUtils;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.tree.AstVisitor;
@@ -297,7 +298,7 @@ public class FilterStatsCalculator
         protected PlanNodeStatsEstimate visitIsNotNullPredicate(IsNotNullPredicate node, Void context)
         {
             if (node.getValue() instanceof SymbolReference) {
-                Symbol symbol = Symbol.from(node.getValue());
+                Symbol symbol = SymbolUtils.from(node.getValue());
                 SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
                 PlanNodeStatsEstimate.Builder result = PlanNodeStatsEstimate.buildFrom(input);
                 result.setOutputRowCount(input.getOutputRowCount() * (1 - symbolStats.getNullsFraction()));
@@ -311,7 +312,7 @@ public class FilterStatsCalculator
         protected PlanNodeStatsEstimate visitIsNullPredicate(IsNullPredicate node, Void context)
         {
             if (node.getValue() instanceof SymbolReference) {
-                Symbol symbol = Symbol.from(node.getValue());
+                Symbol symbol = SymbolUtils.from(node.getValue());
                 SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
                 PlanNodeStatsEstimate.Builder result = PlanNodeStatsEstimate.buildFrom(input);
                 result.setOutputRowCount(input.getOutputRowCount() * symbolStats.getNullsFraction());
@@ -339,7 +340,7 @@ public class FilterStatsCalculator
                 return PlanNodeStatsEstimate.unknown();
             }
 
-            SymbolStatsEstimate valueStats = input.getSymbolStatistics(Symbol.from(node.getValue()));
+            SymbolStatsEstimate valueStats = input.getSymbolStatistics(SymbolUtils.from(node.getValue()));
             Expression lowerBound = new ComparisonExpression(GREATER_THAN_OR_EQUAL, node.getValue(), node.getMin());
             Expression upperBound = new ComparisonExpression(LESS_THAN_OR_EQUAL, node.getValue(), node.getMax());
 
@@ -390,7 +391,7 @@ public class FilterStatsCalculator
             result.setOutputRowCount(min(inEstimate.getOutputRowCount(), notNullValuesBeforeIn));
 
             if (node.getValue() instanceof SymbolReference) {
-                Symbol valueSymbol = Symbol.from(node.getValue());
+                Symbol valueSymbol = SymbolUtils.from(node.getValue());
                 SymbolStatsEstimate newSymbolStats = inEstimate.getSymbolStatistics(valueSymbol)
                         .mapDistinctValuesCount(newDistinctValuesCount -> min(newDistinctValuesCount, valueStats.getDistinctValuesCount()));
                 result.addSymbolStatistics(valueSymbol, newSymbolStats);
@@ -422,7 +423,7 @@ public class FilterStatsCalculator
             }
 
             SymbolStatsEstimate leftStats = getExpressionStats(left);
-            Optional<Symbol> leftSymbol = left instanceof SymbolReference ? Optional.of(Symbol.from(left)) : Optional.empty();
+            Optional<Symbol> leftSymbol = left instanceof SymbolReference ? Optional.of(SymbolUtils.from(left)) : Optional.empty();
             if (right instanceof Literal) {
                 Object literalValue = LiteralInterpreter.evaluate(metadata, session.toConnectorSession(), right);
                 if (literalValue == null) {
@@ -438,14 +439,14 @@ public class FilterStatsCalculator
                 return estimateExpressionToLiteralComparison(input, leftStats, leftSymbol, value, operator);
             }
 
-            Optional<Symbol> rightSymbol = right instanceof SymbolReference ? Optional.of(Symbol.from(right)) : Optional.empty();
+            Optional<Symbol> rightSymbol = right instanceof SymbolReference ? Optional.of(SymbolUtils.from(right)) : Optional.empty();
             return estimateExpressionToExpressionComparison(input, leftStats, leftSymbol, rightStats, rightSymbol, operator);
         }
 
         private Type getType(Expression expression)
         {
             if (expression instanceof SymbolReference) {
-                Symbol symbol = Symbol.from(expression);
+                Symbol symbol = SymbolUtils.from(expression);
                 return requireNonNull(types.get(symbol), () -> format("No type for symbol %s", symbol));
             }
 
@@ -465,7 +466,7 @@ public class FilterStatsCalculator
         private SymbolStatsEstimate getExpressionStats(Expression expression)
         {
             if (expression instanceof SymbolReference) {
-                Symbol symbol = Symbol.from(expression);
+                Symbol symbol = SymbolUtils.from(expression);
                 return requireNonNull(input.getSymbolStatistics(symbol), () -> format("No statistics for symbol %s", symbol));
             }
             return scalarStatsCalculator.calculate(expression, input, session, types);
