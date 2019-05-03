@@ -21,6 +21,7 @@ import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.DiscretePredicates;
 import com.facebook.presto.spi.LocalProperty;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.plan.TableHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.sql.planner.PartitioningHandle;
 import com.google.common.collect.ImmutableList;

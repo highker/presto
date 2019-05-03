@@ -15,8 +15,11 @@ package com.facebook.presto.sql.planner.plan;
 
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.matching.Property;
+import com.facebook.presto.spi.plan.FilterNode;
+import com.facebook.presto.spi.plan.PlanNode;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TableScanNode;
 import com.facebook.presto.spi.relation.RowExpression;
-import com.facebook.presto.sql.planner.Symbol;
 
 import java.util.List;
 import java.util.Optional;

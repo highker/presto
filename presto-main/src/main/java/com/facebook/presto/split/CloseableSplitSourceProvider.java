@@ -14,8 +14,8 @@
 package com.facebook.presto.split;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy;
+import com.facebook.presto.spi.plan.TableHandle;
 import io.airlift.log.Logger;
 
 import javax.annotation.concurrent.GuardedBy;

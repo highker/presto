@@ -13,9 +13,12 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
-import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.spi.ColumnHandle;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.spi.plan.IRVisitor;
+import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.plan.Symbol;
+import com.facebook.presto.spi.plan.TableHandle;
+import com.facebook.presto.spi.plan.TableScanNode;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 

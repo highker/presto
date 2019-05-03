@@ -15,7 +15,7 @@ package com.facebook.presto.redis;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.QualifiedObjectName;
-import com.facebook.presto.metadata.TableHandle;
+import com.facebook.presto.spi.plan.TableHandle;
 import com.facebook.presto.redis.util.EmbeddedRedis;
 import com.facebook.presto.redis.util.JsonEncoder;
 import com.facebook.presto.security.AllowAllAccessControl;
