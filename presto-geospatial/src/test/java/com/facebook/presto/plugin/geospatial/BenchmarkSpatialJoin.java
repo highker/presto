@@ -15,7 +15,7 @@ package com.facebook.presto.plugin.geospatial;
 
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.QualifiedObjectName;
-import com.facebook.presto.metadata.TableHandle;
+import com.facebook.presto.spi.plan.TableHandle;
 import com.facebook.presto.plugin.memory.MemoryConnectorFactory;
 import com.facebook.presto.testing.LocalQueryRunner;
 import com.facebook.presto.testing.MaterializedResult;

@@ -20,7 +20,7 @@ import com.facebook.presto.hive.HiveSessionProperties.InsertExistingPartitionsBe
 import com.facebook.presto.metadata.InsertTableHandle;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.QualifiedObjectName;
-import com.facebook.presto.metadata.TableHandle;
+import com.facebook.presto.spi.plan.TableHandle;
 import com.facebook.presto.metadata.TableLayout;
 import com.facebook.presto.metadata.TableMetadata;
 import com.facebook.presto.spi.CatalogSchemaTableName;
