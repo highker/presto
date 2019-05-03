@@ -504,7 +504,7 @@ public class IOPlanPrinter
             else if (writerTarget instanceof DeleteHandle) {
                 DeleteHandle deleteHandle = (DeleteHandle) writerTarget;
                 context.setOutputTable(new CatalogSchemaTableName(
-                        deleteHandle.getHandle().getConnectorId().getCatalogName(),
+                        deleteHandle.getHandle().getCatalog(),
                         deleteHandle.getSchemaTableName().getSchemaName(),
                         deleteHandle.getSchemaTableName().getTableName()));
             }

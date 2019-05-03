@@ -78,7 +78,7 @@ public class TableLayout
 
     public TableHandle getNewTableHandle()
     {
-        return new TableHandle(connectorId, connectorTableHandle, transactionHandle, Optional.of(layout.getHandle()));
+        return new TableHandle(connectorId.getCatalogName(), connectorTableHandle, transactionHandle, Optional.of(layout.getHandle()));
     }
 
     public Optional<TablePartitioning> getTablePartitioning()

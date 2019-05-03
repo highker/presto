@@ -80,6 +80,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import static com.facebook.presto.connector.ConnectorId.fromCatalogName;
 import static com.facebook.presto.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID;
 import static com.facebook.presto.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static com.facebook.presto.execution.scheduler.SqlQueryScheduler.createSqlQueryScheduler;
@@ -448,12 +449,12 @@ public class SqlQueryExecution
         ImmutableSet.Builder<ConnectorId> connectors = ImmutableSet.builder();
 
         for (TableHandle tableHandle : analysis.getTables()) {
-            connectors.add(tableHandle.getConnectorId());
+            connectors.add(fromCatalogName(tableHandle.getCatalog()));
         }
 
         if (analysis.getInsert().isPresent()) {
             TableHandle target = analysis.getInsert().get().getTarget();
-            connectors.add(target.getConnectorId());
+            connectors.add(fromCatalogName(target.getCatalog()));
         }
 
         return connectors.build();

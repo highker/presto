@@ -22,6 +22,7 @@ import com.facebook.presto.sql.planner.plan.TableWriterNode;
 
 import java.util.Optional;
 
+import static com.facebook.presto.connector.ConnectorId.fromCatalogName;
 import static com.google.common.base.Preconditions.checkState;
 
 public class OutputExtractor
@@ -65,7 +66,7 @@ public class OutputExtractor
                 schemaTableName = ((TableWriterNode.InsertHandle) writerTarget).getSchemaTableName();
             }
             if (writerTarget instanceof TableWriterNode.DeleteHandle) {
-                connectorId = ((TableWriterNode.DeleteHandle) writerTarget).getHandle().getConnectorId();
+                connectorId = fromCatalogName(((TableWriterNode.DeleteHandle) writerTarget).getHandle().getCatalog());
                 checkState(schemaTableName == null || schemaTableName.equals(((TableWriterNode.DeleteHandle) writerTarget).getSchemaTableName()),
                         "cannot have more than a single create, insert or delete in a query");
                 schemaTableName = ((TableWriterNode.DeleteHandle) writerTarget).getSchemaTableName();

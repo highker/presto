@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import static com.facebook.presto.connector.ConnectorId.fromCatalogName;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -64,7 +65,7 @@ public class SplitManager
 
     public SplitSource getSplits(Session session, TableHandle table, SplitSchedulingStrategy splitSchedulingStrategy)
     {
-        ConnectorId connectorId = table.getConnectorId();
+        ConnectorId connectorId = fromCatalogName(table.getCatalog());
         ConnectorSplitManager splitManager = getConnectorSplitManager(connectorId);
 
         ConnectorSession connectorSession = session.toConnectorSession(connectorId);

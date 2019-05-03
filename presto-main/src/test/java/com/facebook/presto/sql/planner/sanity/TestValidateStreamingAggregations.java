@@ -56,7 +56,7 @@ public class TestValidateStreamingAggregations
         TpchTableHandle nationTpchTableHandle = new TpchTableHandle("nation", 1.0);
         ConnectorId connectorId = getCurrentConnectorId();
         nationTableHandle = new TableHandle(
-                connectorId,
+                connectorId.getCatalogName(),
                 nationTpchTableHandle,
                 TestingTransactionHandle.create(),
                 Optional.of(new TpchTableLayoutHandle(nationTpchTableHandle, TupleDomain.all())));

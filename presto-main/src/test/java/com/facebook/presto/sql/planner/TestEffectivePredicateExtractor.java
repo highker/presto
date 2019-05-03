@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.sql.planner;
 
-import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.MetadataManager;
 import com.facebook.presto.metadata.TableHandle;
@@ -86,13 +85,13 @@ import static org.testng.Assert.assertEquals;
 public class TestEffectivePredicateExtractor
 {
     private static final TableHandle DUAL_TABLE_HANDLE = new TableHandle(
-            new ConnectorId("test"),
+            "test",
             new TestingTableHandle(),
             TestingTransactionHandle.create(),
             Optional.empty());
 
     private static final TableHandle DUAL_TABLE_HANDLE_WITH_LAYOUT = new TableHandle(
-            new ConnectorId("test"),
+            "test",
             new TestingTableHandle(),
             TestingTransactionHandle.create(),
             Optional.of(TestingHandle.INSTANCE));

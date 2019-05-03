@@ -14,7 +14,6 @@
 package com.facebook.presto.sql.planner.iterative.rule.test;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.metadata.IndexHandle;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.TableHandle;
@@ -93,6 +92,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import static com.facebook.presto.connector.ConnectorId.fromCatalogName;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
@@ -378,7 +378,7 @@ public class PlanBuilder
     public TableScanNode tableScan(List<Symbol> symbols, Map<Symbol, ColumnHandle> assignments)
     {
         TableHandle tableHandle = new TableHandle(
-                new ConnectorId("testConnector"),
+                "testConnector",
                 new TestingTableHandle(),
                 TestingTransactionHandle.create(),
                 Optional.empty());
@@ -413,7 +413,7 @@ public class PlanBuilder
     {
         TableWriterNode.DeleteHandle deleteHandle = new TableWriterNode.DeleteHandle(
                 new TableHandle(
-                        new ConnectorId("testConnector"),
+                        "testConnector",
                         new TestingTableHandle(),
                         TestingTransactionHandle.create(),
                         Optional.empty()),
@@ -496,7 +496,7 @@ public class PlanBuilder
         return new IndexSourceNode(
                 idAllocator.getNextId(),
                 new IndexHandle(
-                        tableHandle.getConnectorId(),
+                        fromCatalogName(tableHandle.getCatalog()),
                         TestingConnectorTransactionHandle.INSTANCE,
                         TestingConnectorIndexHandle.INSTANCE),
                 tableHandle,
