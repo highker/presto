@@ -18,6 +18,7 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.SymbolUtils;
 import com.facebook.presto.sql.planner.SymbolsExtractor;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.WindowNode;
@@ -92,7 +93,7 @@ public class WindowFunctionMatcher
                         RowExpression actualExpression = actualExpressions.get(i);
                         if (!isExpression(actualExpression)) {
                             SymbolAliases.Builder builder = SymbolAliases.builder();
-                            SymbolsExtractor.extractUnique(expectedExpression).forEach(symbol -> builder.put(symbol.getName(), symbol.toSymbolReference()));
+                            SymbolsExtractor.extractUnique(expectedExpression).forEach(symbol -> builder.put(symbol.getName(), SymbolUtils.toSymbolReference(symbol)));
                             if (!new RowExpressionVerifier(builder.build(), metadata, session).process(expectedExpression, actualExpression)) {
                                 return false;
                             }

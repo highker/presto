@@ -18,6 +18,7 @@ import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.planner.OrderingScheme;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.SymbolUtils;
 import com.facebook.presto.sql.planner.assertions.ExpectedValueProvider;
 import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
 import com.facebook.presto.sql.planner.iterative.rule.test.BaseRuleTest;
@@ -223,8 +224,8 @@ public class TestPruneWindowColumns
                                                 Optional.of(startValue1),
                                                 CURRENT_ROW,
                                                 Optional.of(endValue1),
-                                                Optional.of(startValue1.toSymbolReference()).map(Expression::toString),
-                                                Optional.of(endValue2.toSymbolReference()).map(Expression::toString))),
+                                                Optional.of(SymbolUtils.toSymbolReference(startValue1)).map(Expression::toString),
+                                                Optional.of(SymbolUtils.toSymbolReference(endValue2)).map(Expression::toString))),
                                 output2,
                                 new WindowNode.Function(
                                         call(FUNCTION_NAME, FUNCTION_HANDLE, BIGINT, new VariableReferenceExpression(input2.getName(), BIGINT)),
@@ -234,8 +235,8 @@ public class TestPruneWindowColumns
                                                 Optional.of(startValue2),
                                                 CURRENT_ROW,
                                                 Optional.of(endValue2),
-                                                Optional.of(startValue2.toSymbolReference()).map(Expression::toString),
-                                                Optional.of(endValue2.toSymbolReference()).map(Expression::toString)))),
+                                                Optional.of(SymbolUtils.toSymbolReference(startValue2)).map(Expression::toString),
+                                                Optional.of(SymbolUtils.toSymbolReference(endValue2)).map(Expression::toString)))),
                         hash,
                         p.values(
                                 inputs.stream()
