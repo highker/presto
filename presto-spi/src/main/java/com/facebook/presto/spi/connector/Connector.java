@@ -132,7 +132,7 @@ public interface Connector
         return emptyList();
     }
 
-    default ConnectorRuleProvider getConnectorOptimizerProvider()
+    default ConnectorRuleProvider getConnectorRuleProvider()
     {
         throw new UnsupportedOperationException();
     }

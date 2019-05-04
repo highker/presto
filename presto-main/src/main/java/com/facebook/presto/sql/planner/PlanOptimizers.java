@@ -135,12 +135,13 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 public class PlanOptimizers
 {
-    private List<PlanOptimizer> optimizers;
+    private final List<PlanOptimizer> optimizers = new ArrayList<>();
     private final RuleStatsRecorder ruleStats = new RuleStatsRecorder();
     private final OptimizerStatsRecorder optimizerStats = new OptimizerStatsRecorder();
     private final MBeanExporter exporter;
@@ -527,7 +528,7 @@ public class PlanOptimizers
                 costCalculator,
                 new TranslateExpressions(metadata, sqlParser).rules()));
 
-        this.optimizers = builder.build();
+        this.optimizers.addAll(builder.build());
     }
 
     public List<PlanOptimizer> get()
@@ -537,28 +538,39 @@ public class PlanOptimizers
 
     public void addOptimizerProvider(StatsCalculator statsCalculator, CostCalculator costCalculator, ConnectorRuleProvider connectorRuleProvider)
     {
-        Set<ConnectorRule> connectorRules = connectorRuleProvider.createRuleSet();
+        Set<ConnectorRule<?>> connectorRules = connectorRuleProvider.createRuleSet();
         ImmutableSet.Builder<Rule<?>> rules = ImmutableSet.builder();
-        for (ConnectorRule connectorRule : connectorRules) {
-            rules.add(new Rule<PlanNode>() {
-                @Override
-                public Pattern<PlanNode> getPattern()
-                {
-                    return new TypeOfPattern(connectorRule.getNodeType());
-                }
-
-                @Override
-                public Result apply(PlanNode node, Captures captures, Context context)
-                {
-                    ConnectorRule.Result result = connectorRule.apply(node);
-                    if (result.isEmpty()) {
-                        return Result.empty();
-                    }
-                    return Result.ofPlanNode(result.getTransformedPlan());
-                }
-            });
+        for (ConnectorRule<?> connectorRule : connectorRules) {
+            rules.add(new DelegateRule(connectorRule));
         }
         PlanOptimizer optimizer = new IterativeOptimizer(ruleStats, statsCalculator, costCalculator, rules.build());
-        optimizers = ImmutableList.<PlanOptimizer>builder().addAll(optimizers).add(optimizer).build();
+        optimizers.add(optimizer);
+    }
+
+    private static final class DelegateRule
+            implements Rule<PlanNode>
+    {
+        private final ConnectorRule connectorRule;
+
+        DelegateRule(ConnectorRule connectorRule)
+        {
+            this.connectorRule = connectorRule;
+        }
+
+        @Override
+        public Pattern<PlanNode> getPattern()
+        {
+            return new TypeOfPattern(connectorRule.getNodeType());
+        }
+
+        @Override
+        public Rule.Result apply(PlanNode node, Captures captures, Rule.Context context)
+        {
+            ConnectorRule.Result result = connectorRule.apply(node);
+            if (result.isEmpty()) {
+                return Rule.Result.empty();
+            }
+            return Rule.Result.ofPlanNode(result.getTransformedPlan());
+        }
     }
 }

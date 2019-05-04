@@ -19,12 +19,12 @@ import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
-public interface ConnectorRule
+public interface ConnectorRule<T extends PlanNode>
 {
     /**
      * Match a specific PlanNode
      */
-    Class<? extends PlanNode> getNodeType();
+    Class<T> getNodeType();
 
     /**
      * Apply the transformation on the matched node

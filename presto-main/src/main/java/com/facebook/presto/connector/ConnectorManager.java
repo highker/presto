@@ -434,7 +434,7 @@ public class ConnectorManager
 
             ConnectorRuleProvider optimizerProvider = null;
             try {
-                optimizerProvider = connector.getConnectorOptimizerProvider();
+                optimizerProvider = connector.getConnectorRuleProvider();
                 requireNonNull(optimizerProvider, format("Connector %s returned a null optimizer provider", connectorId));
             }
             catch (UnsupportedOperationException ignored) {
