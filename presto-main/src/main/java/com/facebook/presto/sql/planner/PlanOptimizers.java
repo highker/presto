@@ -547,12 +547,12 @@ public class PlanOptimizers
         optimizers.add(optimizer);
     }
 
-    private static final class DelegateRule
+    public static final class DelegateRule
             implements Rule<PlanNode>
     {
         private final ConnectorRule connectorRule;
 
-        DelegateRule(ConnectorRule connectorRule)
+        public DelegateRule(ConnectorRule connectorRule)
         {
             this.connectorRule = connectorRule;
         }
