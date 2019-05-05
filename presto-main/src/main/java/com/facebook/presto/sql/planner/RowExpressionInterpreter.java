@@ -138,6 +138,29 @@ public class RowExpressionInterpreter
         this.visitor = new Visitor();
     }
 
+    public static final class Optimizer
+            implements com.facebook.presto.spi.relation.ExpressionOptimizer
+    {
+        private final Metadata metadata;
+
+        public Optimizer(Metadata metadata)
+        {
+            this.metadata = requireNonNull(metadata, "metadata is null");
+        }
+
+        @Override
+        public RowExpression optimize(RowExpression rowExpression, Level level, ConnectorSession session)
+        {
+            if (level == Level.SERIALIZABLE) {
+                return toRowExpression(rowExpressionInterpreter(rowExpression, metadata, session).evaluate(), rowExpression.getType());
+            }
+            if (level == Level.MOST_OPTIMIZED) {
+                return toRowExpression(new RowExpressionInterpreter(rowExpression, metadata, session, true).optimize(), rowExpression.getType());
+            }
+            throw new IllegalArgumentException("Unrecognized optimization level: " + level);
+        }
+    }
+
     public Type getType()
     {
         return expression.getType();

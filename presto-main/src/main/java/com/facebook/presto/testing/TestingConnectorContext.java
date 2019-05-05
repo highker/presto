@@ -30,10 +30,12 @@ import com.facebook.presto.spi.connector.ConnectorContext;
 import com.facebook.presto.spi.function.FunctionMetadataManager;
 import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.facebook.presto.spi.relation.DomainTranslator;
+import com.facebook.presto.spi.relation.ExpressionOptimizer;
 import com.facebook.presto.spi.relation.RowExpressionService;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.gen.JoinCompiler;
+import com.facebook.presto.sql.planner.RowExpressionInterpreter;
 import com.facebook.presto.sql.relational.FunctionResolution;
 import com.facebook.presto.sql.relational.RowExpressionDomainTranslator;
 import com.facebook.presto.type.TypeRegistry;
@@ -95,6 +97,12 @@ public class TestingConnectorContext
             public DomainTranslator getDomainTranslator()
             {
                 return domainTranslator;
+            }
+
+            @Override
+            public ExpressionOptimizer getExpressionOptimizer()
+            {
+                return new RowExpressionInterpreter.Optimizer(metadata);
             }
         };
     }
