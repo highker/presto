@@ -19,5 +19,5 @@ import java.util.Set;
 
 public interface ConnectorRuleProvider
 {
-    Set<ConnectorRule<?>> createRuleSet();
+    Set<ConnectorRule> createRuleSet();
 }

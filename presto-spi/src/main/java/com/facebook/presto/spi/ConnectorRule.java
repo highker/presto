@@ -15,49 +15,15 @@ package com.facebook.presto.spi;
 
 import com.facebook.presto.spi.plan.PlanNode;
 
-import java.util.Optional;
-
-import static java.util.Objects.requireNonNull;
-
-public interface ConnectorRule<T extends PlanNode>
+public interface ConnectorRule
 {
     /**
      * Match a specific PlanNode
      */
-    Class<T> getNodeType();
+    boolean match(PlanNode subPlan);
 
     /**
      * Apply the transformation on the matched node
      */
-    Result apply(PlanNode planNode);
-
-    public final class Result
-    {
-        public static Result empty()
-        {
-            return new Result(Optional.empty());
-        }
-
-        public static Result ofPlanNode(PlanNode transformedPlan)
-        {
-            return new Result(Optional.of(transformedPlan));
-        }
-
-        private final Optional<PlanNode> transformedPlan;
-
-        private Result(Optional<PlanNode> transformedPlan)
-        {
-            this.transformedPlan = requireNonNull(transformedPlan, "transformedPlan is null");
-        }
-
-        public PlanNode getTransformedPlan()
-        {
-            return transformedPlan.get();
-        }
-
-        public boolean isEmpty()
-        {
-            return !transformedPlan.isPresent();
-        }
-    }
+    PlanNode apply(PlanNode planNode);
 }

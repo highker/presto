@@ -19,8 +19,6 @@ import com.facebook.presto.connector.system.MetadataBasedSystemTablesProvider;
 import com.facebook.presto.connector.system.StaticSystemTablesProvider;
 import com.facebook.presto.connector.system.SystemConnector;
 import com.facebook.presto.connector.system.SystemTablesProvider;
-import com.facebook.presto.cost.CostCalculator;
-import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.index.IndexManager;
 import com.facebook.presto.metadata.Catalog;
 import com.facebook.presto.metadata.CatalogManager;
@@ -104,8 +102,6 @@ public class ConnectorManager
     private final TransactionManager transactionManager;
     private final DomainTranslator domainTranslator;
     private final PlanOptimizers planOptimizers;
-    private final StatsCalculator statsCalculator;
-    private final CostCalculator costCalculator;
 
     @GuardedBy("this")
     private final ConcurrentMap<String, ConnectorFactory> connectorFactories = new ConcurrentHashMap<>();
@@ -125,8 +121,6 @@ public class ConnectorManager
             IndexManager indexManager,
             NodePartitioningManager nodePartitioningManager,
             PlanOptimizers planOptimizers,
-            StatsCalculator statsCalculator,
-            CostCalculator costCalculator,
             PageSinkManager pageSinkManager,
             HandleResolver handleResolver,
             InternalNodeManager nodeManager,
@@ -145,8 +139,6 @@ public class ConnectorManager
         this.indexManager = indexManager;
         this.nodePartitioningManager = nodePartitioningManager;
         this.planOptimizers = planOptimizers;
-        this.statsCalculator = statsCalculator;
-        this.costCalculator = costCalculator;
         this.pageSinkManager = pageSinkManager;
         this.handleResolver = handleResolver;
         this.nodeManager = nodeManager;
@@ -280,7 +272,7 @@ public class ConnectorManager
                 .ifPresent(partitioningProvider -> nodePartitioningManager.addPartitioningProvider(connectorId, partitioningProvider));
 
         connector.getOptimizerProvider()
-                .ifPresent(optimizerProvider -> planOptimizers.addOptimizerProvider(statsCalculator, costCalculator, optimizerProvider));
+                .ifPresent(planOptimizers::addOptimizerProvider);
 
         metadataManager.getProcedureRegistry().addProcedures(connectorId, connector.getProcedures());
 

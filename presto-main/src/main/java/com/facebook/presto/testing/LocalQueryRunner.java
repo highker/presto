@@ -348,8 +348,6 @@ public class LocalQueryRunner
                         estimatedExchangesCostCalculator,
                         new CostComparator(featuresConfig),
                         taskCountEstimator),
-                statsCalculator,
-                costCalculator,
                 pageSinkManager,
                 new HandleResolver(),
                 nodeManager,

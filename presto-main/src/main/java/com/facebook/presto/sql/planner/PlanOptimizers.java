@@ -13,11 +13,13 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostCalculator;
 import com.facebook.presto.cost.CostCalculator.EstimatedExchanges;
 import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.cost.TaskCountEstimator;
+import com.facebook.presto.execution.warnings.WarningCollector;
 import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.matching.pattern.TypeOfPattern;
@@ -536,41 +538,40 @@ public class PlanOptimizers
         return optimizers;
     }
 
-    public void addOptimizerProvider(StatsCalculator statsCalculator, CostCalculator costCalculator, ConnectorRuleProvider connectorRuleProvider)
+    public void addOptimizerProvider(ConnectorRuleProvider connectorRuleProvider)
     {
-        Set<ConnectorRule<?>> connectorRules = connectorRuleProvider.createRuleSet();
-        ImmutableSet.Builder<Rule<?>> rules = ImmutableSet.builder();
-        for (ConnectorRule<?> connectorRule : connectorRules) {
-            rules.add(new DelegateRule(connectorRule));
+        Set<ConnectorRule> connectorRules = connectorRuleProvider.createRuleSet();
+        for (ConnectorRule connectorRule : connectorRules) {
+            optimizers.add(new ConnectorPlanOptimizer(connectorRule));
         }
-        PlanOptimizer optimizer = new IterativeOptimizer(ruleStats, statsCalculator, costCalculator, rules.build());
-        optimizers.add(optimizer);
     }
 
-    public static final class DelegateRule
-            implements Rule<PlanNode>
+    public static final class ConnectorPlanOptimizer
+            implements PlanOptimizer
     {
         private final ConnectorRule connectorRule;
 
-        public DelegateRule(ConnectorRule connectorRule)
+        public ConnectorPlanOptimizer(ConnectorRule connectorRule)
         {
             this.connectorRule = connectorRule;
         }
 
         @Override
-        public Pattern<PlanNode> getPattern()
+        public PlanNode optimize(PlanNode plan,
+                Session session,
+                TypeProvider types,
+                SymbolAllocator symbolAllocator,
+                PlanNodeIdAllocator idAllocator,
+                WarningCollector warningCollector)
         {
-            return new TypeOfPattern(connectorRule.getNodeType());
-        }
-
-        @Override
-        public Rule.Result apply(PlanNode node, Captures captures, Rule.Context context)
-        {
-            ConnectorRule.Result result = connectorRule.apply(node);
-            if (result.isEmpty()) {
-                return Rule.Result.empty();
+            if (connectorRule.match(plan)) {
+                return connectorRule.apply(plan);
             }
-            return Rule.Result.ofPlanNode(result.getTransformedPlan());
+            ImmutableList.Builder<PlanNode> children = ImmutableList.builder();
+            for (PlanNode child : plan.getSources()) {
+                children.add(optimize(child, session, types, symbolAllocator, idAllocator, warningCollector));
+            }
+            return plan.replaceChildren(children.build());
         }
     }
 }
