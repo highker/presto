@@ -15,6 +15,7 @@ package com.facebook.presto.raptor.storage;
 
 import com.facebook.presto.raptor.filesystem.RaptorHdfsConfig;
 import com.facebook.presto.raptor.filesystem.RaptorHdfsConfiguration;
+import com.facebook.presto.raptor.filesystem.RaptorRemoteFileSystemConfiguration;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Scopes;
@@ -28,7 +29,7 @@ public class HdfsModule
     public void configure(Binder binder)
     {
         configBinder(binder).bindConfig(RaptorHdfsConfig.class);
-        binder.bind(RaptorHdfsConfiguration.class).in(Scopes.SINGLETON);
+        binder.bind(RaptorRemoteFileSystemConfiguration.class).to(RaptorHdfsConfiguration.class).in(Scopes.SINGLETON);
         binder.bind(StorageService.class).to(HdfsStorageService.class).in(Scopes.SINGLETON);
         binder.bind(OrcDataEnvironment.class).to(HdfsOrcDataEnvironment.class).in(Scopes.SINGLETON);
     }

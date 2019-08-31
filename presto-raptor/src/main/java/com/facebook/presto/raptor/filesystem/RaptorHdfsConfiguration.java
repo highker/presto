@@ -44,6 +44,7 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_CLIENT_SOCKET_TIMEOUT_KEY
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY;
 
 public class RaptorHdfsConfiguration
+        implements RaptorRemoteFileSystemConfiguration
 {
     private static final Configuration INITIAL_CONFIGURATION = getInitialConfiguration();
 
@@ -68,6 +69,7 @@ public class RaptorHdfsConfiguration
         this.initializer = new HdfsConfigurationInitializer(requireNonNull(config, "config is null"));
     }
 
+    @Override
     public Configuration getConfiguration()
     {
         return hadoopConfiguration.get();

@@ -17,7 +17,7 @@ import com.facebook.presto.orc.OrcDataSink;
 import com.facebook.presto.orc.OrcDataSource;
 import com.facebook.presto.orc.OrcDataSourceId;
 import com.facebook.presto.orc.OutputStreamOrcDataSink;
-import com.facebook.presto.raptor.filesystem.RaptorHdfsConfiguration;
+import com.facebook.presto.raptor.filesystem.RaptorRemoteFileSystemConfiguration;
 import com.facebook.presto.spi.PrestoException;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -34,7 +34,7 @@ public class HdfsOrcDataEnvironment
     private final FileSystem fileSystem;
 
     @Inject
-    public HdfsOrcDataEnvironment(Path baseLocation, RaptorHdfsConfiguration configuration)
+    public HdfsOrcDataEnvironment(Path baseLocation, RaptorRemoteFileSystemConfiguration configuration)
     {
         try {
             this.fileSystem = baseLocation.getFileSystem(configuration.getConfiguration());

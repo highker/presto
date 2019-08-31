@@ -65,17 +65,6 @@ public class StorageModule
 
         binder.bind(Ticker.class).toInstance(Ticker.systemTicker());
 
-        if (buildConfigObject(StorageManagerConfig.class).isDisaggregated()) {
-            configBinder(binder).bindConfig(RaptorHdfsConfig.class);
-            binder.bind(RaptorHdfsConfiguration.class).in(Scopes.SINGLETON);
-            binder.bind(StorageService.class).to(HdfsStorageService.class).in(Scopes.SINGLETON);
-            binder.bind(OrcDataEnvironment.class).to(HdfsOrcDataEnvironment.class).in(Scopes.SINGLETON);
-        }
-        else {
-            binder.bind(StorageService.class).to(FileStorageService.class).in(Scopes.SINGLETON);
-            binder.bind(OrcDataEnvironment.class).to(LocalOrcDataEnvironment.class).in(Scopes.SINGLETON);
-        }
-
         binder.bind(StorageManager.class).to(OrcStorageManager.class).in(Scopes.SINGLETON);
         binder.bind(ShardManager.class).to(DatabaseShardManager.class).in(Scopes.SINGLETON);
         binder.bind(ShardRecorder.class).to(DatabaseShardRecorder.class).in(Scopes.SINGLETON);
@@ -112,6 +101,6 @@ public class StorageModule
     public Path createBaseLocation(StorageManagerConfig config)
     {
         // TODO: this is wrong
-        return new Path(config.getDataDirectory().toURI());
+        return new Path("ws://ws.rocksdb.eval4/");
     }
 }

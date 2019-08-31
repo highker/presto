@@ -63,6 +63,7 @@ public class HdfsStorageService
     @PostConstruct
     public void start()
     {
+        // TODO: this should postpone till the server starts. Otherwise the HDFS client may not start yet
         deleteStagingFilesAsync();
         createDirectory(baseStagingDir);
         createDirectory(baseStorageDir);
@@ -125,7 +126,7 @@ public class HdfsStorageService
             files = fileSystem.listStatus(baseStagingDir);
         }
         catch (IOException e) {
-            log.warn(e, "Failed to list director " + baseStagingDir);
+            log.warn(e, "Failed to list directory " + baseStagingDir);
             return;
         }
 
