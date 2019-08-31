@@ -46,13 +46,15 @@ public class RaptorConnectorFactory
 {
     private final String name;
     private final Module metadataModule;
+    private final Module fileSystemModule;
     private final Map<String, Module> backupProviders;
 
-    public RaptorConnectorFactory(String name, Module metadataModule, Map<String, Module> backupProviders)
+    public RaptorConnectorFactory(String name, Module metadataModule, Module fileSystemModule, Map<String, Module> backupProviders)
     {
         checkArgument(!isNullOrEmpty(name), "name is null or empty");
         this.name = name;
         this.metadataModule = requireNonNull(metadataModule, "metadataModule is null");
+        this.fileSystemModule = requireNonNull(fileSystemModule, "metadataModule is null");
         this.backupProviders = ImmutableMap.copyOf(requireNonNull(backupProviders, "backupProviders is null"));
     }
 
@@ -84,6 +86,7 @@ public class RaptorConnectorFactory
                         binder.bind(TypeManager.class).toInstance(context.getTypeManager());
                     },
                     metadataModule,
+                    fileSystemModule,
                     new BackupModule(backupProviders),
                     new StorageModule(catalogName),
                     new RaptorModule(catalogName),

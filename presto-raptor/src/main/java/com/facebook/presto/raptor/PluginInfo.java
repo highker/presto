@@ -14,6 +14,7 @@
 package com.facebook.presto.raptor;
 
 import com.facebook.presto.raptor.metadata.DatabaseMetadataModule;
+import com.facebook.presto.raptor.storage.HdfsModule;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Module;
 
@@ -29,6 +30,11 @@ public class PluginInfo
     public Module getMetadataModule()
     {
         return new DatabaseMetadataModule();
+    }
+
+    public Module getFileSystemModule()
+    {
+        return new HdfsModule();
     }
 
     public Map<String, Module> getBackupProviders()
