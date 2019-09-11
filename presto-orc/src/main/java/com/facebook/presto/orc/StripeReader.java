@@ -51,9 +51,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static com.facebook.presto.orc.checkpoint.Checkpoints.getDictionaryStreamCheckpoint;
 import static com.facebook.presto.orc.checkpoint.Checkpoints.getStreamCheckpoints;
@@ -75,6 +77,8 @@ import static java.util.Objects.requireNonNull;
 
 public class StripeReader
 {
+    private static final Map<FooterKey, StripeFooter> FOOTER_CACHE = new ConcurrentHashMap<>();
+
     private final OrcDataSource orcDataSource;
     private final Optional<OrcDecompressor> decompressor;
     private final List<OrcType> types;
@@ -84,6 +88,41 @@ public class StripeReader
     private final OrcPredicate predicate;
     private final MetadataReader metadataReader;
     private final Optional<OrcWriteValidation> writeValidation;
+
+    private static class FooterKey
+    {
+        OrcDataSourceId id;
+        long offset;
+        int tailLength;
+
+        public FooterKey(OrcDataSourceId id, long offset, int tailLength)
+        {
+            this.id = id;
+            this.offset = offset;
+            this.tailLength = tailLength;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(id, offset, tailLength);
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            FooterKey that = (FooterKey) o;
+            return Objects.equals(id, that.id) &&
+                    Objects.equals(offset, that.offset) &&
+                    Objects.equals(tailLength, that.tailLength);
+        }
+    }
 
     public StripeReader(OrcDataSource orcDataSource,
             Optional<OrcDecompressor> decompressor,
@@ -380,11 +419,18 @@ public class StripeReader
         long offset = stripe.getOffset() + stripe.getIndexLength() + stripe.getDataLength();
         int tailLength = toIntExact(stripe.getFooterLength());
 
+        FooterKey key = new FooterKey(orcDataSource.getId(), offset, tailLength);
+
+        if (FOOTER_CACHE.containsKey(key)) {
+            return FOOTER_CACHE.get(key);
+        }
         // read the footer
         byte[] tailBuffer = new byte[tailLength];
         orcDataSource.readFully(offset, tailBuffer);
         try (InputStream inputStream = new OrcInputStream(orcDataSource.getId(), Slices.wrappedBuffer(tailBuffer).getInput(), decompressor, systemMemoryUsage, tailLength)) {
-            return metadataReader.readStripeFooter(types, inputStream);
+            StripeFooter footer = metadataReader.readStripeFooter(types, inputStream);
+            FOOTER_CACHE.put(key, footer);
+            return footer;
         }
     }
 
