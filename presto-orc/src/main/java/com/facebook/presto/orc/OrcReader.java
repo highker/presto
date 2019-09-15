@@ -20,6 +20,7 @@ import com.facebook.presto.orc.metadata.Footer;
 import com.facebook.presto.orc.metadata.Metadata;
 import com.facebook.presto.orc.metadata.PostScript;
 import com.facebook.presto.orc.metadata.PostScript.HiveWriterVersion;
+import com.facebook.presto.orc.metadata.StripeFooter;
 import com.facebook.presto.orc.stream.OrcInputStream;
 import com.facebook.presto.spi.Subfield;
 import com.facebook.presto.spi.type.Type;
@@ -36,6 +37,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 import static com.facebook.presto.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
@@ -49,6 +51,10 @@ import static java.util.Objects.requireNonNull;
 
 public class OrcReader
 {
+    private static final Map<OrcDataSourceId, PostScript> POST_SCRIPT_CACHE = new ConcurrentHashMap<>();
+    private static final Map<OrcDataSourceId, Metadata> METADATA_CACHE = new ConcurrentHashMap<>();
+    private static final Map<OrcDataSourceId, Footer> FOOTER_CACHE = new ConcurrentHashMap<>();
+
     public static final int MAX_BATCH_SIZE = 1024;
     public static final int INITIAL_BATCH_SIZE = 1;
     public static final int BATCH_SIZE_GROWTH_FACTOR = 2;
@@ -113,27 +119,38 @@ public class OrcReader
             throw new OrcCorruptionException(orcDataSource.getId(), "Invalid file size %s", size);
         }
 
-        // Read the tail of the file
-        byte[] buffer = new byte[toIntExact(min(size, EXPECTED_FOOTER_SIZE))];
-        orcDataSource.readFully(size - buffer.length, buffer);
-
-        // get length of PostScript - last byte of the file
-        int postScriptSize = buffer[buffer.length - SIZE_OF_BYTE] & 0xff;
-        if (postScriptSize >= buffer.length) {
-            throw new OrcCorruptionException(orcDataSource.getId(), "Invalid postscript length %s", postScriptSize);
-        }
-
-        // decode the post script
         PostScript postScript;
-        try {
-            postScript = metadataReader.readPostScript(buffer, buffer.length - SIZE_OF_BYTE - postScriptSize, postScriptSize);
+        byte[] buffer = null;
+        int postScriptSize = 0;
+
+        boolean cached = POST_SCRIPT_CACHE.containsKey(orcDataSource.getId());
+        if (cached) {
+            postScript = POST_SCRIPT_CACHE.get(orcDataSource.getId());
         }
-        catch (OrcCorruptionException e) {
-            // check if this is an ORC file and not an RCFile or something else
-            if (!isValidHeaderMagic(orcDataSource)) {
-                throw new OrcCorruptionException(orcDataSource.getId(), "Not an ORC file");
+        else {
+            // Read the tail of the file
+            buffer = new byte[toIntExact(min(size, EXPECTED_FOOTER_SIZE))];
+            orcDataSource.readFully(size - buffer.length, buffer);
+
+            // get length of PostScript - last byte of the file
+            postScriptSize = buffer[buffer.length - SIZE_OF_BYTE] & 0xff;
+            if (postScriptSize >= buffer.length) {
+                throw new OrcCorruptionException(orcDataSource.getId(), "Invalid postscript length %s", postScriptSize);
             }
-            throw e;
+
+            // decode the post script
+
+            try {
+                postScript = metadataReader.readPostScript(buffer, buffer.length - SIZE_OF_BYTE - postScriptSize, postScriptSize);
+                POST_SCRIPT_CACHE.put(orcDataSource.getId(), postScript);
+            }
+            catch (OrcCorruptionException e) {
+                // check if this is an ORC file and not an RCFile or something else
+                if (!isValidHeaderMagic(orcDataSource)) {
+                    throw new OrcCorruptionException(orcDataSource.getId(), "Not an ORC file");
+                }
+                throw e;
+            }
         }
 
         // verify this is a supported version
@@ -152,38 +169,46 @@ public class OrcReader
         int footerSize = toIntExact(postScript.getFooterLength());
         int metadataSize = toIntExact(postScript.getMetadataLength());
 
-        // check if extra bytes need to be read
-        Slice completeFooterSlice;
-        int completeFooterSize = footerSize + metadataSize + postScriptSize + SIZE_OF_BYTE;
-        if (completeFooterSize > buffer.length) {
-            // allocate a new buffer large enough for the complete footer
-            byte[] newBuffer = new byte[completeFooterSize];
-            completeFooterSlice = Slices.wrappedBuffer(newBuffer);
+        if (!cached) {
+            // check if extra bytes need to be read
+            Slice completeFooterSlice;
+            int completeFooterSize = footerSize + metadataSize + postScriptSize + SIZE_OF_BYTE;
+            if (completeFooterSize > buffer.length) {
+                // allocate a new buffer large enough for the complete footer
+                byte[] newBuffer = new byte[completeFooterSize];
+                completeFooterSlice = Slices.wrappedBuffer(newBuffer);
 
-            // initial read was not large enough, so read missing section
-            orcDataSource.readFully(size - completeFooterSize, newBuffer, 0, completeFooterSize - buffer.length);
+                // initial read was not large enough, so read missing section
+                orcDataSource.readFully(size - completeFooterSize, newBuffer, 0, completeFooterSize - buffer.length);
 
-            // copy already read bytes into the new buffer
-            completeFooterSlice.setBytes(completeFooterSize - buffer.length, buffer);
+                // copy already read bytes into the new buffer
+                completeFooterSlice.setBytes(completeFooterSize - buffer.length, buffer);
+            }
+            else {
+                // footer is already in the bytes in buffer, just adjust position, length
+                completeFooterSlice = Slices.wrappedBuffer(buffer, buffer.length - completeFooterSize, completeFooterSize);
+            }
+
+            // read metadata
+            Slice metadataSlice = completeFooterSlice.slice(0, metadataSize);
+            try (InputStream metadataInputStream = new OrcInputStream(orcDataSource.getId(), metadataSlice.getInput(), decompressor, newSimpleAggregatedMemoryContext(), metadataSize)) {
+                this.metadata = metadataReader.readMetadata(hiveWriterVersion, metadataInputStream);
+            }
+
+            // read footer
+            Slice footerSlice = completeFooterSlice.slice(metadataSize, footerSize);
+            try (InputStream footerInputStream = new OrcInputStream(orcDataSource.getId(), footerSlice.getInput(), decompressor, newSimpleAggregatedMemoryContext(), footerSize)) {
+                this.footer = metadataReader.readFooter(hiveWriterVersion, footerInputStream);
+            }
+            if (footer.getTypes().size() == 0) {
+                throw new OrcCorruptionException(orcDataSource.getId(), "File has no columns");
+            }
+            METADATA_CACHE.put(orcDataSource.getId(), metadata);
+            FOOTER_CACHE.put((orcDataSource.getId()), footer);
         }
         else {
-            // footer is already in the bytes in buffer, just adjust position, length
-            completeFooterSlice = Slices.wrappedBuffer(buffer, buffer.length - completeFooterSize, completeFooterSize);
-        }
-
-        // read metadata
-        Slice metadataSlice = completeFooterSlice.slice(0, metadataSize);
-        try (InputStream metadataInputStream = new OrcInputStream(orcDataSource.getId(), metadataSlice.getInput(), decompressor, newSimpleAggregatedMemoryContext(), metadataSize)) {
-            this.metadata = metadataReader.readMetadata(hiveWriterVersion, metadataInputStream);
-        }
-
-        // read footer
-        Slice footerSlice = completeFooterSlice.slice(metadataSize, footerSize);
-        try (InputStream footerInputStream = new OrcInputStream(orcDataSource.getId(), footerSlice.getInput(), decompressor, newSimpleAggregatedMemoryContext(), footerSize)) {
-            this.footer = metadataReader.readFooter(hiveWriterVersion, footerInputStream);
-        }
-        if (footer.getTypes().size() == 0) {
-            throw new OrcCorruptionException(orcDataSource.getId(), "File has no columns");
+            this.metadata = METADATA_CACHE.get(orcDataSource.getId());
+            this.footer = FOOTER_CACHE.get(orcDataSource.getId());
         }
 
         validateWrite(validation -> validation.getColumnNames().equals(getColumnNames()), "Unexpected column names");
