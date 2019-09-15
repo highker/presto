@@ -30,7 +30,6 @@ import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
-import java.io.File;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -44,7 +43,7 @@ import static java.lang.Runtime.getRuntime;
 @DefunctConfig("storage.backup-directory")
 public class StorageManagerConfig
 {
-    private File dataDirectory;
+    private String dataDirectory;
     private DataSize minAvailableSpace = new DataSize(0, BYTE);
     private Duration shardRecoveryTimeout = new Duration(30, TimeUnit.SECONDS);
     private Duration missingShardDiscoveryInterval = new Duration(5, TimeUnit.MINUTES);
@@ -75,14 +74,14 @@ public class StorageManagerConfig
     private boolean disaggregated;
 
     @NotNull
-    public File getDataDirectory()
+    public String getDataDirectory()
     {
         return dataDirectory;
     }
 
     @Config("storage.data-directory")
     @ConfigDescription("Base directory to use for storing shard data")
-    public StorageManagerConfig setDataDirectory(File dataDirectory)
+    public StorageManagerConfig setDataDirectory(String dataDirectory)
     {
         this.dataDirectory = dataDirectory;
         return this;

@@ -101,6 +101,6 @@ public class StorageModule
     public Path createBaseLocation(StorageManagerConfig config)
     {
         // TODO: this is wrong
-        return new Path("ws://ws.rocksdb.eval4/");
+        return new Path(config.getDataDirectory());
     }
 }

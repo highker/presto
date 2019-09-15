@@ -57,7 +57,7 @@ public class FileStorageService
     @Inject
     public FileStorageService(OrcDataEnvironment environment, StorageManagerConfig config)
     {
-        this(environment, config.getDataDirectory());
+        this(environment, new File(config.getDataDirectory()));
     }
 
     public FileStorageService(OrcDataEnvironment environment, File dataDirectory)

@@ -110,7 +110,7 @@ public class TestStorageManagerConfig
                 .build();
 
         StorageManagerConfig expected = new StorageManagerConfig()
-                .setDataDirectory(new File("/data"))
+                .setDataDirectory("/data")
                 .setMinAvailableSpace(new DataSize(123, GIGABYTE))
                 .setOrcMaxMergeDistance(new DataSize(16, KILOBYTE))
                 .setOrcMaxReadSize(new DataSize(16, KILOBYTE))
