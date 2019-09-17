@@ -206,7 +206,10 @@ public class SqlQueryExecution
                     warningCollector);
 
             try {
+                long nanos = System.nanoTime();
+
                 this.analysis = analyzer.analyze(preparedQuery.getStatement());
+                System.out.println("analysis: " + (System.nanoTime() - nanos));
             }
             catch (RuntimeException e) {
                 stateMachine.transitionToFailed(e);

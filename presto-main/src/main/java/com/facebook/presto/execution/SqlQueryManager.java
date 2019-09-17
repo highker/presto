@@ -313,6 +313,7 @@ public class SqlQueryManager
 
     private <C> void createQueryInternal(QueryId queryId, SessionContext sessionContext, String query, ResourceGroupManager<C> resourceGroupManager)
     {
+        long nanos = System.nanoTime();
         requireNonNull(queryId, "queryId is null");
         requireNonNull(sessionContext, "sessionFactory is null");
         requireNonNull(query, "query is null");
@@ -336,10 +337,18 @@ public class SqlQueryManager
             // decode session
             session = sessionSupplier.createSession(queryId, sessionContext);
 
+            long newNaoes = System.nanoTime();
+            log.info(queryId + " create session: " + (newNaoes - nanos));
+            nanos = newNaoes;
             WarningCollector warningCollector = warningCollectorFactory.create();
 
             // prepare query
             preparedQuery = queryPreparer.prepareQuery(session, query, warningCollector);
+
+            newNaoes = System.nanoTime();
+            log.info(queryId + " prepare: " + (newNaoes - nanos));
+            nanos = newNaoes;
+
 
             // select resource group
             queryType = getQueryType(preparedQuery.getStatement().getClass());
@@ -351,11 +360,20 @@ public class SqlQueryManager
                     sessionContext.getResourceEstimates(),
                     queryType.map(Enum::name)));
 
+            newNaoes = System.nanoTime();
+            log.info(queryId + " select resource group: " + (newNaoes - nanos));
+            nanos = newNaoes;
+
             // apply system defaults for query
             session = sessionPropertyDefaults.newSessionWithDefaultProperties(session, queryType.map(Enum::name), selectionContext.getResourceGroupId());
 
             // mark existing transaction as active
             transactionManager.activateTransaction(session, isTransactionControlStatement(preparedQuery.getStatement()), accessControl);
+
+
+            newNaoes = System.nanoTime();
+            log.info(queryId + " transaction: " + (newNaoes - nanos));
+            nanos = newNaoes;
 
             // create query execution
             QueryExecutionFactory<?> queryExecutionFactory = executionFactories.get(preparedQuery.getStatement().getClass());
@@ -369,6 +387,10 @@ public class SqlQueryManager
                     selectionContext.getResourceGroupId(),
                     warningCollector,
                     queryType);
+
+            newNaoes = System.nanoTime();
+            log.info(queryId + " create exe: " + (newNaoes - nanos));
+            nanos = newNaoes;
         }
         catch (RuntimeException e) {
             // This is intentionally not a method, since after the state change listener is registered

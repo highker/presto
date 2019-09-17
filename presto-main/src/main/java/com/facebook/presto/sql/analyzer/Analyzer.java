@@ -73,10 +73,18 @@ public class Analyzer
 
     public Analysis analyze(Statement statement, boolean isDescribe)
     {
+        long nanos = System.nanoTime();
         Statement rewrittenStatement = StatementRewrite.rewrite(session, metadata, sqlParser, queryExplainer, statement, parameters, accessControl, warningCollector);
+        long newNanos = System.nanoTime();
+        System.out.println("rewrite: " + (newNanos - nanos));
+        nanos = newNanos;
+
         Analysis analysis = new Analysis(rewrittenStatement, parameters, isDescribe);
         StatementAnalyzer analyzer = new StatementAnalyzer(analysis, metadata, sqlParser, accessControl, session, warningCollector);
         analyzer.analyze(rewrittenStatement, Optional.empty());
+        newNanos = System.nanoTime();
+        System.out.println("real analyze: " + (newNanos - nanos));
+        nanos = newNanos;
 
         /*
         // check column access permissions for each table
