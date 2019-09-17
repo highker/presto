@@ -78,6 +78,7 @@ public class Analyzer
         StatementAnalyzer analyzer = new StatementAnalyzer(analysis, metadata, sqlParser, accessControl, session, warningCollector);
         analyzer.analyze(rewrittenStatement, Optional.empty());
 
+        /*
         // check column access permissions for each table
         analysis.getTableColumnReferences().forEach((accessControlInfo, tableColumnReferences) ->
                 tableColumnReferences.forEach((tableName, columns) ->
@@ -86,6 +87,8 @@ public class Analyzer
                                 accessControlInfo.getIdentity(),
                                 tableName,
                                 columns)));
+
+         */
         return analysis;
     }
 
