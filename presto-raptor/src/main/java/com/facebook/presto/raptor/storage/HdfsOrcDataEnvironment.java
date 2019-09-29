@@ -31,7 +31,7 @@ import static com.facebook.presto.raptor.RaptorErrorCode.RAPTOR_LOCAL_FILE_SYSTE
 public class HdfsOrcDataEnvironment
         implements OrcDataEnvironment
 {
-    private final FileSystem fileSystem;
+    protected final FileSystem fileSystem;
 
     @Inject
     public HdfsOrcDataEnvironment(Path baseLocation, RaptorRemoteFileSystemConfiguration configuration)
