@@ -14,10 +14,67 @@
 package com.facebook.presto.spi.connector;
 
 import com.facebook.presto.spi.ConnectorPlanOptimizer;
+import com.facebook.presto.spi.function.FunctionHandle;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 
-public interface ConnectorPlanOptimizerProvider
+import static java.util.Collections.emptySet;
+
+public interface ConnectorPlanOptimizerProvider<T>
 {
-    Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers();
+    /**
+     * @return a list of function mappings for registration.
+     * The function translation will be used by {@link #getConnectorPlanOptimizers(TranslationContext)}
+     */
+    default Set<Class<?>> getFunctionTranslation()
+    {
+        return emptySet();
+    }
+
+    /**
+     * @param functionTranslator that maps CallExpression to TargetExpression.
+     * @return a set of optimizer rules.
+     */
+    Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers(TranslationContext<T> functionTranslator);
+
+    final class TargetExpression<T>
+    {
+        private final List<TargetExpression> parameters;
+        private final Optional<T> translatedExpression;
+
+        public TargetExpression(List<TargetExpression> parameters, Optional<T> translatedExpression)
+        {
+            this.parameters = parameters;
+            this.translatedExpression = translatedExpression;
+        }
+
+        public List<TargetExpression> getParameters()
+        {
+            return parameters;
+        }
+
+        public Optional<T> getTranslatedExpression()
+        {
+            return translatedExpression;
+        }
+    }
+
+    final class TranslationContext<T>
+    {
+        // TODO: add other translators
+        BiFunction<FunctionHandle, List<TargetExpression<T>>, TargetExpression<T>> functionTranslator;
+
+        public TranslationContext(BiFunction<FunctionHandle, List<TargetExpression<T>>, TargetExpression<T>> functionTranslator)
+        {
+            this.functionTranslator = functionTranslator;
+        }
+
+        public BiFunction<FunctionHandle, List<TargetExpression<T>>, TargetExpression<T>> getFunctionTranslator()
+        {
+            return functionTranslator;
+        }
+    }
 }

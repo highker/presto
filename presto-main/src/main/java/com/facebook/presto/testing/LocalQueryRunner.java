@@ -308,7 +308,7 @@ public class LocalQueryRunner
                 notificationExecutor);
         this.partitioningProviderManager = new PartitioningProviderManager();
         this.nodePartitioningManager = new NodePartitioningManager(nodeScheduler, partitioningProviderManager);
-        this.planOptimizerManager = new ConnectorPlanOptimizerManager();
+        this.planOptimizerManager = new ConnectorPlanOptimizerManager(getMetadata().getFunctionManager());
 
         this.blockEncodingManager = new BlockEncodingManager(typeRegistry);
         this.metadata = new MetadataManager(

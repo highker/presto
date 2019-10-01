@@ -19,6 +19,8 @@ import com.facebook.presto.spi.ConnectorPlanOptimizer;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.VariableAllocator;
+import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider.TargetExpression;
+import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider.TranslationContext;
 import com.facebook.presto.spi.function.FunctionMetadataManager;
 import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.facebook.presto.spi.plan.FilterNode;
@@ -32,20 +34,24 @@ import com.google.common.collect.ImmutableList;
 
 import java.util.Optional;
 
+import static com.facebook.presto.spi.relation.RowExpressionTreeTranslator.defaultTranslate;
 import static java.util.Objects.requireNonNull;
 
 public class JdbcComputePushdown
         implements ConnectorPlanOptimizer
 {
     private final ExpressionOptimizer expressionOptimizer;
+    private final TranslationContext<String> translationContext;
 
     public JdbcComputePushdown(
             FunctionMetadataManager functionMetadataManager,
             StandardFunctionResolution functionResolution,
             DeterminismEvaluator determinismEvaluator,
-            ExpressionOptimizer expressionOptimizer)
+            ExpressionOptimizer expressionOptimizer,
+            TranslationContext<String> translationContext)
     {
         this.expressionOptimizer = expressionOptimizer;
+        this.translationContext = translationContext;
     }
 
     @Override
@@ -105,7 +111,8 @@ public class JdbcComputePushdown
                 return node;
             }
 
-            // TODO: FilterRowExpression is currently mocked, needs to be implemented
+            TargetExpression<String> translatedFilter = defaultTranslate(node.getPredicate(), translationContext);
+            // TODO: put the translated filter into JdbcTableLayoutHandle
 
             JdbcTableLayoutHandle oldTableLayoutHandle = (JdbcTableLayoutHandle) oldTableHandle.getLayout().get();
             // TODO: add pushdownResult to new TableLayoutHandle

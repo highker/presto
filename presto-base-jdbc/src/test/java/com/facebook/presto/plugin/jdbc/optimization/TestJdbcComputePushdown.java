@@ -68,7 +68,7 @@ public class TestJdbcComputePushdown
 
     public TestJdbcComputePushdown()
     {
-        this.jdbcComputePushdown = new JdbcComputePushdown(null, null, null, null);
+        this.jdbcComputePushdown = new JdbcComputePushdown(null, null, null, null, null);
     }
 
     @Test

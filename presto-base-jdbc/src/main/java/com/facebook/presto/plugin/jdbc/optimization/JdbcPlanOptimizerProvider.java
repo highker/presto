@@ -26,7 +26,7 @@ import java.util.Set;
 import static java.util.Objects.requireNonNull;
 
 public class JdbcPlanOptimizerProvider
-        implements ConnectorPlanOptimizerProvider
+        implements ConnectorPlanOptimizerProvider<String>
 {
     private final FunctionMetadataManager functionManager;
     private final StandardFunctionResolution functionResolution;
@@ -47,12 +47,19 @@ public class JdbcPlanOptimizerProvider
     }
 
     @Override
-    public Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers()
+    public Set<Class<?>> getFunctionTranslation()
+    {
+        return ImmutableSet.of(BigintOperators.class);
+    }
+
+    @Override
+    public Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers(TranslationContext<String> translator)
     {
         return ImmutableSet.of(new JdbcComputePushdown(
                 functionManager,
                 functionResolution,
                 determinismEvaluator,
-                expressionOptimizer));
+                expressionOptimizer,
+                translator));
     }
 }
