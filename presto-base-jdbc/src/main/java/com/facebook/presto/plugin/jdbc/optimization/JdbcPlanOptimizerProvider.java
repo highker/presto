@@ -13,14 +13,20 @@
  */
 package com.facebook.presto.plugin.jdbc.optimization;
 
+import com.facebook.presto.plugin.jdbc.JdbcClient;
+import com.facebook.presto.plugin.jdbc.optimization.function.OperatorTranslators;
 import com.facebook.presto.spi.ConnectorPlanOptimizer;
 import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider;
+import com.facebook.presto.spi.function.FunctionMetadata;
 import com.facebook.presto.spi.function.FunctionMetadataManager;
 import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.facebook.presto.spi.relation.DeterminismEvaluator;
 import com.facebook.presto.spi.relation.ExpressionOptimizer;
+import com.facebook.presto.spi.relation.translator.FunctionTranslator;
 import com.google.common.collect.ImmutableSet;
+import com.google.inject.Inject;
 
+import java.util.Map;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
@@ -32,27 +38,45 @@ public class JdbcPlanOptimizerProvider
     private final StandardFunctionResolution functionResolution;
     private final DeterminismEvaluator determinismEvaluator;
     private final ExpressionOptimizer expressionOptimizer;
+    private final String identifierQuote;
 
+    @Inject
     public JdbcPlanOptimizerProvider(
+            JdbcClient jdbcClient,
             FunctionMetadataManager functionManager,
             StandardFunctionResolution functionResolution,
             DeterminismEvaluator determinismEvaluator,
             ExpressionOptimizer expressionOptimizer)
     {
-        // TODO: Override getConnectorPlanOptimizer in JdbcConnector and add JdbcPlanOptimizer to it
         this.functionManager = requireNonNull(functionManager, "functionManager is null");
         this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
         this.determinismEvaluator = requireNonNull(determinismEvaluator, "determinismEvaluator is null");
         this.expressionOptimizer = requireNonNull(expressionOptimizer, "expressionOptimizer is null");
+        this.identifierQuote = jdbcClient.getIdentifierQuote();
     }
 
     @Override
-    public Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers()
+    public Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers(Context context)
     {
+        RowExpressionToSqlTranslator translator = getRowExpressionToSqlTranslator(
+                functionManager,
+                context.getFunctionTranslatorMapping(JdbcSql.class));
         return ImmutableSet.of(new JdbcComputePushdown(
                 functionManager,
                 functionResolution,
                 determinismEvaluator,
-                expressionOptimizer));
+                expressionOptimizer,
+                translator));
+    }
+
+    @Override
+    public Set<Class<?>> getFunctionTranslators()
+    {
+        return ImmutableSet.of(OperatorTranslators.class);
+    }
+
+    public RowExpressionToSqlTranslator getRowExpressionToSqlTranslator(FunctionMetadataManager functionMetadataManager, Map<FunctionMetadata, FunctionTranslator<JdbcSql>> functionTranslators)
+    {
+        return new RowExpressionToSqlTranslator(functionMetadataManager, functionTranslators, identifierQuote);
     }
 }

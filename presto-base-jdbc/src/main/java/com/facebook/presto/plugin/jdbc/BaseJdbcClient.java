@@ -137,6 +137,12 @@ public class BaseJdbcClient
     }
 
     @Override
+    public String getIdentifierQuote()
+    {
+        return identifierQuote;
+    }
+
+    @Override
     public final Set<String> getSchemaNames(JdbcIdentity identity)
     {
         try (Connection connection = connectionFactory.openConnection(identity)) {

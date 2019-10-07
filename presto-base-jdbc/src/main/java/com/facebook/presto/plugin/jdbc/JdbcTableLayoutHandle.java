@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.plugin.jdbc;
 
+import com.facebook.presto.plugin.jdbc.optimization.JdbcSql;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
@@ -20,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -28,14 +30,23 @@ public class JdbcTableLayoutHandle
 {
     private final JdbcTableHandle table;
     private final TupleDomain<ColumnHandle> tupleDomain;
+    private final Optional<JdbcSql> translatedSql;
 
     @JsonCreator
     public JdbcTableLayoutHandle(
             @JsonProperty("table") JdbcTableHandle table,
-            @JsonProperty("tupleDomain") TupleDomain<ColumnHandle> domain)
+            @JsonProperty("tupleDomain") TupleDomain<ColumnHandle> domain,
+            @JsonProperty("translatedSql") Optional<JdbcSql> translatedSql)
     {
         this.table = requireNonNull(table, "table is null");
         this.tupleDomain = requireNonNull(domain, "tupleDomain is null");
+        this.translatedSql = translatedSql;
+    }
+
+    @JsonProperty
+    public Optional<JdbcSql> getTranslatedSql()
+    {
+        return translatedSql;
     }
 
     @JsonProperty

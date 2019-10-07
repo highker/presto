@@ -28,24 +28,35 @@ import com.facebook.presto.spi.plan.PlanVisitor;
 import com.facebook.presto.spi.plan.TableScanNode;
 import com.facebook.presto.spi.relation.DeterminismEvaluator;
 import com.facebook.presto.spi.relation.ExpressionOptimizer;
+import com.facebook.presto.spi.relation.translator.TranslatedExpression;
 import com.google.common.collect.ImmutableList;
 
 import java.util.Optional;
 
+import static com.facebook.presto.spi.relation.translator.RowExpressionTreeTranslator.translateWith;
 import static java.util.Objects.requireNonNull;
 
 public class JdbcComputePushdown
         implements ConnectorPlanOptimizer
 {
+    private final FunctionMetadataManager functionMetadataManager;
+    private final StandardFunctionResolution functionResolution;
+    private final DeterminismEvaluator determinismEvaluator;
     private final ExpressionOptimizer expressionOptimizer;
+    private final RowExpressionToSqlTranslator rowExpressionToSqlTranslator;
 
     public JdbcComputePushdown(
             FunctionMetadataManager functionMetadataManager,
             StandardFunctionResolution functionResolution,
             DeterminismEvaluator determinismEvaluator,
-            ExpressionOptimizer expressionOptimizer)
+            ExpressionOptimizer expressionOptimizer,
+            RowExpressionToSqlTranslator rowExpressionToSqlTranslator)
     {
+        this.functionMetadataManager = functionMetadataManager;
+        this.functionResolution = functionResolution;
+        this.determinismEvaluator = determinismEvaluator;
         this.expressionOptimizer = expressionOptimizer;
+        this.rowExpressionToSqlTranslator = rowExpressionToSqlTranslator;
     }
 
     @Override
@@ -99,19 +110,24 @@ public class JdbcComputePushdown
             TableScanNode oldTableScanNode = (TableScanNode) node.getSource();
             TableHandle oldTableHandle = oldTableScanNode.getTable();
             JdbcTableHandle oldConnectorTable = (JdbcTableHandle) oldTableHandle.getConnectorHandle();
+            TranslatedExpression<JdbcSql> jdbcSqlTranslatedExpression = translateWith(
+                    node.getPredicate(),
+                    determinismEvaluator,
+                    functionResolution,
+                    functionMetadataManager,
+                    rowExpressionToSqlTranslator,
+                    oldTableScanNode.getAssignments());
 
             // TODO: remove dependency on oldTableLayoutHandle, currently it needs oldTableLayoutHandle to get predicate
-            if (!oldTableHandle.getLayout().isPresent()) {
+            if (!oldTableHandle.getLayout().isPresent() || !jdbcSqlTranslatedExpression.getTranslated().isPresent()) {
                 return node;
             }
 
-            // TODO: FilterRowExpression is currently mocked, needs to be implemented
-
             JdbcTableLayoutHandle oldTableLayoutHandle = (JdbcTableLayoutHandle) oldTableHandle.getLayout().get();
-            // TODO: add pushdownResult to new TableLayoutHandle
             JdbcTableLayoutHandle newTableLayoutHandle = new JdbcTableLayoutHandle(
                     oldConnectorTable,
-                    oldTableLayoutHandle.getTupleDomain());
+                    oldTableLayoutHandle.getTupleDomain(),
+                    jdbcSqlTranslatedExpression.getTranslated());
 
             TableHandle tableHandle = new TableHandle(
                     oldTableHandle.getConnectorId(),

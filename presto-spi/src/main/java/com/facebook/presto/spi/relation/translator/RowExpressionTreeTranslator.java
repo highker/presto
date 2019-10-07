@@ -13,10 +13,14 @@
  */
 package com.facebook.presto.spi.relation.translator;
 
+import com.facebook.presto.spi.function.FunctionMetadataManager;
+import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.facebook.presto.spi.relation.CallExpression;
 import com.facebook.presto.spi.relation.ConstantExpression;
+import com.facebook.presto.spi.relation.DeterminismEvaluator;
 import com.facebook.presto.spi.relation.InputReferenceExpression;
 import com.facebook.presto.spi.relation.LambdaDefinitionExpression;
+import com.facebook.presto.spi.relation.LogicalRowExpressions;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.RowExpressionVisitor;
 import com.facebook.presto.spi.relation.SpecialFormExpression;
@@ -39,9 +43,16 @@ public class RowExpressionTreeTranslator<T, C>
         this.visitor = new TranslatingVisitor();
     }
 
-    public static <T, C> TranslatedExpression<T> translateWith(RowExpression expression, RowExpressionTranslator<T, C> translator, C context)
+    public static <T, C> TranslatedExpression<T> translateWith(
+            RowExpression expression,
+            DeterminismEvaluator determinismEvaluator,
+            StandardFunctionResolution functionResolution,
+            FunctionMetadataManager functionMetadataManager,
+            RowExpressionTranslator<T, C> translator,
+            C context)
     {
-        return expression.accept(new RowExpressionTreeTranslator<>(translator).visitor, context);
+        LogicalRowExpressions logicalRowExpressions = new LogicalRowExpressions(determinismEvaluator, functionResolution, functionMetadataManager);
+        return logicalRowExpressions.convertToConjunctiveNormalForm(expression).accept(new RowExpressionTreeTranslator<>(translator).visitor, context);
     }
 
     private class TranslatingVisitor

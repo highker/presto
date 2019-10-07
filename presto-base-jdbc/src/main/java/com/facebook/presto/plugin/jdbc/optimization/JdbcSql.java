@@ -11,23 +11,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spi.connector;
+package com.facebook.presto.plugin.jdbc.optimization;
 
-import com.facebook.presto.spi.ConnectorPlanOptimizer;
-import com.facebook.presto.spi.function.FunctionMetadata;
-import com.facebook.presto.spi.relation.translator.FunctionTranslator;
+import com.facebook.presto.spi.relation.ConstantExpression;
 
-import java.util.Map;
-import java.util.Set;
+import java.util.List;
 
-public interface ConnectorPlanOptimizerProvider
+public class JdbcSql
 {
-    Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers(Context context);
+    private final String sql;
+    private final List<ConstantExpression> bindValues;
 
-    Set<Class<?>> getFunctionTranslators();
-
-    interface Context
+    public JdbcSql(String sql, List<ConstantExpression> bindValues)
     {
-        <T> Map<FunctionMetadata, FunctionTranslator<T>> getFunctionTranslatorMapping(Class<T> expressionType);
+        this.sql = sql;
+        this.bindValues = bindValues;
+    }
+
+    public String getSql()
+    {
+        return sql;
+    }
+
+    public List<ConstantExpression> getBindValues()
+    {
+        return bindValues;
     }
 }

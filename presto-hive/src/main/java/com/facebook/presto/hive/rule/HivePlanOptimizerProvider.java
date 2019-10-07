@@ -23,7 +23,13 @@ public class HivePlanOptimizerProvider
         implements ConnectorPlanOptimizerProvider
 {
     @Override
-    public Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers()
+    public Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers(Context context)
+    {
+        return ImmutableSet.of();
+    }
+
+    @Override
+    public Set<Class<?>> getFunctionTranslators()
     {
         return ImmutableSet.of();
     }

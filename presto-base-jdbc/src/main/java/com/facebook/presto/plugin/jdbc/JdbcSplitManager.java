@@ -41,6 +41,7 @@ public class JdbcSplitManager
             ConnectorTableLayoutHandle layout,
             SplitSchedulingContext splitSchedulingContext)
     {
+        // TODO: use translatedSql from tableLayoutHandle
         JdbcTableLayoutHandle layoutHandle = (JdbcTableLayoutHandle) layout;
         return jdbcClient.getSplits(JdbcIdentity.from(session), layoutHandle);
     }
