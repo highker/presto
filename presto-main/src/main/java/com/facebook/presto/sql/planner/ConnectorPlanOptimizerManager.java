@@ -17,7 +17,6 @@ import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorPlanOptimizer;
 import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider;
 import com.facebook.presto.spi.function.FunctionMetadata;
-import com.facebook.presto.spi.relation.translator.FunctionTranslator;
 import com.google.common.collect.ImmutableMap;
 
 import javax.inject.Inject;
@@ -50,29 +49,23 @@ public class ConnectorPlanOptimizerManager
 
     public Map<ConnectorId, Set<ConnectorPlanOptimizer>> getOptimizers()
     {
-        return ImmutableMap.copyOf(transformValues(planOptimizerProviders, provider -> provider.getConnectorPlanOptimizers(new ConnectorPlanOptimizerProvider.Context()
-        {
-            @Override
-            public <T> Map<FunctionMetadata, FunctionTranslator<T>> getFunctionTranslatorMapping(Class<T> expressionType)
-            {
-                return getFunctionMapping(expressionType, provider.getFunctionTranslators());
-            }
-        })));
+        return ImmutableMap.copyOf(transformValues(planOptimizerProviders, provider -> provider.getConnectorPlanOptimizers(new ConnectorPlanOptimizerProvider.Context(getFunctionMapping(...))));
     }
 
-    private <T> Map<FunctionMetadata, FunctionTranslator<T>> getFunctionMapping(Class<T> returnClazz, Set<Class<?>> translatorContainers)
+    private <T> ConnectorPlanOptimizerProvider.FunctionTranslator getFunctionMapping(Class<T> returnClazz, Set<Class<?>> translatorContainers)
     {
-        return translatorContainers.stream()
+        new ConnectorPlanOptimizerProvider.FunctionTranslator<>(
+         translatorContainers.stream()
                 .map(containerClazz -> parseFunctionTranslations(returnClazz, containerClazz))
                 .map(Map::entrySet)
                 .flatMap(Set::stream)
-                .collect(toMap(Map.Entry::getKey, entry -> (FunctionTranslator<T>) translatedArguments -> {
+                .collect(toMap(Map.Entry::getKey, entry -> (ConnectorPlanOptimizerProvider.FunctionTranslator<T>) translatedArguments -> {
                     try {
                         return Optional.ofNullable((T) entry.getValue().invokeWithArguments(translatedArguments));
                     }
                     catch (Throwable t) {
                         return Optional.empty();
                     }
-                }));
+                })));
     }
 }

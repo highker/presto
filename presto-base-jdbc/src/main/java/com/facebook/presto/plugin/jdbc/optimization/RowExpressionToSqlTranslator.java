@@ -15,13 +15,13 @@ package com.facebook.presto.plugin.jdbc.optimization;
 
 import com.facebook.presto.plugin.jdbc.JdbcColumnHandle;
 import com.facebook.presto.spi.ColumnHandle;
+import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider;
 import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.function.FunctionMetadata;
 import com.facebook.presto.spi.function.FunctionMetadataManager;
 import com.facebook.presto.spi.relation.ConstantExpression;
 import com.facebook.presto.spi.relation.SpecialFormExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
-import com.facebook.presto.spi.relation.translator.FunctionTranslator;
 import com.facebook.presto.spi.relation.translator.RowExpressionTranslator;
 import com.facebook.presto.spi.relation.translator.TranslatedExpression;
 import com.facebook.presto.spi.type.BigintType;
@@ -54,10 +54,10 @@ public class RowExpressionToSqlTranslator
         extends RowExpressionTranslator<JdbcSql, Map<VariableReferenceExpression, ColumnHandle>>
 {
     private final FunctionMetadataManager functionMetadataManager;
-    private final Map<FunctionMetadata, FunctionTranslator<JdbcSql>> functionTranslators;
+    private final Map<FunctionMetadata, ConnectorPlanOptimizerProvider.FunctionTranslator<JdbcSql>> functionTranslators;
     private final String quote;
 
-    public RowExpressionToSqlTranslator(FunctionMetadataManager functionMetadataManager, Map<FunctionMetadata, FunctionTranslator<JdbcSql>> functionTranslators, String quote)
+    public RowExpressionToSqlTranslator(FunctionMetadataManager functionMetadataManager, Map<FunctionMetadata, ConnectorPlanOptimizerProvider.FunctionTranslator<JdbcSql>> functionTranslators, String quote)
     {
         this.functionMetadataManager = functionMetadataManager;
         this.functionTranslators = functionTranslators;

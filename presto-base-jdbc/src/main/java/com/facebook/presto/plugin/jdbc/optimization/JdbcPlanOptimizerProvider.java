@@ -22,7 +22,6 @@ import com.facebook.presto.spi.function.FunctionMetadataManager;
 import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.facebook.presto.spi.relation.DeterminismEvaluator;
 import com.facebook.presto.spi.relation.ExpressionOptimizer;
-import com.facebook.presto.spi.relation.translator.FunctionTranslator;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 

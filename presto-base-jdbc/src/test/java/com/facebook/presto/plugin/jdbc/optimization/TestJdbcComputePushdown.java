@@ -42,7 +42,6 @@ import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.relation.DeterminismEvaluator;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
-import com.facebook.presto.spi.relation.translator.FunctionTranslator;
 import com.facebook.presto.sql.TestingRowExpressionTranslator;
 import com.facebook.presto.sql.planner.Plan;
 import com.facebook.presto.sql.planner.TypeProvider;
@@ -99,13 +98,13 @@ public class TestJdbcComputePushdown
         DeterminismEvaluator determinismEvaluator = new RowExpressionDeterminismEvaluator(functionManager);
         ConnectorPlanOptimizerProvider.Context context = new ConnectorPlanOptimizerProvider.Context() {
             @Override
-            public <T> Map<FunctionMetadata, FunctionTranslator<T>> getFunctionTranslatorMapping(Class<T> expressionType)
+            public <T> Map<FunctionMetadata, ConnectorPlanOptimizerProvider.FunctionTranslator<T>> getFunctionTranslatorMapping(Class<T> expressionType)
             {
                 return getFunctionTranslators().stream()
                         .map(containerClazz -> parseFunctionTranslations(expressionType, containerClazz))
                         .map(Map::entrySet)
                         .flatMap(Set::stream)
-                        .collect(toMap(Map.Entry::getKey, entry -> (FunctionTranslator<T>) translatedArguments -> {
+                        .collect(toMap(Map.Entry::getKey, entry -> (ConnectorPlanOptimizerProvider.FunctionTranslator<T>) translatedArguments -> {
                             try {
                                 return Optional.ofNullable((T) entry.getValue().invokeWithArguments(translatedArguments));
                             }

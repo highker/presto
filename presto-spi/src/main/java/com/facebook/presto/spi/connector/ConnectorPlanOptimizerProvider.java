@@ -14,20 +14,48 @@
 package com.facebook.presto.spi.connector;
 
 import com.facebook.presto.spi.ConnectorPlanOptimizer;
+import com.facebook.presto.spi.function.FunctionHandle;
 import com.facebook.presto.spi.function.FunctionMetadata;
-import com.facebook.presto.spi.relation.translator.FunctionTranslator;
+import com.facebook.presto.spi.relation.translator.TranslatedExpression;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 public interface ConnectorPlanOptimizerProvider
 {
     Set<ConnectorPlanOptimizer> getConnectorPlanOptimizers(Context context);
 
-    Set<Class<?>> getFunctionTranslators();
-
-    interface Context
+    default Set<Class<?>> registerFunctionMapping()
     {
-        <T> Map<FunctionMetadata, FunctionTranslator<T>> getFunctionTranslatorMapping(Class<T> expressionType);
+        return Collections.emptySet();
+    }
+
+    class Context
+    {
+        public Context(FunctionTranslator functionTranslator)
+        {
+            this.functionTranslator = functionTranslator;
+        }
+
+        FunctionTranslator functionTranslator;
+
+        FunctionTranslator getGetFunctionTranslator()
+        {
+            return functionTranslator;
+        }
+    }
+
+    /**
+     * 1:1 function mapping
+     * @param <T>
+     */
+    class FunctionTranslator<T>
+    {
+        private Map<FunctionMetadata, FunctionTranslator<T>> mapping;
+
+        TranslatedExpression<T> translate(FunctionHandle handle, List<TranslatedExpression<T>> translatedArguments);
     }
 }

@@ -8,12 +8,12 @@ import com.facebook.presto.plugin.jdbc.JdbcTypeHandle;
 import com.facebook.presto.plugin.jdbc.optimization.function.OperatorTranslators;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorId;
+import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider;
 import com.facebook.presto.spi.function.FunctionMetadata;
 import com.facebook.presto.spi.function.StandardFunctionResolution;
 import com.facebook.presto.spi.relation.DeterminismEvaluator;
 import com.facebook.presto.spi.relation.RowExpression;
 import com.facebook.presto.spi.relation.VariableReferenceExpression;
-import com.facebook.presto.spi.relation.translator.FunctionTranslator;
 import com.facebook.presto.spi.relation.translator.TranslatedExpression;
 import com.facebook.presto.sql.TestingRowExpressionTranslator;
 import com.facebook.presto.sql.planner.TypeProvider;
@@ -88,13 +88,13 @@ public class TestRowExpressionToSqlTranslator
         return ImmutableSet.of(OperatorTranslators.class);
     }
 
-    public <T> Map<FunctionMetadata, FunctionTranslator<T>> getFunctionTranslatorMapping()
+    public <T> Map<FunctionMetadata, ConnectorPlanOptimizerProvider.FunctionTranslator<T>> getFunctionTranslatorMapping()
     {
         return getFunctionTranslators().stream()
                 .map(containerClazz -> parseFunctionTranslations(JdbcSql.class, containerClazz))
                 .map(Map::entrySet)
                 .flatMap(Set::stream)
-                .collect(toMap(Map.Entry::getKey, entry -> (FunctionTranslator<T>) translatedArguments -> {
+                .collect(toMap(Map.Entry::getKey, entry -> (ConnectorPlanOptimizerProvider.FunctionTranslator<T>) translatedArguments -> {
                     try {
                         return Optional.ofNullable((T) entry.getValue().invokeWithArguments(translatedArguments));
                     }

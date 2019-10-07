@@ -13,9 +13,10 @@
  */
 package com.facebook.presto.spi.relation.translator;
 
+import com.facebook.presto.spi.connector.ConnectorPlanOptimizerProvider;
 import com.facebook.presto.spi.function.FunctionHandle;
 
 public interface FunctionTranslatorProvider
 {
-   FunctionTranslator getFunctionTranslator(FunctionHandle functionHandle);
+   ConnectorPlanOptimizerProvider.FunctionTranslator getFunctionTranslator(FunctionHandle functionHandle);
 }
