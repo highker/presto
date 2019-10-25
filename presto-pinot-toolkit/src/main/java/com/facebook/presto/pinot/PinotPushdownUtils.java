@@ -120,14 +120,14 @@ public class PinotPushdownUtils
         int groupByKeyIndex = 0;
         ImmutableList.Builder<AggregationColumnNode> nodeBuilder = ImmutableList.builder();
         for (VariableReferenceExpression outputColumn : aggregationNode.getOutputVariables()) {
-            AggregationNode.Aggregation agg = aggregationNode.getAggregations().get(outputColumn);
+            AggregationNode.Aggregation aggregation = aggregationNode.getAggregations().get(outputColumn);
 
-            if (agg != null) {
-                CallExpression aggFunction = agg.getCall();
-                if (!agg.getFilter().isPresent()
-                        && !agg.isDistinct()
-                        && !agg.getOrderBy().isPresent()
-                        && !agg.getMask().isPresent()) {
+            if (aggregation != null) {
+                CallExpression aggFunction = aggregation.getCall();
+                if (!aggregation.getFilter().isPresent()
+                        && !aggregation.isDistinct()
+                        && !aggregation.getOrderBy().isPresent()
+                        && !aggregation.getMask().isPresent()) {
                     nodeBuilder.add(new AggregationFunctionColumnNode(outputColumn, aggFunction));
                 }
                 else {
@@ -147,7 +147,7 @@ public class PinotPushdownUtils
     public static LinkedHashMap<VariableReferenceExpression, SortOrder> getOrderingScheme(TopNNode topNNode)
     {
         LinkedHashMap<VariableReferenceExpression, SortOrder> orderingScheme = new LinkedHashMap<>();
-        topNNode.getOrderingScheme().getOrderByVariables().forEach(v -> orderingScheme.put(v, topNNode.getOrderingScheme().getOrdering(v)));
+        topNNode.getOrderingScheme().getOrderByVariables().forEach(value -> orderingScheme.put(value, topNNode.getOrderingScheme().getOrdering(value)));
         return orderingScheme;
     }
 }

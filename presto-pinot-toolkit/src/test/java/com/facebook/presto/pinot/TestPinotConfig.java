@@ -51,10 +51,10 @@ public class TestPinotConfig
                         .setNumSegmentsPerSplit(1)
                         .setFetchRetryCount(2)
                         .setIgnoreEmptyResponses(false)
-                        .setUseDateTrunc(false)
+                        .setUseDateTruncation(false)
                         .setForbidSegmentQueries(false)
                         .setNonAggregateLimitForBrokerQueries(PinotConfig.DEFAULT_NON_AGGREGATE_LIMIT_FOR_BROKER_QUERIES)
-                        .setUseDateTrunc(false));
+                        .setUseDateTruncation(false));
     }
 
     @Test
@@ -116,7 +116,7 @@ public class TestPinotConfig
                 .setNonAggregateLimitForBrokerQueries(10)
                 .setLimitLargeForSegment(100)
                 .setForbidSegmentQueries(true)
-                .setUseDateTrunc(true);
+                .setUseDateTruncation(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

@@ -76,7 +76,7 @@ public class PinotConfig
     private int numSegmentsPerSplit = 1;
     private boolean ignoreEmptyResponses;
     private int fetchRetryCount = 2;
-    private boolean useDateTrunc;
+    private boolean useDateTruncation;
     private int nonAggregateLimitForBrokerQueries = DEFAULT_NON_AGGREGATE_LIMIT_FOR_BROKER_QUERIES;
 
     @NotNull
@@ -353,15 +353,15 @@ public class PinotConfig
         return this;
     }
 
-    public boolean isUseDateTrunc()
+    public boolean isUseDateTruncation()
     {
-        return useDateTrunc;
+        return useDateTruncation;
     }
 
     @Config("pinot.use-date-trunc")
-    public PinotConfig setUseDateTrunc(boolean useDateTrunc)
+    public PinotConfig setUseDateTruncation(boolean useDateTruncation)
     {
-        this.useDateTrunc = useDateTrunc;
+        this.useDateTruncation = useDateTruncation;
         return this;
     }
 

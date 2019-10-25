@@ -115,7 +115,7 @@ public class TestPinotQueryBase
 
         public SessionHolder(boolean usePrestoDateTrunc)
         {
-            connectorSession = new TestingConnectorSession(new PinotSessionProperties(new PinotConfig().setUseDateTrunc(usePrestoDateTrunc)).getSessionProperties());
+            connectorSession = new TestingConnectorSession(new PinotSessionProperties(new PinotConfig().setUseDateTruncation(usePrestoDateTrunc)).getSessionProperties());
             session = TestingSession.testSessionBuilder(new SessionPropertyManager(new SystemSessionProperties().getSessionProperties())).build();
         }
 
@@ -198,15 +198,15 @@ public class TestPinotQueryBase
         return SqlToRowExpressionTranslator.translate(expression, expressionTypes, ImmutableMap.of(), functionMetadataManager, typeManager, session);
     }
 
-    protected LimitNode limit(PlanBuilder pb, long count, PlanNode source)
+    protected LimitNode limit(PlanBuilder planBuilder, long count, PlanNode source)
     {
-        return new LimitNode(pb.getIdAllocator().getNextId(), source, count, FINAL);
+        return new LimitNode(planBuilder.getIdAllocator().getNextId(), source, count, FINAL);
     }
 
-    protected TopNNode topn(PlanBuilder pb, long count, List<String> orderingColumns, List<Boolean> ascending, PlanNode source)
+    protected TopNNode topN(PlanBuilder planBuilder, long count, List<String> orderingColumns, List<Boolean> ascending, PlanNode source)
     {
         ImmutableList<Ordering> ordering = IntStream.range(0, orderingColumns.size()).boxed().map(i -> new Ordering(v(orderingColumns.get(i)), ascending.get(i) ? SortOrder.ASC_NULLS_FIRST : SortOrder.DESC_NULLS_FIRST)).collect(toImmutableList());
-        return new TopNNode(pb.getIdAllocator().getNextId(), source, count, new OrderingScheme(ordering), TopNNode.Step.SINGLE);
+        return new TopNNode(planBuilder.getIdAllocator().getNextId(), source, count, new OrderingScheme(ordering), TopNNode.Step.SINGLE);
     }
 
     protected RowExpression getRowExpression(String sqlExpression, SessionHolder sessionHolder)

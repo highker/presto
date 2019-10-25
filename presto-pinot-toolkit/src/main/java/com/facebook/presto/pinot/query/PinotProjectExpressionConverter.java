@@ -73,7 +73,7 @@ class PinotProjectExpressionConverter
         implements RowExpressionVisitor<PinotExpression, Map<VariableReferenceExpression, Selection>>
 {
     // Pinot does not support modulus yet
-    private static final Map<String, String> PRESTO_TO_PINOT_OP = ImmutableMap.of(
+    private static final Map<String, String> PRESTO_TO_PINOT_OPERATORS = ImmutableMap.of(
             "-", "SUB",
             "+", "ADD",
             "*", "MULT",
@@ -134,7 +134,7 @@ class PinotProjectExpressionConverter
             return format("%d", number.longValue());
         }
         if (type instanceof DoubleType) {
-            return format("%f", (Double) node.getValue());
+            return node.getValue().toString();
         }
         if (type instanceof RealType) {
             Long number = (Long) node.getValue();
@@ -183,7 +183,7 @@ class PinotProjectExpressionConverter
         throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(), "Could not dig function out of expression: " + originalExpression + ", inside of " + expression);
     }
 
-    private PinotExpression handleDateTruncViaDateTimeConvert(
+    private PinotExpression handleDateTruncationViaDateTimeConvert(
             CallExpression function,
             Map<VariableReferenceExpression, Selection> context)
     {
@@ -214,8 +214,8 @@ class PinotProjectExpressionConverter
                     "interval unit in date_trunc is not supported: " + intervalParameter);
         }
 
-        String strValue = getStringFromConstant(intervalParameter);
-        switch (strValue) {
+        String value = getStringFromConstant(intervalParameter);
+        switch (value) {
             case "second":
                 outputGranularity = "'1:SECONDS'";
                 break;
@@ -241,14 +241,16 @@ class PinotProjectExpressionConverter
                 outputGranularity = "'1:YEARS'";
                 break;
             default:
-                throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(),
-                        "interval in date_trunc is not supported: " + strValue);
+                throw new PinotException(
+                        PINOT_UNSUPPORTED_EXPRESSION,
+                        Optional.empty(),
+                        "interval in date_trunc is not supported: " + value);
         }
 
         return derived("dateTimeConvert(" + inputColumn + ", " + inputFormat + ", " + outputFormat + ", " + outputGranularity + ")");
     }
 
-    private PinotExpression handleDateTruncViaDateTrunc(
+    private PinotExpression handleDateTruncationViaDateTruncation(
             CallExpression function,
             Map<VariableReferenceExpression, Selection> context)
     {
@@ -270,7 +272,9 @@ class PinotProjectExpressionConverter
 
         RowExpression intervalParameter = function.getArguments().get(0);
         if (!(intervalParameter instanceof ConstantExpression)) {
-            throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(),
+            throw new PinotException(
+                    PINOT_UNSUPPORTED_EXPRESSION,
+                    Optional.empty(),
                     "interval unit in date_trunc is not supported: " + intervalParameter);
         }
 
@@ -314,12 +318,12 @@ class PinotProjectExpressionConverter
         if (arguments.size() == 2) {
             PinotExpression left = arguments.get(0).accept(this, context);
             PinotExpression right = arguments.get(1).accept(this, context);
-            String prestoOp = operatorType.getOperator();
-            String pinotOp = PRESTO_TO_PINOT_OP.get(prestoOp);
-            if (pinotOp == null) {
-                throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(), "Unsupported binary expression " + prestoOp);
+            String prestoOperator = operatorType.getOperator();
+            String pinotOperator = PRESTO_TO_PINOT_OPERATORS.get(prestoOperator);
+            if (pinotOperator == null) {
+                throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(), "Unsupported binary expression " + prestoOperator);
             }
-            return derived(format("%s(%s, %s)", pinotOp, left.getDefinition(), right.getDefinition()));
+            return derived(format("%s(%s, %s)", pinotOperator, left.getDefinition(), right.getDefinition()));
         }
         throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(), format("Don't know how to interpret %s as an arithmetic expression", expression));
     }
@@ -346,10 +350,10 @@ class PinotProjectExpressionConverter
     {
         switch (function.getDisplayName().toLowerCase(ENGLISH)) {
             case "date_trunc":
-                boolean useDateTrunc = PinotSessionProperties.isUseDateTrunc(session);
-                return useDateTrunc ?
-                        handleDateTruncViaDateTrunc(function, context) :
-                        handleDateTruncViaDateTimeConvert(function, context);
+                boolean useDateTruncation = PinotSessionProperties.isUseDateTruncation(session);
+                return useDateTruncation ?
+                        handleDateTruncationViaDateTruncation(function, context) :
+                        handleDateTruncationViaDateTimeConvert(function, context);
             default:
                 throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(), format("function %s not supported yet", function.getDisplayName()));
         }

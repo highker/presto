@@ -140,18 +140,24 @@ public class PinotQueryGenerator
     {
         final String table;
         final String pql;
-        final List<Integer> columnIndicesExpected;
-        final int numGroupByClauses;
+        final List<Integer> expectedColumnIndices;
+        final int groupByClauses;
         final boolean haveFilter;
         final boolean isQueryShort;
 
         @JsonCreator
-        public GeneratedPql(@JsonProperty("table") String table, @JsonProperty("pql") String pql, @JsonProperty("columnIndicesExpected") List<Integer> columnIndicesExpected, @JsonProperty("numGroupByClauses") int numGroupByClauses, @JsonProperty("haveFilter") boolean haveFilter, @JsonProperty("isQueryShort") boolean isQueryShort)
+        public GeneratedPql(
+                @JsonProperty("table") String table,
+                @JsonProperty("pql") String pql,
+                @JsonProperty("expectedColumnIndices") List<Integer> expectedColumnIndices,
+                @JsonProperty("groupByClauses") int groupByClauses,
+                @JsonProperty("haveFilter") boolean haveFilter,
+                @JsonProperty("isQueryShort") boolean isQueryShort)
         {
             this.table = table;
             this.pql = pql;
-            this.columnIndicesExpected = columnIndicesExpected;
-            this.numGroupByClauses = numGroupByClauses;
+            this.expectedColumnIndices = expectedColumnIndices;
+            this.groupByClauses = groupByClauses;
             this.haveFilter = haveFilter;
             this.isQueryShort = isQueryShort;
         }
@@ -162,16 +168,16 @@ public class PinotQueryGenerator
             return pql;
         }
 
-        @JsonProperty("columnIndicesExpected")
-        public List<Integer> getColumnIndicesExpected()
+        @JsonProperty("expectedColumnIndices")
+        public List<Integer> getExpectedColumnIndices()
         {
-            return columnIndicesExpected;
+            return expectedColumnIndices;
         }
 
-        @JsonProperty("numGroupByClauses")
-        public int getNumGroupByClauses()
+        @JsonProperty("groupByClauses")
+        public int getGroupByClauses()
         {
-            return numGroupByClauses;
+            return groupByClauses;
         }
 
         @JsonProperty("table")
@@ -198,8 +204,8 @@ public class PinotQueryGenerator
             return toStringHelper(this)
                     .add("pql", pql)
                     .add("table", table)
-                    .add("columnIndicesExpected", columnIndicesExpected)
-                    .add("numGroupByClauses", numGroupByClauses)
+                    .add("expectedColumnIndices", expectedColumnIndices)
+                    .add("groupByClauses", groupByClauses)
                     .add("haveFilter", haveFilter)
                     .add("isQueryShort", isQueryShort)
                     .toString();
@@ -238,7 +244,7 @@ public class PinotQueryGenerator
             context = node.getSource().accept(this, context);
             requireNonNull(context, "context is null");
             LinkedHashMap<VariableReferenceExpression, Selection> selections = context.getSelections();
-            String filter = node.getPredicate().accept(pinotFilterExpressionConverter, (var) -> selections.get(var)).getDefinition();
+            String filter = node.getPredicate().accept(pinotFilterExpressionConverter, selections::get).getDefinition();
             return context.withFilter(filter).withOutputColumns(node.getOutputVariables());
         }
 
@@ -280,19 +286,19 @@ public class PinotQueryGenerator
 
         private String handleAggregationFunction(CallExpression aggregation, Map<VariableReferenceExpression, Selection> inputSelections)
         {
-            String prestoAgg = aggregation.getDisplayName().toLowerCase(ENGLISH);
-            List<RowExpression> params = aggregation.getArguments();
-            switch (prestoAgg) {
+            String prestoAggregation = aggregation.getDisplayName().toLowerCase(ENGLISH);
+            List<RowExpression> parameters = aggregation.getArguments();
+            switch (prestoAggregation) {
                 case "count":
-                    if (params.size() <= 1) {
-                        return format("count(%s)", params.isEmpty() ? "*" : inputSelections.get(getVariableReference(params.get(0))));
+                    if (parameters.size() <= 1) {
+                        return format("count(%s)", parameters.isEmpty() ? "*" : inputSelections.get(getVariableReference(parameters.get(0))));
                     }
                     break;
                 case "approx_percentile":
                     return handleApproxPercentile(aggregation, inputSelections);
                 default:
-                    if (UNARY_AGGREGATION_MAP.containsKey(prestoAgg) && aggregation.getArguments().size() == 1) {
-                        return format("%s(%s)", UNARY_AGGREGATION_MAP.get(prestoAgg), inputSelections.get(getVariableReference(params.get(0))));
+                    if (UNARY_AGGREGATION_MAP.containsKey(prestoAggregation) && aggregation.getArguments().size() == 1) {
+                        return format("%s(%s)", UNARY_AGGREGATION_MAP.get(prestoAggregation), inputSelections.get(getVariableReference(parameters.get(0))));
                     }
             }
 
@@ -323,6 +329,7 @@ public class PinotQueryGenerator
             else {
                 throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(), "Expected the fraction to be a constant or a variable " + fractionInput);
             }
+
             int percentile = getValidPercentile(fractionString);
             if (percentile < 0) {
                 throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(),
@@ -334,11 +341,11 @@ public class PinotQueryGenerator
         private int getValidPercentile(String fraction)
         {
             try {
-                double p = Double.parseDouble(fraction);
-                if (p < 0 || p > 1) {
+                double percent = Double.parseDouble(fraction);
+                if (percent < 0 || percent > 1) {
                     throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "Percentile must be between 0 and 1");
                 }
-                double percent = p * 100.0;
+                percent = percent * 100.0;
                 if (percent == Math.floor(percent)) {
                     return (int) percent;
                 }
@@ -377,10 +384,10 @@ public class PinotQueryGenerator
                         break;
                     }
                     case AGGREGATE: {
-                        AggregationFunctionColumnNode aggr = (AggregationFunctionColumnNode) expression;
-                        String pinotAggFunction = handleAggregationFunction(aggr.getCallExpression(), context.getSelections());
-                        newSelections.put(getVariableReference(aggr.getOutputColumn()), new Selection(pinotAggFunction, DERIVED));
-                        ++aggregations;
+                        AggregationFunctionColumnNode aggregationNode = (AggregationFunctionColumnNode) expression;
+                        String pinotAggFunction = handleAggregationFunction(aggregationNode.getCallExpression(), context.getSelections());
+                        newSelections.put(getVariableReference(aggregationNode.getOutputColumn()), new Selection(pinotAggFunction, DERIVED));
+                        aggregations++;
                         break;
                     }
                     default:

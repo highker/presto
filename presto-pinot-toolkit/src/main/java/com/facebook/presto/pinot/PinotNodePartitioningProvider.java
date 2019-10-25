@@ -50,7 +50,8 @@ public class PinotNodePartitioningProvider
     public BucketFunction getBucketFunction(
             ConnectorTransactionHandle transactionHandle,
             ConnectorSession session,
-            ConnectorPartitioningHandle partitioningHandle, List<Type> partitionChannelTypes,
+            ConnectorPartitioningHandle partitioningHandle,
+            List<Type> partitionChannelTypes,
             int bucketCount)
     {
         return null;

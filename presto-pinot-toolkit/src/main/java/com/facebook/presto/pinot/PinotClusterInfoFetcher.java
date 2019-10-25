@@ -151,9 +151,16 @@ public class PinotClusterInfoFetcher
             return responseBody;
         }
         else {
-            throw new PinotException(PinotErrorCode.PINOT_HTTP_ERROR,
+            throw new PinotException(
+                    PinotErrorCode.PINOT_HTTP_ERROR,
                     Optional.empty(),
-                    String.format("Unexpected response status: %d for request %s to url %s, with headers %s, full response %s", response.getStatusCode(), requestBody.orElse(""), request.getUri(), request.getHeaders(), responseBody));
+                    String.format(
+                            "Unexpected response status: %d for request %s to url %s, with headers %s, full response %s",
+                            response.getStatusCode(),
+                            requestBody.orElse(""),
+                            request.getUri(),
+                            request.getHeaders(),
+                            responseBody));
         }
     }
 

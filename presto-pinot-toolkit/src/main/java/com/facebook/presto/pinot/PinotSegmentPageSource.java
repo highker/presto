@@ -161,8 +161,8 @@ public class PinotSegmentPageSource
             // Write a block for each column in the original order.
             writeBlock(blockBuilder, columnType, columnHandleIdx);
         }
-        Page page = pageBuilder.build();
-        return page;
+
+        return pageBuilder.build();
     }
 
     /**
@@ -263,104 +263,104 @@ public class PinotSegmentPageSource
         }
     }
 
-    private void writeBooleanBlock(BlockBuilder blockBuilder, Type columnType, int columnIdx)
+    private void writeBooleanBlock(BlockBuilder blockBuilder, Type columnType, int columnIndex)
     {
         for (int i = 0; i < currentDataTable.getDataTable().getNumberOfRows(); i++) {
-            columnType.writeBoolean(blockBuilder, getBoolean(i, columnIdx));
+            columnType.writeBoolean(blockBuilder, getBoolean(i, columnIndex));
             completedBytes++;
         }
     }
 
-    private void writeLongBlock(BlockBuilder blockBuilder, Type columnType, int columnIdx)
+    private void writeLongBlock(BlockBuilder blockBuilder, Type columnType, int columnIndex)
     {
         for (int i = 0; i < currentDataTable.getDataTable().getNumberOfRows(); i++) {
-            columnType.writeLong(blockBuilder, getLong(i, columnIdx));
+            columnType.writeLong(blockBuilder, getLong(i, columnIndex));
             completedBytes += Long.BYTES;
         }
     }
 
-    private void writeDoubleBlock(BlockBuilder blockBuilder, Type columnType, int columnIdx)
+    private void writeDoubleBlock(BlockBuilder blockBuilder, Type columnType, int columnIndex)
     {
         for (int i = 0; i < currentDataTable.getDataTable().getNumberOfRows(); i++) {
-            columnType.writeDouble(blockBuilder, getDouble(i, columnIdx));
+            columnType.writeDouble(blockBuilder, getDouble(i, columnIndex));
             completedBytes += Double.BYTES;
         }
     }
 
-    private void writeSliceBlock(BlockBuilder blockBuilder, Type columnType, int columnIdx)
+    private void writeSliceBlock(BlockBuilder blockBuilder, Type columnType, int columnIndex)
     {
         for (int i = 0; i < currentDataTable.getDataTable().getNumberOfRows(); i++) {
-            Slice slice = getSlice(i, columnIdx);
+            Slice slice = getSlice(i, columnIndex);
             columnType.writeSlice(blockBuilder, slice, 0, slice.length());
             completedBytes += slice.getBytes().length;
         }
     }
 
-    Type getType(int colIdx)
+    Type getType(int columnIndex)
     {
-        checkArgument(colIdx < columnHandles.size(), "Invalid field index");
-        return columnHandles.get(colIdx).getDataType();
+        checkArgument(columnIndex < columnHandles.size(), "Invalid field index");
+        return columnHandles.get(columnIndex).getDataType();
     }
 
-    boolean getBoolean(int rowIdx, int colIdx)
+    boolean getBoolean(int rowIdx, int columnIndex)
     {
-        return Boolean.getBoolean(currentDataTable.getDataTable().getString(rowIdx, colIdx));
+        return Boolean.getBoolean(currentDataTable.getDataTable().getString(rowIdx, columnIndex));
     }
 
-    long getLong(int rowIdx, int colIdx)
+    long getLong(int rowIndex, int columnIndex)
     {
-        DataSchema.ColumnDataType dataType = currentDataTable.getDataTable().getDataSchema().getColumnDataType(colIdx);
+        DataSchema.ColumnDataType dataType = currentDataTable.getDataTable().getDataSchema().getColumnDataType(columnIndex);
         // Note columnType in the dataTable could be different from the original columnType in the columnHandle.
         // e.g. when original column type is int/long and aggregation value is requested, the returned dataType from Pinot would be double.
         // So need to cast it back to the original columnType.
         if (dataType.equals(DataType.DOUBLE)) {
-            return (long) currentDataTable.getDataTable().getDouble(rowIdx, colIdx);
+            return (long) currentDataTable.getDataTable().getDouble(rowIndex, columnIndex);
         }
         if (dataType.equals(DataType.INT)) {
-            return (long) currentDataTable.getDataTable().getInt(rowIdx, colIdx);
+            return (long) currentDataTable.getDataTable().getInt(rowIndex, columnIndex);
         }
         else {
-            return currentDataTable.getDataTable().getLong(rowIdx, colIdx);
+            return currentDataTable.getDataTable().getLong(rowIndex, columnIndex);
         }
     }
 
-    double getDouble(int rowIdx, int colIdx)
+    double getDouble(int rowIndex, int columnIndex)
     {
-        DataSchema.ColumnDataType dataType = currentDataTable.getDataTable().getDataSchema().getColumnDataType(colIdx);
+        DataSchema.ColumnDataType dataType = currentDataTable.getDataTable().getDataSchema().getColumnDataType(columnIndex);
         if (dataType.equals(DataType.FLOAT)) {
-            return currentDataTable.getDataTable().getFloat(rowIdx, colIdx);
+            return currentDataTable.getDataTable().getFloat(rowIndex, columnIndex);
         }
         else {
-            return currentDataTable.getDataTable().getDouble(rowIdx, colIdx);
+            return currentDataTable.getDataTable().getDouble(rowIndex, columnIndex);
         }
     }
 
-    Slice getSlice(int rowIdx, int colIdx)
+    Slice getSlice(int rowIndex, int columnIndex)
     {
-        checkColumnType(colIdx, VARCHAR);
-        DataSchema.ColumnDataType columnType = currentDataTable.getDataTable().getDataSchema().getColumnDataType(colIdx);
+        checkColumnType(columnIndex, VARCHAR);
+        DataSchema.ColumnDataType columnType = currentDataTable.getDataTable().getDataSchema().getColumnDataType(columnIndex);
         switch (columnType) {
             case INT_ARRAY:
-                int[] intArray = currentDataTable.getDataTable().getIntArray(rowIdx, colIdx);
+                int[] intArray = currentDataTable.getDataTable().getIntArray(rowIndex, columnIndex);
                 return utf8Slice(Arrays.toString(intArray));
             case LONG_ARRAY:
-                long[] longArray = currentDataTable.getDataTable().getLongArray(rowIdx, colIdx);
+                long[] longArray = currentDataTable.getDataTable().getLongArray(rowIndex, columnIndex);
                 return utf8Slice(Arrays.toString(longArray));
             case FLOAT_ARRAY:
-                float[] floatArray = currentDataTable.getDataTable().getFloatArray(rowIdx, colIdx);
+                float[] floatArray = currentDataTable.getDataTable().getFloatArray(rowIndex, columnIndex);
                 return utf8Slice(Arrays.toString(floatArray));
             case DOUBLE_ARRAY:
-                double[] doubleArray = currentDataTable.getDataTable().getDoubleArray(rowIdx, colIdx);
+                double[] doubleArray = currentDataTable.getDataTable().getDoubleArray(rowIndex, columnIndex);
                 return utf8Slice(Arrays.toString(doubleArray));
             case STRING_ARRAY:
-                String[] stringArray = currentDataTable.getDataTable().getStringArray(rowIdx, colIdx);
+                String[] stringArray = currentDataTable.getDataTable().getStringArray(rowIndex, columnIndex);
                 return utf8Slice(Arrays.toString(stringArray));
             case STRING:
-                String fieldStr = currentDataTable.getDataTable().getString(rowIdx, colIdx);
-                if (fieldStr == null || fieldStr.isEmpty()) {
+                String field = currentDataTable.getDataTable().getString(rowIndex, columnIndex);
+                if (field == null || field.isEmpty()) {
                     return Slices.EMPTY_SLICE;
                 }
-                return Slices.utf8Slice(fieldStr);
+                return Slices.utf8Slice(field);
         }
         return Slices.EMPTY_SLICE;
     }
@@ -390,10 +390,10 @@ public class PinotSegmentPageSource
         return pinotConfig.getEstimatedSizeInBytesForNonNumericColumn();
     }
 
-    void checkColumnType(int colIdx, Type expected)
+    void checkColumnType(int columnIndex, Type expected)
     {
-        Type actual = getType(colIdx);
-        checkArgument(actual.equals(expected), "Expected column %s to be type %s but is %s", colIdx, expected, actual);
+        Type actual = getType(columnIndex);
+        checkArgument(actual.equals(expected), "Expected column %s to be type %s but is %s", columnIndex, expected, actual);
     }
 
     Type getTypeForBlock(PinotColumnHandle pinotColumnHandle)
@@ -410,7 +410,7 @@ public class PinotSegmentPageSource
         return 0;
     }
 
-    private class PinotDataTableWithSize
+    private static class PinotDataTableWithSize
     {
         DataTable dataTable;
         int estimatedSizeInBytes;

@@ -110,7 +110,7 @@ public class PinotSplitManager
             String pql)
     {
         final String finalTableName = tableName + tableNameSuffix;
-        int numSegmentsPerSplitConfigured = PinotSessionProperties.getNumSegmentsPerSplit(session);
+        int segmentsPerSplitConfigured = PinotSessionProperties.getNumSegmentsPerSplit(session);
         for (String routingTableName : routingTable.keySet()) {
             if (!routingTableName.equalsIgnoreCase(finalTableName)) {
                 continue;
@@ -118,7 +118,7 @@ public class PinotSplitManager
 
             Map<String, List<String>> hostToSegmentsMap = routingTable.get(routingTableName);
             hostToSegmentsMap.forEach((host, segments) -> {
-                int numSegmentsInThisSplit = Math.min(segments.size(), numSegmentsPerSplitConfigured);
+                int numSegmentsInThisSplit = Math.min(segments.size(), segmentsPerSplitConfigured);
                 // segments is already shuffled
                 Iterables.partition(segments, numSegmentsInThisSplit).forEach(
                         segmentsForThisSplit -> splits.add(

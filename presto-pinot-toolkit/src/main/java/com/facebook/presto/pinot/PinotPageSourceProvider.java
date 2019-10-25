@@ -49,7 +49,12 @@ public class PinotPageSourceProvider
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
         this.pinotConfig = requireNonNull(pinotConfig, "pinotConfig is null");
-        this.pinotQueryClient = new PinotScatterGatherQueryClient(new PinotScatterGatherQueryClient.Config(pinotConfig.getIdleTimeout().toMillis(), pinotConfig.getThreadPoolSize(), pinotConfig.getMinConnectionsPerServer(), pinotConfig.getMaxBacklogPerServer(), pinotConfig.getMaxConnectionsPerServer()));
+        this.pinotQueryClient = new PinotScatterGatherQueryClient(new PinotScatterGatherQueryClient.Config(
+                pinotConfig.getIdleTimeout().toMillis(),
+                pinotConfig.getThreadPoolSize(),
+                pinotConfig.getMinConnectionsPerServer(),
+                pinotConfig.getMaxBacklogPerServer(),
+                pinotConfig.getMaxConnectionsPerServer()));
         this.clusterInfoFetcher = requireNonNull(clusterInfoFetcher, "cluster info fetcher is null");
         this.objectMapper = requireNonNull(objectMapper, "object mapper is null");
     }

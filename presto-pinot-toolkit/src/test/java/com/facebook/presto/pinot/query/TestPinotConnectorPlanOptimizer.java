@@ -71,7 +71,7 @@ public class TestPinotConnectorPlanOptimizer
             functionMetadataManager);
     private final PinotTableHandle pinotTable = TestPinotSplitManager.hybridTable;
 
-    private PlanBuilder createPb(SessionHolder sessionHolder)
+    private PlanBuilder createPlanBuilder(SessionHolder sessionHolder)
     {
         return new PlanBuilder(sessionHolder.getSession(), new PlanNodeIdAllocator(), metadata);
     }
@@ -200,20 +200,20 @@ public class TestPinotConnectorPlanOptimizer
     @Test
     public void testSimpleSelectStar()
     {
-        PlanBuilder pb = createPb(defaultSessionHolder);
-        PlanNode originalPlan = limit(pb, 50L, tableScan(pb, pinotTable, regionId, city, fare, secondsSinceEpoch));
-        PlanNode optimized = getOptimizedPlan(pb, originalPlan, true);
+        PlanBuilder planBuilder = createPlanBuilder(defaultSessionHolder);
+        PlanNode originalPlan = limit(planBuilder, 50L, tableScan(planBuilder, pinotTable, regionId, city, fare, secondsSinceEpoch));
+        PlanNode optimized = getOptimizedPlan(planBuilder, originalPlan, true);
         assertPlanMatch(optimized, SimpleTableScanMatcher.tableScan(pinotTable, Optional.of("SELECT regionId, city, fare, secondsSinceEpoch FROM hybrid LIMIT 50"), Optional.of(false), originalPlan.getOutputVariables()), typeProvider);
     }
 
     @Test
     public void testFilterSplitting()
     {
-        PlanBuilder pb = createPb(defaultSessionHolder);
-        TableScanNode tableScanNode = tableScan(pb, pinotTable, regionId, city, fare, secondsSinceEpoch);
-        FilterNode filter = filter(pb, tableScanNode, getRowExpression("lower(substr(city, 0, 3)) = 'del' AND fare > 100", defaultSessionHolder));
-        PlanNode originalPlan = limit(pb, 50L, filter);
-        PlanNode optimized = getOptimizedPlan(pb, originalPlan, true);
+        PlanBuilder planBuilder = createPlanBuilder(defaultSessionHolder);
+        TableScanNode tableScanNode = tableScan(planBuilder, pinotTable, regionId, city, fare, secondsSinceEpoch);
+        FilterNode filter = filter(planBuilder, tableScanNode, getRowExpression("lower(substr(city, 0, 3)) = 'del' AND fare > 100", defaultSessionHolder));
+        PlanNode originalPlan = limit(planBuilder, 50L, filter);
+        PlanNode optimized = getOptimizedPlan(planBuilder, originalPlan, true);
         PlanMatchPattern tableScanMatcher = SimpleTableScanMatcher.tableScan(pinotTable, Optional.of("SELECT regionId, city, fare, secondsSinceEpoch FROM hybrid__TABLE_NAME_SUFFIX_TEMPLATE__ WHERE \\(fare > 100\\).*"), Optional.of(true), filter.getOutputVariables());
         assertPlanMatch(optimized, PlanMatchPattern.limit(50L, PlanMatchPattern.filter("lower(substr(city, 0, 3)) = 'del'", tableScanMatcher)), typeProvider);
     }
@@ -224,21 +224,21 @@ public class TestPinotConnectorPlanOptimizer
         Map<String, ExpectedValueProvider<FunctionCall>> aggregationsSecond = ImmutableMap.of(
                 "count", PlanMatchPattern.functionCall("count", false, ImmutableList.of()));
 
-        PlanBuilder pb = createPb(defaultSessionHolder);
-        PlanNode limit = limit(pb, 50L, tableScan(pb, pinotTable, regionId, city, fare, secondsSinceEpoch));
-        PlanNode originalPlan = pb.aggregation(builder -> builder.source(limit).globalGrouping().addAggregation(new VariableReferenceExpression("count", BIGINT), getRowExpression("count(*)", defaultSessionHolder)));
+        PlanBuilder planBuilder = createPlanBuilder(defaultSessionHolder);
+        PlanNode limit = limit(planBuilder, 50L, tableScan(planBuilder, pinotTable, regionId, city, fare, secondsSinceEpoch));
+        PlanNode originalPlan = planBuilder.aggregation(builder -> builder.source(limit).globalGrouping().addAggregation(new VariableReferenceExpression("count", BIGINT), getRowExpression("count(*)", defaultSessionHolder)));
 
-        PlanNode optimized = getOptimizedPlan(pb, originalPlan, true);
+        PlanNode optimized = getOptimizedPlan(planBuilder, originalPlan, true);
 
         PlanMatchPattern tableScanMatcher = SimpleTableScanMatcher.tableScan(pinotTable, Optional.of("SELECT regionId, city, fare, secondsSinceEpoch FROM hybrid LIMIT 50"), Optional.of(false), originalPlan.getOutputVariables());
         assertPlanMatch(optimized, aggregation(aggregationsSecond, tableScanMatcher), typeProvider);
     }
 
-    private PlanNode getOptimizedPlan(PlanBuilder pb, PlanNode originalPlan, boolean scanParallelism)
+    private PlanNode getOptimizedPlan(PlanBuilder planBuilder, PlanNode originalPlan, boolean scanParallelism)
     {
         PinotConfig pinotConfig = new PinotConfig().setPreferBrokerQueries(scanParallelism);
         PinotQueryGenerator pinotQueryGenerator = new PinotQueryGenerator(pinotConfig, typeManager, functionMetadataManager, standardFunctionResolution);
         PinotConnectorPlanOptimizer optimizer = new PinotConnectorPlanOptimizer(pinotQueryGenerator, typeManager, functionMetadataManager, logicalRowExpressions, standardFunctionResolution);
-        return optimizer.optimize(originalPlan, defaultSessionHolder.getConnectorSession(), new PlanVariableAllocator(), pb.getIdAllocator());
+        return optimizer.optimize(originalPlan, defaultSessionHolder.getConnectorSession(), new PlanVariableAllocator(), planBuilder.getIdAllocator());
     }
 }

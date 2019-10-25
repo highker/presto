@@ -27,7 +27,7 @@ import static org.testng.Assert.fail;
 public class TestPinotExpressionConverters
         extends TestPinotQueryBase
 {
-    private final Function<VariableReferenceExpression, PinotQueryGeneratorContext.Selection> testInputFunction = (var) -> testInput.get(var);
+    private final Function<VariableReferenceExpression, PinotQueryGeneratorContext.Selection> testInputFunction = testInput::get;
 
     @Test
     public void testProjectExpressionConverter()
@@ -63,7 +63,7 @@ public class TestPinotExpressionConverters
     }
 
     @Test
-    public void testPrestoDateTruncConversion()
+    public void testPrestoDateTruncationConversion()
     {
         SessionHolder sessionHolder = new SessionHolder(true);
         testProject("date_trunc('hour', from_unixtime(secondssinceepoch + 2))",

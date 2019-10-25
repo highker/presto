@@ -154,7 +154,6 @@ public class PinotConnectorPlanOptimizer
             this.session = session;
             this.idAllocator = idAllocator;
             this.tableScanNode = tableScanNode;
-            String tableName = getPinotTableHandle(this.tableScanNode).get().getTableName();
         }
 
         private Optional<PlanNode> tryCreatingNewScanNode(PlanNode plan)
@@ -189,7 +188,7 @@ public class PinotConnectorPlanOptimizer
             Optional<PlanNode> pushedDownPlan = tryCreatingNewScanNode(node);
             return pushedDownPlan.orElseGet(() -> replaceChildren(
                     node,
-                    node.getSources().stream().map(c -> c.accept(this, null)).collect(toImmutableList())));
+                    node.getSources().stream().map(source -> source.accept(this, null)).collect(toImmutableList())));
         }
 
         @Override

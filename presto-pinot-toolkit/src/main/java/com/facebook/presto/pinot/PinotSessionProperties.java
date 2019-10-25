@@ -77,7 +77,7 @@ public class PinotSessionProperties
         return session.getProperty(RETRY_COUNT, Integer.class);
     }
 
-    public static boolean isUseDateTrunc(ConnectorSession session)
+    public static boolean isUseDateTruncation(ConnectorSession session)
     {
         return session.getProperty(USE_DATE_TRUNC, Boolean.class);
     }
@@ -119,7 +119,7 @@ public class PinotSessionProperties
                 booleanProperty(
                         USE_DATE_TRUNC,
                         "Use the new UDF dateTrunc in pinot that is more presto compatible",
-                        pinotConfig.isUseDateTrunc(),
+                        pinotConfig.isUseDateTruncation(),
                         false),
                 new PropertyMetadata<>(
                         CONNECTION_TIMEOUT,

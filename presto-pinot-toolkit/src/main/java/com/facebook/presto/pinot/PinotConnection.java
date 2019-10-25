@@ -67,16 +67,14 @@ public class PinotConnection
                             }
                         }, executor));
 
-        executor.execute(() -> {
-            this.allTablesCache.refresh(ALL_TABLES_CACHE_KEY);
-        });
+        executor.execute(() -> this.allTablesCache.refresh(ALL_TABLES_CACHE_KEY));
     }
 
     private static <K, V> V getFromCache(LoadingCache<K, V> cache, K key)
     {
-        V v = cache.getIfPresent(key);
-        if (v != null) {
-            return v;
+        V value = cache.getIfPresent(key);
+        if (value != null) {
+            return value;
         }
         try {
             return cache.get(key);

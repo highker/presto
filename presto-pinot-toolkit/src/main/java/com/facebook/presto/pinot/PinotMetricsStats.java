@@ -30,8 +30,8 @@ import static com.facebook.presto.pinot.PinotUtils.isValidPinotHttpResponseCode;
 public class PinotMetricsStats
 {
     private final TimeStat time = new TimeStat(TimeUnit.MILLISECONDS);
-    private final CounterStat numRequests = new CounterStat();
-    private final CounterStat numErrorRequests = new CounterStat();
+    private final CounterStat requests = new CounterStat();
+    private final CounterStat errorRequests = new CounterStat();
     private DistributionStat responseSize;
 
     public PinotMetricsStats(boolean withResponse)
@@ -44,14 +44,14 @@ public class PinotMetricsStats
     public void record(StringResponse response, long duration, TimeUnit timeUnit)
     {
         time.add(duration, timeUnit);
-        numRequests.update(1);
+        requests.update(1);
         if (isValidPinotHttpResponseCode(response.getStatusCode())) {
             if (responseSize != null) {
                 responseSize.add(response.getBody().length());
             }
         }
         else {
-            numErrorRequests.update(1);
+            errorRequests.update(1);
         }
     }
 
@@ -64,16 +64,16 @@ public class PinotMetricsStats
 
     @Managed
     @Nested
-    public CounterStat getNumRequests()
+    public CounterStat getRequests()
     {
-        return numRequests;
+        return requests;
     }
 
     @Managed
     @Nested
-    public CounterStat getNumErrorRequests()
+    public CounterStat getErrorRequests()
     {
-        return numErrorRequests;
+        return errorRequests;
     }
 
     @Managed

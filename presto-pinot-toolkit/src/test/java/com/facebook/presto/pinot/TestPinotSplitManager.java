@@ -113,8 +113,11 @@ public class TestPinotSplitManager
                 ENGLISH,
                 System.currentTimeMillis(),
                 new PinotSessionProperties(pinotConfig).getSessionProperties(),
-                ImmutableMap.of(PinotSessionProperties.NUM_SEGMENTS_PER_SPLIT, numSegmentsPerSplit,
-                        PinotSessionProperties.FORBID_SEGMENT_QUERIES, forbidSegmentQueries),
+                ImmutableMap.of(
+                        PinotSessionProperties.NUM_SEGMENTS_PER_SPLIT,
+                        numSegmentsPerSplit,
+                        PinotSessionProperties.FORBID_SEGMENT_QUERIES,
+                        forbidSegmentQueries),
                 new FeaturesConfig().isLegacyTimestamp(),
                 Optional.empty());
     }

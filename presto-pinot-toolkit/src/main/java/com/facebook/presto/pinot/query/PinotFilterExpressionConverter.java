@@ -77,8 +77,11 @@ public class PinotFilterExpressionConverter
         }
         List<RowExpression> arguments = call.getArguments();
         if (arguments.size() == 2) {
-            return derived(format("(%s %s %s)",
-                    arguments.get(0).accept(this, context).getDefinition(), operator, arguments.get(1).accept(this, context).getDefinition()));
+            return derived(format(
+                    "(%s %s %s)",
+                    arguments.get(0).accept(this, context).getDefinition(),
+                    operator,
+                    arguments.get(1).accept(this, context).getDefinition()));
         }
         throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(), format("Unknown logical binary: '%s'", call));
     }
@@ -92,7 +95,8 @@ public class PinotFilterExpressionConverter
             RowExpression min = between.getArguments().get(1);
             RowExpression max = between.getArguments().get(2);
 
-            return derived(format("(%s BETWEEN %s AND %s)",
+            return derived(format(
+                    "(%s BETWEEN %s AND %s)",
                     value.accept(this, context).getDefinition(),
                     min.accept(this, context).getDefinition(),
                     max.accept(this, context).getDefinition()));
@@ -192,7 +196,7 @@ public class PinotFilterExpressionConverter
                 specialForm.getArguments().get(0).accept(this, context).getDefinition(),
                 isWhitelist ? "IN" : "NOT IN",
                 specialForm.getArguments().subList(1, specialForm.getArguments().size()).stream()
-                        .map(a -> a.accept(this, context).getDefinition())
+                        .map(argument -> argument.accept(this, context).getDefinition())
                         .collect(Collectors.joining(", "))));
     }
 
@@ -214,8 +218,11 @@ public class PinotFilterExpressionConverter
                 return handleIn(specialForm, true, context);
             case AND:
             case OR:
-                return derived(format("(%s %s %s)",
-                        specialForm.getArguments().get(0).accept(this, context).getDefinition(), specialForm.getForm().toString(), specialForm.getArguments().get(1).accept(this, context).getDefinition()));
+                return derived(format(
+                        "(%s %s %s)",
+                        specialForm.getArguments().get(0).accept(this, context).getDefinition(),
+                        specialForm.getForm().toString(),
+                        specialForm.getArguments().get(1).accept(this, context).getDefinition()));
             default:
                 throw new PinotException(PINOT_UNSUPPORTED_EXPRESSION, Optional.empty(), "Unexpected special form: " + specialForm);
         }

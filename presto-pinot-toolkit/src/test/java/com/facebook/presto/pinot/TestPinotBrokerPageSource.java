@@ -53,25 +53,25 @@ public class TestPinotBrokerPageSource
 
     private static class PqlParsedInfo
     {
-        final int numGroupByColumns;
-        final int numColumns;
-        final int numRows;
+        final int groupByColumns;
+        final int columns;
+        final int rows;
 
-        private PqlParsedInfo(int numGroupByColumns, int numColumns, int numRows)
+        private PqlParsedInfo(int groupByColumns, int columns, int rows)
         {
-            this.numGroupByColumns = numGroupByColumns;
-            this.numColumns = numColumns;
-            this.numRows = numRows;
+            this.groupByColumns = groupByColumns;
+            this.columns = columns;
+            this.rows = rows;
         }
 
-        public static PqlParsedInfo forSelection(int numColumns, int numRows)
+        public static PqlParsedInfo forSelection(int columns, int rows)
         {
-            return new PqlParsedInfo(0, numColumns, numRows);
+            return new PqlParsedInfo(0, columns, rows);
         }
 
-        public static PqlParsedInfo forAggregation(int numGroups, int numAggregates, int numRows)
+        public static PqlParsedInfo forAggregation(int groups, int aggregates, int rows)
         {
-            return new PqlParsedInfo(numGroups, numGroups + numAggregates, numRows);
+            return new PqlParsedInfo(groups, groups + aggregates, rows);
         }
     }
 
@@ -83,32 +83,33 @@ public class TestPinotBrokerPageSource
         if (selectionResults != null) {
             return PqlParsedInfo.forSelection(selectionResults.get("columns").size(), selectionResults.get("results").size());
         }
+
         JsonNode aggregationResults = pqlJson.get("aggregationResults");
-        int numAggregates = aggregationResults.size();
+        int aggregates = aggregationResults.size();
         Set<List<String>> groups = new HashSet<>();
-        int numGroupByColumns = 0;
-        int numPureAggregates = 0;
-        for (int i = 0; i < numAggregates; ++i) {
+        int groupByColumns = 0;
+        int pureAggregates = 0;
+        for (int i = 0; i < aggregates; i++) {
             JsonNode groupByResult = aggregationResults.get(i).get("groupByResult");
             if (groupByResult != null) {
                 for (int j = 0; j < groupByResult.size(); ++j) {
                     JsonNode groupJson = groupByResult.get(j).get("group");
                     List<String> group = Streams.stream(groupJson.iterator()).map(JsonNode::asText).collect(toImmutableList());
                     groups.add(group);
-                    if (numGroupByColumns == 0) {
-                        numGroupByColumns = group.size();
+                    if (groupByColumns == 0) {
+                        groupByColumns = group.size();
                     }
                 }
             }
             else {
-                ++numPureAggregates;
+                pureAggregates++;
             }
         }
-        assertTrue(numPureAggregates == 0 || numPureAggregates == numAggregates, String.format("In pql response %s, got mixed aggregates %d of %d", pqlResponse, numPureAggregates, numAggregates));
-        if (numPureAggregates == 0) {
-            return PqlParsedInfo.forAggregation(numGroupByColumns, numAggregates, groups.size());
+        assertTrue(pureAggregates == 0 || pureAggregates == aggregates, String.format("In pql response %s, got mixed aggregates %d of %d", pqlResponse, pureAggregates, aggregates));
+        if (pureAggregates == 0) {
+            return PqlParsedInfo.forAggregation(groupByColumns, aggregates, groups.size());
         }
-        return PqlParsedInfo.forAggregation(0, numPureAggregates, 1);
+        return PqlParsedInfo.forAggregation(0, pureAggregates, 1);
     }
 
     @DataProvider(name = "pqlResponses")
@@ -177,23 +178,25 @@ public class TestPinotBrokerPageSource
         ImmutableList.Builder<BlockBuilder> blockBuilders = ImmutableList.builder();
         PageBuilder pageBuilder = new PageBuilder(types);
         PinotBrokerPageSource pageSource = getPinotBrokerPageSource();
-        for (int i = 0; i < types.size(); ++i) {
+        for (int i = 0; i < types.size(); i++) {
             blockBuilders.add(pageBuilder.getBlockBuilder(i));
         }
+
         Optional<? extends PrestoException> thrown = Optional.empty();
-        int numRows = -1;
+        int rows = -1;
         try {
-            numRows = pageSource.populateFromPqlResults(pql, pqlParsedInfo.numGroupByColumns, blockBuilders.build(), types, pqlResponse);
+            rows = pageSource.populateFromPqlResults(pql, pqlParsedInfo.groupByColumns, blockBuilders.build(), types, pqlResponse);
         }
         catch (PrestoException e) {
             thrown = Optional.of(e);
         }
+
         Optional<? extends Class<? extends PrestoException>> thrownType = thrown.map(e -> e.getClass());
         Optional<String> errorString = thrown.map(e -> Throwables.getStackTraceAsString(e));
         assertEquals(thrownType, expectedError, String.format("Expected error %s, but got error of type %s: %s", expectedError, thrownType, errorString));
         if (!expectedError.isPresent()) {
-            assertEquals(types.size(), pqlParsedInfo.numColumns);
-            assertEquals(numRows, pqlParsedInfo.numRows);
+            assertEquals(types.size(), pqlParsedInfo.columns);
+            assertEquals(rows, pqlParsedInfo.rows);
         }
     }
 
