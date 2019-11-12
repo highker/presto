@@ -480,11 +480,13 @@ public class SqlQueryScheduler
             PlanNodeId planNodeId = entry.getKey();
             SplitSource splitSource = entry.getValue();
             ConnectorId connectorId = splitSource.getConnectorId();
+            NodeSelector nodeSelector;
             if (isInternalSystemConnector(connectorId)) {
-                connectorId = null;
+                nodeSelector = nodeScheduler.createLegacyNodeSelector(null, maxTasksPerStage);
             }
-
-            NodeSelector nodeSelector = nodeScheduler.createNodeSelector(connectorId, maxTasksPerStage);
+            else {
+                nodeSelector = nodeScheduler.createNodeSelector(connectorId, maxTasksPerStage);
+            }
             SplitPlacementPolicy placementPolicy = new DynamicSplitPlacementPolicy(nodeSelector, stageExecution::getAllTasks);
 
             checkArgument(!plan.getFragment().getStageExecutionDescriptor().isStageGroupedExecution());

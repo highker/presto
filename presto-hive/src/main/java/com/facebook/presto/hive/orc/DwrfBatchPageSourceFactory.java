@@ -127,6 +127,7 @@ public class DwrfBatchPageSourceFactory
                 stripeMetadataSource,
                 extraFileInfo,
                 fileOpener,
+                true,
                 new OrcReaderOptions(
                         getOrcMaxMergeDistance(session),
                         getOrcTinyStripeThreshold(session),

@@ -52,4 +52,9 @@ public class CachingFileOpener
         FSDataInputStream inputStream = fileOpener.open(cachingFileSystem.getDataTier(), path, extraFileInfo);
         return new CachingInputStream(inputStream, cacheManager, path, cachingFileSystem.isCacheValidationEnabled());
     }
+
+    public FileOpener getInternalFileOpener()
+    {
+        return fileOpener;
+    }
 }

@@ -17,7 +17,6 @@ import com.facebook.presto.spi.BucketFunction;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.Node;
-import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.connector.ConnectorBucketNodeMap;
 import com.facebook.presto.spi.connector.ConnectorNodePartitioningProvider;
 import com.facebook.presto.spi.connector.ConnectorPartitioningHandle;
@@ -27,13 +26,12 @@ import com.google.common.collect.ImmutableList;
 
 import javax.inject.Inject;
 
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.function.ToIntFunction;
 
-import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static com.facebook.presto.spi.connector.ConnectorBucketNodeMap.createBucketNodeMap;
-import static com.google.common.collect.Maps.uniqueIndex;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
 public class RaptorNodePartitioningProvider
@@ -52,15 +50,13 @@ public class RaptorNodePartitioningProvider
     {
         RaptorPartitioningHandle handle = (RaptorPartitioningHandle) partitioning;
 
-        Map<String, Node> nodesById = uniqueIndex(nodeSupplier.getWorkerNodes(), Node::getNodeIdentifier);
+        List<Node> nodes = nodeSupplier.getWorkerNodes().stream()
+                .sorted(Comparator.comparing(Node::getNodeIdentifier))
+                .collect(toImmutableList());
 
         ImmutableList.Builder<Node> bucketToNode = ImmutableList.builder();
-        for (String nodeIdentifier : handle.getBucketToNode()) {
-            Node node = nodesById.get(nodeIdentifier);
-            if (node == null) {
-                throw new PrestoException(NO_NODES_AVAILABLE, "Node for bucket is offline: " + nodeIdentifier);
-            }
-            bucketToNode.add(node);
+        for (int i = 0; i < handle.getBucketToNode().size(); i++) {
+            bucketToNode.add(nodes.get(i % nodes.size()));
         }
         return createBucketNodeMap(bucketToNode.build());
     }
