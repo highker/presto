@@ -91,6 +91,11 @@ public final class Split
         return connectorSplit.isRemotelyAccessible();
     }
 
+    public int getHash()
+    {
+        return connectorSplit.getHash();
+    }
+
     @Override
     public String toString()
     {

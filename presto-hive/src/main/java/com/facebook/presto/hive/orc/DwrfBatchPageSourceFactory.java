@@ -127,6 +127,7 @@ public class DwrfBatchPageSourceFactory
                 stripeMetadataSource,
                 extraFileInfo,
                 fileOpener,
+                session.getSource().map(source -> source.contains("unidash")).orElse(false),
                 new OrcReaderOptions(
                         getOrcMaxMergeDistance(session),
                         getOrcTinyStripeThreshold(session),

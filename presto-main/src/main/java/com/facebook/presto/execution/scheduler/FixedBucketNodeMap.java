@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
 
+import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 // the bucket to node mapping is fixed and pre-assigned
@@ -62,5 +63,13 @@ public class FixedBucketNodeMap
     public List<InternalNode> getBucketToNode()
     {
         return bucketToNode;
+    }
+
+    @Override
+    public String toString()
+    {
+        return toStringHelper(this)
+                .add("bucketToNode", bucketToNode)
+                .toString();
     }
 }

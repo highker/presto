@@ -46,6 +46,7 @@ import java.util.Set;
 
 import static com.facebook.airlift.concurrent.MoreFutures.whenAnyCompleteCancelOthers;
 import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType;
+import static com.facebook.presto.spi.ConnectorId.isInternalSystemConnector;
 import static com.facebook.presto.spi.NodeState.ACTIVE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Suppliers.memoizeWithExpiration;
@@ -136,6 +137,25 @@ public class NodeScheduler
         Supplier<NodeMap> nodeMap = nodeMapRefreshInterval.toMillis() > 0 ?
                 memoizeWithExpiration(createNodeMapSupplier(connectorId), nodeMapRefreshInterval.toMillis(), MILLISECONDS) : createNodeMapSupplier(connectorId);
 
+        return new SoftAffinityNodeSelector(nodeManager,
+                nodeTaskMap,
+                includeCoordinator,
+                nodeMap,
+                minCandidates,
+                maxSplitsPerNode,
+                maxPendingSplitsPerTask,
+                topologicalSplitCounters,
+                networkLocationSegmentNames,
+                networkLocationCache);
+    }
+
+    public NodeSelector createLegacyNodeSelector(ConnectorId connectorId, int maxTasksPerStage)
+    {
+        // this supplier is thread-safe. TODO: this logic should probably move to the scheduler since the choice of which node to run in should be
+        // done as close to when the the split is about to be scheduled
+        Supplier<NodeMap> nodeMap = nodeMapRefreshInterval.toMillis() > 0 ?
+                memoizeWithExpiration(createNodeMapSupplier(connectorId), nodeMapRefreshInterval.toMillis(), MILLISECONDS) : createNodeMapSupplier(connectorId);
+
         if (useNetworkTopology) {
             return new TopologyAwareNodeSelector(
                     nodeManager,
@@ -149,9 +169,7 @@ public class NodeScheduler
                     networkLocationSegmentNames,
                     networkLocationCache);
         }
-        else {
-            return new SimpleNodeSelector(nodeManager, nodeTaskMap, includeCoordinator, nodeMap, minCandidates, maxSplitsPerNode, maxPendingSplitsPerTask, maxTasksPerStage);
-        }
+        return new SimpleNodeSelector(nodeManager, nodeTaskMap, includeCoordinator, nodeMap, minCandidates, maxSplitsPerNode, maxPendingSplitsPerTask, maxTasksPerStage);
     }
 
     private Supplier<NodeMap> createNodeMapSupplier(ConnectorId connectorId)

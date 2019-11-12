@@ -226,6 +226,13 @@ public class HiveSplit
         return extraFileInfo;
     }
 
+    @JsonProperty
+    @Override
+    public int getHash()
+    {
+        return path.hashCode();
+    }
+
     @Override
     public Object getInfo()
     {

@@ -42,10 +42,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.facebook.presto.SystemSessionProperties.getMaxTasksPerStage;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
 
 public class NodePartitioningManager
@@ -124,7 +126,7 @@ public class NodePartitioningManager
         else {
             ConnectorId connectorId = partitioningHandle.getConnectorId()
                     .orElseThrow(() -> new IllegalArgumentException("No connector ID for partitioning handle: " + partitioningHandle));
-            bucketToNode = createArbitraryBucketToNode(
+            bucketToNode = createAffinityBucketToNode(
                     nodeScheduler.createNodeSelector(connectorId).selectRandomNodes(getMaxTasksPerStage(session)),
                     connectorBucketNodeMap.getBucketCount());
         }
@@ -163,7 +165,7 @@ public class NodePartitioningManager
 
         return new FixedBucketNodeMap(
                 getSplitToBucket(session, partitioningHandle),
-                createArbitraryBucketToNode(
+                createAffinityBucketToNode(
                         nodeScheduler.createNodeSelector(partitioningHandle.getConnectorId().get()).selectRandomNodes(getMaxTasksPerStage(session)),
                         connectorBucketNodeMap.getBucketCount()));
     }
@@ -225,5 +227,13 @@ public class NodePartitioningManager
             distribution.add(shuffledNodes.get(i % shuffledNodes.size()));
         }
         return distribution.build();
+    }
+
+    private static List<InternalNode> createAffinityBucketToNode(List<InternalNode> nodes, int bucketCount)
+    {
+        List<InternalNode> sortedNodes = nodes.stream()
+                .sorted(comparing(InternalNode::getNodeIdentifier))
+                .collect(toImmutableList());
+        return Stream.generate(() -> sortedNodes).flatMap(List::stream).limit(bucketCount).collect(toImmutableList());
     }
 }

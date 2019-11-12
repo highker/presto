@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.orc;
 
+import com.facebook.presto.hive.CachingFileOpener;
 import com.facebook.presto.hive.FileFormatDataSourceStats;
 import com.facebook.presto.hive.FileOpener;
 import com.facebook.presto.hive.HdfsEnvironment;
@@ -178,6 +179,7 @@ public class OrcBatchPageSourceFactory
                 stripeMetadataSource,
                 extraFileInfo,
                 fileOpener,
+                session.getSource().map(source -> source.contains("unidash")).orElse(false),
                 new OrcReaderOptions(
                         getOrcMaxMergeDistance(session),
                         getOrcTinyStripeThreshold(session),
@@ -209,6 +211,7 @@ public class OrcBatchPageSourceFactory
             StripeMetadataSource stripeMetadataSource,
             Optional<byte[]> extraFileInfo,
             FileOpener fileOpener,
+            boolean useCache,
             OrcReaderOptions orcReaderOptions)
     {
         checkArgument(domainCompactionThreshold >= 1, "domainCompactionThreshold must be at least 1");
@@ -216,6 +219,9 @@ public class OrcBatchPageSourceFactory
         OrcDataSource orcDataSource;
         try {
             FileSystem fileSystem = hdfsEnvironment.getFileSystem(sessionUser, path, configuration);
+            if (!useCache && fileOpener instanceof CachingFileOpener) {
+                fileOpener = ((CachingFileOpener) fileOpener).getInternalFileOpener();
+            }
             FSDataInputStream inputStream = fileOpener.open(fileSystem, path, extraFileInfo);
             orcDataSource = new HdfsOrcDataSource(
                     new OrcDataSourceId(path.toString()),

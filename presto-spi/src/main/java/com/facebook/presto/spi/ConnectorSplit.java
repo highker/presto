@@ -22,4 +22,9 @@ public interface ConnectorSplit
     List<HostAddress> getAddresses();
 
     Object getInfo();
+
+    default int getHash()
+    {
+        return 0;
+    }
 }
