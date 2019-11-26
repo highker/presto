@@ -36,7 +36,7 @@ import static org.testng.Assert.assertEquals;
 
 public class TestFilterStatsCalculator
 {
-    private static final VarcharType MEDIUM_VARCHAR_TYPE = VarcharType.createVarcharType(100);
+    private static final VarcharType VARCHAR_TYPE = VarcharType.createVarcharType(100);
 
     private VariableStatsEstimate xStats;
     private VariableStatsEstimate yStats;
@@ -46,6 +46,7 @@ public class TestFilterStatsCalculator
     private VariableStatsEstimate unknownRangeStats;
     private VariableStatsEstimate emptyRangeStats;
     private VariableStatsEstimate mediumVarcharStats;
+    private VariableStatsEstimate nonNullVarcharStats;
     private FilterStatsCalculator statsCalculator;
     private PlanNodeStatsEstimate standardInputStatistics;
     private TypeProvider standardTypes;
@@ -112,6 +113,13 @@ public class TestFilterStatsCalculator
                 .setHighValue(POSITIVE_INFINITY)
                 .setNullsFraction(0.34)
                 .build();
+        nonNullVarcharStats = VariableStatsEstimate.builder()
+                .setAverageRowSize(85.0)
+                .setLowValue(NEGATIVE_INFINITY)
+                .setHighValue(POSITIVE_INFINITY)
+                .setDistinctValuesCount(NaN)
+                .setNullsFraction(0.0)
+                .build();
         standardInputStatistics = PlanNodeStatsEstimate.builder()
                 .addVariableStatistics(new VariableReferenceExpression("x", DOUBLE), xStats)
                 .addVariableStatistics(new VariableReferenceExpression("y", DOUBLE), yStats)
@@ -120,7 +128,8 @@ public class TestFilterStatsCalculator
                 .addVariableStatistics(new VariableReferenceExpression("rightOpen", DOUBLE), rightOpenStats)
                 .addVariableStatistics(new VariableReferenceExpression("unknownRange", DOUBLE), unknownRangeStats)
                 .addVariableStatistics(new VariableReferenceExpression("emptyRange", DOUBLE), emptyRangeStats)
-                .addVariableStatistics(new VariableReferenceExpression("mediumVarchar", MEDIUM_VARCHAR_TYPE), mediumVarcharStats)
+                .addVariableStatistics(new VariableReferenceExpression("mediumVarchar", VARCHAR_TYPE), mediumVarcharStats)
+                .addVariableStatistics(new VariableReferenceExpression("nonNullVarcharStats", VARCHAR_TYPE), nonNullVarcharStats)
                 .setOutputRowCount(1000.0)
                 .build();
 
@@ -132,7 +141,8 @@ public class TestFilterStatsCalculator
                 .add(new VariableReferenceExpression("rightOpen", DOUBLE))
                 .add(new VariableReferenceExpression("unknownRange", DOUBLE))
                 .add(new VariableReferenceExpression("emptyRange", DOUBLE))
-                .add(new VariableReferenceExpression("mediumVarchar", MEDIUM_VARCHAR_TYPE))
+                .add(new VariableReferenceExpression("mediumVarchar", VARCHAR_TYPE))
+                .add(new VariableReferenceExpression("nonNullVarcharStats", VARCHAR_TYPE))
                 .build());
 
         session = testSessionBuilder().build();
@@ -482,6 +492,13 @@ public class TestFilterStatsCalculator
     }
 
     @Test
+    public void testNotIn()
+    {
+        // TODO: the output estimation is off
+        assertExpression("nonNullVarcharStats NOT IN ('a', 'b', 'c')").outputRowsCount(0.0);
+    }
+
+    @Test
     public void testInPredicateFilter()
     {
         assertExpression("x IN (null)").outputRowsCount(0.0);
@@ -550,15 +567,15 @@ public class TestFilterStatsCalculator
                                 .nullsFraction(0.0));
 
         // Casted literals as value
-        assertExpression(format("mediumVarchar IN (CAST('abc' AS %s))", MEDIUM_VARCHAR_TYPE.toString()))
+        assertExpression(format("mediumVarchar IN (CAST('abc' AS %s))", VARCHAR_TYPE.toString()))
                 .outputRowsCount(4)
-                .variableStats(new VariableReferenceExpression("mediumVarchar", MEDIUM_VARCHAR_TYPE), variableStats ->
+                .variableStats(new VariableReferenceExpression("mediumVarchar", VARCHAR_TYPE), variableStats ->
                         variableStats.distinctValuesCount(1)
                                 .nullsFraction(0.0));
 
-        assertExpression(format("mediumVarchar IN (CAST('abc' AS %1$s), CAST('def' AS %1$s))", MEDIUM_VARCHAR_TYPE.toString()))
+        assertExpression(format("mediumVarchar IN (CAST('abc' AS %1$s), CAST('def' AS %1$s))", VARCHAR_TYPE.toString()))
                 .outputRowsCount(8)
-                .variableStats(new VariableReferenceExpression("mediumVarchar", MEDIUM_VARCHAR_TYPE), variableStats ->
+                .variableStats(new VariableReferenceExpression("mediumVarchar", VARCHAR_TYPE), variableStats ->
                         variableStats.distinctValuesCount(2)
                                 .nullsFraction(0.0));
 
