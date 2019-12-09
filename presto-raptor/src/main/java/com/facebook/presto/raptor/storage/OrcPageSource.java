@@ -14,7 +14,6 @@
 package com.facebook.presto.raptor.storage;
 
 import com.facebook.presto.memory.context.AggregatedMemoryContext;
-import com.facebook.presto.orc.OrcBatchRecordReader;
 import com.facebook.presto.orc.OrcDataSource;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
@@ -58,7 +57,7 @@ public class OrcPageSource
 
     private final Optional<ShardRewriter> shardRewriter;
 
-    private final OrcBatchRecordReader recordReader;
+    private final RaptorPageSource pageSource;
     private final OrcDataSource orcDataSource;
 
     private final BitSet rowsToDelete;
@@ -72,12 +71,13 @@ public class OrcPageSource
     private final AggregatedMemoryContext systemMemoryContext;
 
     private int batchId;
+    private Page currentPage;
     private long completedPositions;
     private boolean closed;
 
     public OrcPageSource(
             Optional<ShardRewriter> shardRewriter,
-            OrcBatchRecordReader recordReader,
+            RaptorPageSource pageSource,
             OrcDataSource orcDataSource,
             List<Long> columnIds,
             List<Type> columnTypes,
@@ -87,10 +87,10 @@ public class OrcPageSource
             AggregatedMemoryContext systemMemoryContext)
     {
         this.shardRewriter = requireNonNull(shardRewriter, "shardRewriter is null");
-        this.recordReader = requireNonNull(recordReader, "recordReader is null");
+        this.pageSource = requireNonNull(pageSource, "pageSource is null");
         this.orcDataSource = requireNonNull(orcDataSource, "orcDataSource is null");
 
-        this.rowsToDelete = new BitSet(toIntExact(recordReader.getFileRowCount()));
+        this.rowsToDelete = new BitSet(toIntExact(pageSource.getFileRowCount()));
 
         checkArgument(columnIds.size() == columnTypes.size(), "ids and types mismatch");
         checkArgument(columnIds.size() == columnIndexes.size(), "ids and indexes mismatch");
@@ -154,7 +154,9 @@ public class OrcPageSource
     {
         try {
             batchId++;
-            int batchSize = recordReader.nextBatch();
+            currentPage = pageSource.getNextPage();
+            int batchSize = currentPage.getPositionCount();
+
             if (batchSize <= 0) {
                 close();
                 return null;
@@ -162,7 +164,7 @@ public class OrcPageSource
 
             completedPositions += batchSize;
 
-            long filePosition = recordReader.getFilePosition();
+            long filePosition = pageSource.getFilePosition();
 
             Block[] blocks = new Block[columnIndexes.length];
             for (int fieldId = 0; fieldId < blocks.length; fieldId++) {
@@ -179,7 +181,7 @@ public class OrcPageSource
 
             return new Page(batchSize, blocks);
         }
-        catch (IOException | RuntimeException e) {
+        catch (RuntimeException e) {
             closeWithSuppression(e);
             throw new PrestoException(RAPTOR_ERROR, e);
         }
@@ -191,7 +193,7 @@ public class OrcPageSource
         closed = true;
 
         try {
-            recordReader.close();
+            pageSource.close();
         }
         catch (IOException e) {
             throw new PrestoException(RAPTOR_ERROR, e);
@@ -279,14 +281,8 @@ public class OrcPageSource
 
             checkState(batchId == expectedBatchId);
 
-            try {
-                Block block = recordReader.readBlock(columnIndex);
-                lazyBlock.setBlock(block);
-            }
-            catch (IOException e) {
-                throw new PrestoException(RAPTOR_ERROR, e);
-            }
-
+            Block block = currentPage.getBlock(columnIndex).getLoadedBlock();
+            lazyBlock.setBlock(block);
             loaded = true;
         }
     }
