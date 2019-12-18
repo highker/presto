@@ -88,7 +88,6 @@
         <module>presto-kafka</module>
         <module>presto-redis</module>
         <module>presto-accumulo</module>
-        <module>presto-cassandra</module>
         <module>presto-blackhole</module>
         <module>presto-memory</module>
         <module>presto-orc</module>
@@ -109,7 +108,6 @@
         <module>presto-postgresql</module>
         <module>presto-redshift</module>
         <module>presto-sqlserver</module>
-        <module>presto-mongodb</module>
         <module>presto-bytecode</module>
         <module>presto-client</module>
         <module>presto-parser</module>
@@ -142,7 +140,6 @@
         <module>presto-memory-context</module>
         <module>presto-proxy</module>
         <module>presto-kudu</module>
-        <module>presto-elasticsearch</module>
         <module>presto-sql-function</module>
         <module>presto-expressions</module>
         <module>presto-benchmark-runner</module>
@@ -406,12 +403,6 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-memory-context</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.facebook.presto</groupId>
-                <artifactId>presto-elasticsearch</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
