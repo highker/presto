@@ -29,6 +29,9 @@ import com.facebook.airlift.jmx.testing.TestingJmxModule;
 import com.facebook.airlift.json.JsonModule;
 import com.facebook.airlift.node.testing.TestingNodeModule;
 import com.facebook.airlift.tracetoken.TraceTokenModule;
+import com.facebook.drift.server.DriftServer;
+import com.facebook.drift.transport.netty.server.DriftNettyServerModule;
+import com.facebook.drift.transport.netty.server.DriftNettyServerTransport;
 import com.facebook.presto.connector.ConnectorManager;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.eventlistener.EventListenerManager;
@@ -250,6 +253,7 @@ public class TestingPrestoServer
                 .add(new EventModule())
                 .add(new TraceTokenModule())
                 .add(new ServerSecurityModule())
+                .add(new DriftNettyServerModule())
                 .add(new ServerMainModule(parserOptions))
                 .add(new TestingWarningCollectorModule())
                 .add(binder -> {
@@ -302,6 +306,8 @@ public class TestingPrestoServer
         else {
             queryManager = null;
         }
+
+        int port = ((DriftNettyServerTransport) (injector.getInstance(DriftServer.class)).getServerTransport()).getPort();
 
         pluginManager = injector.getInstance(PluginManager.class);
 

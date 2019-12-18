@@ -28,6 +28,7 @@ import com.facebook.airlift.log.LogJmxModule;
 import com.facebook.airlift.log.Logger;
 import com.facebook.airlift.node.NodeModule;
 import com.facebook.airlift.tracetoken.TraceTokenModule;
+import com.facebook.drift.transport.netty.server.DriftNettyServerModule;
 import com.facebook.presto.eventlistener.EventListenerManager;
 import com.facebook.presto.eventlistener.EventListenerModule;
 import com.facebook.presto.execution.resourceGroups.ResourceGroupManager;
@@ -116,6 +117,7 @@ public class PrestoServer
                 new ServerSecurityModule(),
                 new AccessControlModule(),
                 new EventListenerModule(),
+                new DriftNettyServerModule(),
                 new ServerMainModule(sqlParserOptions),
                 new GracefulShutdownModule(),
                 new WarningCollectorModule());

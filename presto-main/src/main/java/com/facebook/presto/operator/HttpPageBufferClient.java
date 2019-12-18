@@ -22,14 +22,26 @@ import com.facebook.airlift.http.client.Response;
 import com.facebook.airlift.http.client.ResponseHandler;
 import com.facebook.airlift.http.client.ResponseTooLargeException;
 import com.facebook.airlift.log.Logger;
+import com.facebook.drift.client.DriftClientFactory;
+import com.facebook.drift.client.address.AddressSelector;
+import com.facebook.drift.client.address.SimpleAddressSelector;
+import com.facebook.drift.codec.ThriftCodecManager;
+import com.facebook.drift.transport.netty.client.DriftNettyClientConfig;
+import com.facebook.drift.transport.netty.client.DriftNettyMethodInvokerFactory;
+import com.facebook.presto.execution.TaskId;
+import com.facebook.presto.execution.buffer.BufferResult;
 import com.facebook.presto.execution.buffer.SerializedPage;
+import com.facebook.presto.server.TaskThriftClient;
 import com.facebook.presto.server.remotetask.Backoff;
 import com.facebook.presto.spi.PrestoException;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.net.HostAndPort;
 import com.google.common.net.MediaType;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.slice.InputStreamSliceInput;
 import io.airlift.slice.SliceInput;
 import io.airlift.units.DataSize;
@@ -60,12 +72,14 @@ import static com.facebook.airlift.http.client.Request.Builder.prepareGet;
 import static com.facebook.airlift.http.client.ResponseHandlerUtils.propagate;
 import static com.facebook.airlift.http.client.StatusResponseHandler.StatusResponse;
 import static com.facebook.airlift.http.client.StatusResponseHandler.createStatusResponseHandler;
+import static com.facebook.drift.client.ExceptionClassifier.NORMAL_RESULT;
+import static com.facebook.drift.transport.netty.client.DriftNettyMethodInvokerFactory.createStaticDriftNettyMethodInvokerFactory;
 import static com.facebook.presto.PrestoMediaTypes.PRESTO_PAGES_TYPE;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_BUFFER_COMPLETE;
-import static com.facebook.presto.client.PrestoHeaders.PRESTO_MAX_SIZE;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_PAGE_NEXT_TOKEN;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_PAGE_TOKEN;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_TASK_INSTANCE_ID;
+import static com.facebook.presto.execution.buffer.OutputBuffers.OutputBufferId.fromString;
 import static com.facebook.presto.execution.buffer.PagesSerdeUtil.readSerializedPages;
 import static com.facebook.presto.operator.HttpPageBufferClient.PagesResponse.createEmptyPagesResponse;
 import static com.facebook.presto.operator.HttpPageBufferClient.PagesResponse.createPagesResponse;
@@ -110,6 +124,7 @@ public final class HttpPageBufferClient
     }
 
     private final HttpClient httpClient;
+    private final TaskThriftClient thriftClient;
     private final boolean acknowledgePages;
     private final URI location;
     private final ClientCallback clientCallback;
@@ -119,7 +134,7 @@ public final class HttpPageBufferClient
     @GuardedBy("this")
     private boolean closed;
     @GuardedBy("this")
-    private HttpResponseFuture<?> future;
+    private ListenableFuture<?> future;
     @GuardedBy("this")
     private DateTime lastUpdate = DateTime.now();
     @GuardedBy("this")
@@ -174,6 +189,15 @@ public final class HttpPageBufferClient
         requireNonNull(maxErrorDuration, "maxErrorDuration is null");
         requireNonNull(ticker, "ticker is null");
         this.backoff = new Backoff(maxErrorDuration, ticker);
+
+        AddressSelector<SimpleAddressSelector.SimpleAddress> addressSelector = new SimpleAddressSelector(
+                ImmutableSet.of(HostAndPort.fromParts(location.getHost(), 7779)),
+                true);
+
+        try (DriftNettyMethodInvokerFactory<?> invokerFactory = createStaticDriftNettyMethodInvokerFactory(new DriftNettyClientConfig())) {
+            DriftClientFactory clientFactory = new DriftClientFactory(new ThriftCodecManager(), invokerFactory, addressSelector, NORMAL_RESULT);
+            this.thriftClient = clientFactory.createDriftClient(TaskThriftClient.class).get();
+        }
     }
 
     public synchronized PageBufferClientStatus getStatus()
@@ -196,7 +220,7 @@ public final class HttpPageBufferClient
         }
         String httpRequestState = "not scheduled";
         if (future != null) {
-            httpRequestState = future.getState();
+            httpRequestState = "ok";
         }
 
         long rejectedRows = rowsRejected.get();
@@ -293,17 +317,15 @@ public final class HttpPageBufferClient
     private synchronized void sendGetResults(DataSize maxResponseSize)
     {
         URI uri = HttpUriBuilder.uriBuilderFrom(location).appendPath(String.valueOf(token)).build();
-        HttpResponseFuture<PagesResponse> resultFuture = httpClient.executeAsync(
-                prepareGet()
-                        .setHeader(PRESTO_MAX_SIZE, maxResponseSize.toString())
-                        .setUri(uri).build(),
-                new PageResponseHandler());
+
+        String[] paths = location.getPath().split("/");
+        ListenableFuture<BufferResult> resultFuture = thriftClient.getResults(TaskId.valueOf(paths[0]), fromString(paths[2]), token, maxResponseSize.toBytes());
 
         future = resultFuture;
-        Futures.addCallback(resultFuture, new FutureCallback<PagesResponse>()
+        Futures.addCallback(resultFuture, new FutureCallback<BufferResult>()
         {
             @Override
-            public void onSuccess(PagesResponse result)
+            public void onSuccess(BufferResult result)
             {
                 checkNotHoldsLock(this);
 
@@ -323,7 +345,7 @@ public final class HttpPageBufferClient
                         }
 
                         if (result.getToken() == token) {
-                            pages = result.getPages();
+                            pages = result.getSerializedPages();
                             token = result.getNextToken();
                             shouldAcknowledge = pages.size() > 0;
                         }
@@ -378,7 +400,7 @@ public final class HttpPageBufferClient
 
                 synchronized (HttpPageBufferClient.this) {
                     // client is complete, acknowledge it by sending it a delete in the next request
-                    if (result.isClientComplete()) {
+                    if (result.isBufferComplete()) {
                         completed = true;
                     }
                     if (future == resultFuture) {
@@ -457,7 +479,7 @@ public final class HttpPageBufferClient
         checkState(!Thread.holdsLock(lock), "Cannot execute this method while holding a lock");
     }
 
-    private void handleFailure(Throwable t, HttpResponseFuture<?> expectedFuture)
+    private void handleFailure(Throwable t, ListenableFuture<?> expectedFuture)
     {
         // Can not delegate to other callback while holding a lock on this
         checkNotHoldsLock(this);

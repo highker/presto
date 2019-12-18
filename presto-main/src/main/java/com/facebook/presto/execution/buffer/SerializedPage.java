@@ -13,7 +13,11 @@
  */
 package com.facebook.presto.execution.buffer;
 
+import com.facebook.drift.annotations.ThriftConstructor;
+import com.facebook.drift.annotations.ThriftField;
+import com.facebook.drift.annotations.ThriftStruct;
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 import org.openjdk.jol.info.ClassLayout;
 
 import static com.facebook.presto.execution.buffer.PageCodecMarker.COMPRESSED;
@@ -22,6 +26,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
+@ThriftStruct
 public class SerializedPage
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SerializedPage.class).instanceSize();
@@ -49,11 +54,27 @@ public class SerializedPage
         }
     }
 
+    @ThriftConstructor
+    public SerializedPage(byte[] data, int positionCount, int uncompressedSizeInBytes, byte pageCodecMarkers)
+    {
+        this.slice = Slices.wrappedBuffer(data);
+        this.positionCount = positionCount;
+        this.uncompressedSizeInBytes = uncompressedSizeInBytes;
+        this.pageCodecMarkers = pageCodecMarkers;
+    }
+
+    @ThriftField(1)
+    public byte[] getData()
+    {
+        return slice.getBytes();
+    }
+
     public int getSizeInBytes()
     {
         return slice.length();
     }
 
+    @ThriftField(3)
     public int getUncompressedSizeInBytes()
     {
         return uncompressedSizeInBytes;
@@ -64,6 +85,7 @@ public class SerializedPage
         return INSTANCE_SIZE + slice.getRetainedSize();
     }
 
+    @ThriftField(2)
     public int getPositionCount()
     {
         return positionCount;
@@ -74,6 +96,7 @@ public class SerializedPage
         return slice;
     }
 
+    @ThriftField(4)
     public byte getPageCodecMarkers()
     {
         return pageCodecMarkers;
