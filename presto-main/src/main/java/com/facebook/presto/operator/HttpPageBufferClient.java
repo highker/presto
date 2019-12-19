@@ -180,6 +180,7 @@ public final class HttpPageBufferClient
             Ticker ticker,
             Executor pageBufferClientCallbackExecutor)
     {
+        log.info(location.toASCIIString());
         this.httpClient = requireNonNull(httpClient, "httpClient is null");
         this.acknowledgePages = acknowledgePages;
         this.location = requireNonNull(location, "location is null");
@@ -318,8 +319,9 @@ public final class HttpPageBufferClient
     {
         URI uri = HttpUriBuilder.uriBuilderFrom(location).appendPath(String.valueOf(token)).build();
 
+        // example: /v1/task/{taskId}/results/{buffer}
         String[] paths = location.getPath().split("/");
-        ListenableFuture<BufferResult> resultFuture = thriftClient.getResults(TaskId.valueOf(paths[0]), fromString(paths[2]), token, maxResponseSize.toBytes());
+        ListenableFuture<BufferResult> resultFuture = thriftClient.getResults(TaskId.valueOf(paths[3]), fromString(paths[5]), token, maxResponseSize.toBytes());
 
         future = resultFuture;
         Futures.addCallback(resultFuture, new FutureCallback<BufferResult>()
