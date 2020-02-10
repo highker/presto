@@ -29,6 +29,7 @@ import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.metadata.Split;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.HashMultimap;
@@ -131,7 +132,7 @@ public class TopologyAwareNodeSelector
         Set<InternalNode> blockedExactNodes = new HashSet<>();
         boolean splitWaitingForAnyNode = false;
         for (Split split : splits) {
-            if (!split.isRemotelyAccessible()) {
+            if (split.getNodeSelectionStrategy() != NodeSelectionStrategy.NO_PREFERENCE) {
                 List<InternalNode> candidateNodes = selectExactNodes(nodeMap, split.getAddresses(), includeCoordinator);
                 if (candidateNodes.isEmpty()) {
                     log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getNodesByHost().keys());

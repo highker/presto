@@ -28,6 +28,7 @@ import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.facebook.presto.testing.TestingTransactionHandle;
 import com.facebook.presto.util.FinalizerService;
 import com.google.common.base.Splitter;
@@ -263,9 +264,9 @@ public class BenchmarkNodeScheduler
         }
 
         @Override
-        public boolean isRemotelyAccessible()
+        public NodeSelectionStrategy getNodeSelectionStrategy()
         {
-            return true;
+            return NodeSelectionStrategy.NO_PREFERENCE;
         }
 
         @Override

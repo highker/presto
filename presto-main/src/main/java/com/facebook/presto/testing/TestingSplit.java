@@ -15,6 +15,7 @@ package com.facebook.presto.testing;
 
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -26,36 +27,36 @@ public class TestingSplit
 {
     private static final HostAddress localHost = HostAddress.fromString("127.0.0.1");
 
-    private final boolean remotelyAccessible;
+    private final NodeSelectionStrategy nodeSelectionStrategy;
     private final List<HostAddress> addresses;
 
     public static TestingSplit createLocalSplit()
     {
-        return new TestingSplit(false, ImmutableList.of(localHost));
+        return new TestingSplit(NodeSelectionStrategy.HARD_AFFINITY, ImmutableList.of(localHost));
     }
 
     public static TestingSplit createEmptySplit()
     {
-        return new TestingSplit(false, ImmutableList.of());
+        return new TestingSplit(NodeSelectionStrategy.HARD_AFFINITY, ImmutableList.of());
     }
 
     public static TestingSplit createRemoteSplit()
     {
-        return new TestingSplit(true, ImmutableList.of());
+        return new TestingSplit(NodeSelectionStrategy.NO_PREFERENCE, ImmutableList.of());
     }
 
     @JsonCreator
-    public TestingSplit(@JsonProperty("remotelyAccessible") boolean remotelyAccessible, @JsonProperty("addresses") List<HostAddress> addresses)
+    public TestingSplit(@JsonProperty("nodeSelectionStrategy") NodeSelectionStrategy nodeSelectionStrategy, @JsonProperty("addresses") List<HostAddress> addresses)
     {
         this.addresses = addresses;
-        this.remotelyAccessible = remotelyAccessible;
+        this.nodeSelectionStrategy = nodeSelectionStrategy;
     }
 
     @JsonProperty
     @Override
-    public boolean isRemotelyAccessible()
+    public NodeSelectionStrategy getNodeSelectionStrategy()
     {
-        return remotelyAccessible;
+        return nodeSelectionStrategy;
     }
 
     @JsonProperty

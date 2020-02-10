@@ -16,6 +16,7 @@ package com.facebook.presto.split;
 import com.facebook.presto.execution.TaskId;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -58,9 +59,9 @@ public class RemoteSplit
     }
 
     @Override
-    public boolean isRemotelyAccessible()
+    public NodeSelectionStrategy getNodeSelectionStrategy()
     {
-        return true;
+        return NodeSelectionStrategy.NO_PREFERENCE;
     }
 
     @Override

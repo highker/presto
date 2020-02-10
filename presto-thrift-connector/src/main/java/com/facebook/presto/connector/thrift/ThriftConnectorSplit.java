@@ -16,6 +16,7 @@ package com.facebook.presto.connector.thrift;
 import com.facebook.presto.connector.thrift.api.PrestoThriftId;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -61,9 +62,9 @@ public class ThriftConnectorSplit
     }
 
     @Override
-    public boolean isRemotelyAccessible()
+    public NodeSelectionStrategy getNodeSelectionStrategy()
     {
-        return true;
+        return NodeSelectionStrategy.NO_PREFERENCE;
     }
 
     @Override

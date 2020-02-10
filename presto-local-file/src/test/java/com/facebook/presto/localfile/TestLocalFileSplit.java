@@ -16,6 +16,7 @@ package com.facebook.presto.localfile;
 import com.facebook.airlift.json.JsonCodec;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.google.common.collect.ImmutableList;
 import org.testng.annotations.Test;
 
@@ -39,6 +40,6 @@ public class TestLocalFileSplit
         assertEquals(copy.getEffectivePredicate(), split.getEffectivePredicate());
 
         assertEquals(copy.getAddresses(), ImmutableList.of(address));
-        assertEquals(copy.isRemotelyAccessible(), false);
+        assertEquals(copy.getNodeSelectionStrategy(), NodeSelectionStrategy.HARD_AFFINITY);
     }
 }

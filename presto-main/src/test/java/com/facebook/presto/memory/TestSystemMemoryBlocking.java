@@ -29,6 +29,7 @@ import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.testing.MaterializedResult;
 import com.facebook.presto.testing.PageConsumerOperator;
@@ -157,9 +158,9 @@ public class TestSystemMemoryBlocking
             implements ConnectorSplit
     {
         @Override
-        public boolean isRemotelyAccessible()
+        public NodeSelectionStrategy getNodeSelectionStrategy()
         {
-            return false;
+            return NodeSelectionStrategy.HARD_AFFINITY;
         }
 
         @Override

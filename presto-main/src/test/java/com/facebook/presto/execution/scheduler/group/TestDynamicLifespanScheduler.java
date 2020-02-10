@@ -22,6 +22,7 @@ import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.connector.ConnectorPartitionHandle;
 import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.google.common.collect.ImmutableList;
 import org.testng.annotations.Test;
 
@@ -137,9 +138,9 @@ public class TestDynamicLifespanScheduler
         }
 
         @Override
-        public boolean isRemotelyAccessible()
+        public NodeSelectionStrategy getNodeSelectionStrategy()
         {
-            return false;
+            return NodeSelectionStrategy.HARD_AFFINITY;
         }
 
         @Override

@@ -17,6 +17,7 @@ import com.facebook.presto.accumulo.serializers.AccumuloRowSerializer;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -155,9 +156,9 @@ public class AccumuloSplit
     }
 
     @Override
-    public boolean isRemotelyAccessible()
+    public NodeSelectionStrategy getNodeSelectionStrategy()
     {
-        return true;
+        return NodeSelectionStrategy.NO_PREFERENCE;
     }
 
     @Override

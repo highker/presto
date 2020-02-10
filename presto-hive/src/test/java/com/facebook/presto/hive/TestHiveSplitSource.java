@@ -19,6 +19,7 @@ import com.facebook.presto.hive.metastore.StorageFormat;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.ConnectorSplitSource;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.SettableFuture;
@@ -427,6 +428,7 @@ public class TestHiveSplitSource
                     bucketNumber,
                     true,
                     false,
+                    NodeSelectionStrategy.NO_PREFERENCE,
                     false,
                     new HiveSplitPartitionInfo(
                             new Storage(

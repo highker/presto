@@ -32,6 +32,7 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.gen.JoinCompiler;
@@ -236,6 +237,7 @@ public class TestHivePageSink
                 OptionalInt.empty(),
                 OptionalInt.empty(),
                 false,
+                NodeSelectionStrategy.NO_PREFERENCE,
                 getColumnHandles().size(),
                 ImmutableMap.of(),
                 Optional.empty(),

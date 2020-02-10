@@ -14,6 +14,7 @@
 package com.facebook.presto.connector.jmx;
 
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.google.common.collect.ImmutableList;
 import org.testng.annotations.Test;
 
@@ -33,7 +34,7 @@ public class TestJmxSplit
         assertEquals(SPLIT.getTableHandle(), TABLE);
         assertEquals(SPLIT.getAddresses(), ADDRESSES);
         assertSame(SPLIT.getInfo(), SPLIT);
-        assertEquals(SPLIT.isRemotelyAccessible(), false);
+        assertEquals(SPLIT.getNodeSelectionStrategy(), NodeSelectionStrategy.HARD_AFFINITY);
     }
 
     @Test
@@ -45,6 +46,6 @@ public class TestJmxSplit
         assertEquals(copy.getTableHandle(), SPLIT.getTableHandle());
         assertEquals(copy.getAddresses(), SPLIT.getAddresses());
         assertSame(copy.getInfo(), copy);
-        assertEquals(copy.isRemotelyAccessible(), false);
+        assertEquals(copy.getNodeSelectionStrategy(), NodeSelectionStrategy.HARD_AFFINITY);
     }
 }

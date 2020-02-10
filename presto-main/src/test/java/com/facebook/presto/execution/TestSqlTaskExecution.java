@@ -48,6 +48,7 @@ import com.facebook.presto.spi.UpdatablePageSource;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.memory.MemoryPoolId;
 import com.facebook.presto.spi.plan.PlanNodeId;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.facebook.presto.spi.type.TestingTypeManager;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.SpillSpaceTracker;
@@ -1333,9 +1334,9 @@ public class TestSqlTaskExecution
         }
 
         @Override
-        public boolean isRemotelyAccessible()
+        public NodeSelectionStrategy getNodeSelectionStrategy()
         {
-            return true;
+            return NodeSelectionStrategy.NO_PREFERENCE;
         }
 
         @Override

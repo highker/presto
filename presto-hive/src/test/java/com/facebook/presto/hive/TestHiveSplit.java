@@ -28,6 +28,7 @@ import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockEncoding;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
@@ -80,6 +81,7 @@ public class TestHiveSplit
                 OptionalInt.empty(),
                 OptionalInt.empty(),
                 true,
+                NodeSelectionStrategy.NO_PREFERENCE,
                 10,
                 ImmutableMap.of(1, new Column("name", HIVE_STRING, Optional.empty())),
                 Optional.of(new HiveSplit.BucketConversion(
@@ -107,6 +109,7 @@ public class TestHiveSplit
         assertEquals(actual.getPartitionSchemaDifference(), expected.getPartitionSchemaDifference());
         assertEquals(actual.getBucketConversion(), expected.getBucketConversion());
         assertEquals(actual.isForceLocalScheduling(), expected.isForceLocalScheduling());
+        assertEquals(actual.getNodeSelectionStrategy(), expected.getNodeSelectionStrategy());
         assertEquals(actual.isS3SelectPushdownEnabled(), expected.isS3SelectPushdownEnabled());
     }
 

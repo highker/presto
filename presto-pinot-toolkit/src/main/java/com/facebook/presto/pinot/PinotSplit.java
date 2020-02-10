@@ -16,6 +16,7 @@ package com.facebook.presto.pinot;
 import com.facebook.presto.pinot.query.PinotQueryGenerator;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -140,9 +141,9 @@ public class PinotSplit
     }
 
     @Override
-    public boolean isRemotelyAccessible()
+    public NodeSelectionStrategy getNodeSelectionStrategy()
     {
-        return true;
+        return NodeSelectionStrategy.NO_PREFERENCE;
     }
 
     @Override

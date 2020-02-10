@@ -20,6 +20,7 @@ import com.facebook.presto.hive.InternalHiveSplit.InternalHiveBlock;
 import com.facebook.presto.hive.S3SelectPushdown;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.predicate.Domain;
+import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
@@ -48,6 +49,7 @@ public class InternalHiveSplitFactory
     private final InputFormat<?, ?> inputFormat;
     private final Optional<Domain> pathDomain;
     private final boolean forceLocalScheduling;
+    private final NodeSelectionStrategy nodeSelectionStrategy;
     private final boolean s3SelectPushdownEnabled;
     private final HiveSplitPartitionInfo partitionInfo;
     private final boolean schedulerUsesHostAddresses;
@@ -57,6 +59,7 @@ public class InternalHiveSplitFactory
             InputFormat<?, ?> inputFormat,
             Optional<Domain> pathDomain,
             boolean forceLocalScheduling,
+            NodeSelectionStrategy nodeSelectionStrategy,
             boolean s3SelectPushdownEnabled,
             HiveSplitPartitionInfo partitionInfo,
             boolean schedulerUsesHostAddresses)
@@ -65,6 +68,7 @@ public class InternalHiveSplitFactory
         this.inputFormat = requireNonNull(inputFormat, "inputFormat is null");
         this.pathDomain = requireNonNull(pathDomain, "pathDomain is null");
         this.forceLocalScheduling = forceLocalScheduling;
+        this.nodeSelectionStrategy = requireNonNull(nodeSelectionStrategy, "nodeSelectionStrategy is null");
         this.s3SelectPushdownEnabled = s3SelectPushdownEnabled;
         this.partitionInfo = partitionInfo;
         this.schedulerUsesHostAddresses = schedulerUsesHostAddresses;
@@ -181,6 +185,7 @@ public class InternalHiveSplitFactory
                 tableBucketNumber,
                 splittable,
                 forceLocalScheduling && allBlocksHaveRealAddress(blocks),
+                (nodeSelectionStrategy == NodeSelectionStrategy.HARD_AFFINITY && !allBlocksHaveRealAddress(blocks)) ? NodeSelectionStrategy.NO_PREFERENCE : nodeSelectionStrategy,
                 s3SelectPushdownEnabled && S3SelectPushdown.isCompressionCodecSupported(inputFormat, path),
                 partitionInfo,
                 extraFileInfo));
