@@ -147,9 +147,9 @@ public class PinotSplit
     }
 
     @Override
-    public List<HostAddress> getAddresses()
+    public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
     {
-        return null;
+        return ImmutableList.of();
     }
 
     @Override

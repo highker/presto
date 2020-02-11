@@ -70,6 +70,11 @@ public class LocalFileSplit
     }
 
     @Override
+    public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
+    {
+        return ImmutableList.of(address);
+    }
+
     public List<HostAddress> getAddresses()
     {
         return ImmutableList.of(address);

@@ -97,7 +97,7 @@ public class ElasticsearchSplit
     }
 
     @Override
-    public List<HostAddress> getAddresses()
+    public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
     {
         return ImmutableList.of(HostAddress.fromParts(searchNode, port));
     }

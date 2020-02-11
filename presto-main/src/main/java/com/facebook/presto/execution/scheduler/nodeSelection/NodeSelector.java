@@ -15,13 +15,18 @@ package com.facebook.presto.execution.scheduler.nodeSelection;
 
 import com.facebook.presto.execution.RemoteTask;
 import com.facebook.presto.execution.scheduler.BucketNodeMap;
+import com.facebook.presto.execution.scheduler.NodeMap;
 import com.facebook.presto.execution.scheduler.SplitPlacementResult;
 import com.facebook.presto.metadata.InternalNode;
 import com.facebook.presto.metadata.Split;
+import com.facebook.presto.spi.HostAddress;
 import com.google.common.collect.ImmutableSet;
 
 import java.util.List;
 import java.util.Set;
+
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Comparator.comparing;
 
 public interface NodeSelector
 {
@@ -57,4 +62,11 @@ public interface NodeSelector
      * to reattempt scheduling of this batch of splits, if some of them could not be scheduled.
      */
     SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks, BucketNodeMap bucketNodeMap);
+
+    static List<HostAddress> sortedNodes(NodeMap nodeMap)
+    {
+        return nodeMap.getNodesByHostAndPort().values().stream()
+                .sorted(comparing(InternalNode::getNodeIdentifier)).map(node -> node.getHostAndPort())
+                .collect(toImmutableList());
+    }
 }

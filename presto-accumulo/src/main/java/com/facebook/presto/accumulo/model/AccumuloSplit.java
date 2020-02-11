@@ -161,8 +161,13 @@ public class AccumuloSplit
         return NodeSelectionStrategy.NO_PREFERENCE;
     }
 
-    @Override
     public List<HostAddress> getAddresses()
+    {
+        return addresses;
+    }
+
+    @Override
+    public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
     {
         return addresses;
     }

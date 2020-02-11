@@ -144,8 +144,13 @@ public class RaptorSplit
         return NodeSelectionStrategy.HARD_AFFINITY;
     }
 
-    @Override
     public List<HostAddress> getAddresses()
+    {
+        return addresses;
+    }
+
+    @Override
+    public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
     {
         return addresses;
     }

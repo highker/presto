@@ -131,9 +131,10 @@ public class TopologyAwareNodeSelector
         Set<NetworkLocation> filledLocations = new HashSet<>();
         Set<InternalNode> blockedExactNodes = new HashSet<>();
         boolean splitWaitingForAnyNode = false;
+        List<HostAddress> sortedCandidates = NodeSelector.sortedNodes(nodeMap);
         for (Split split : splits) {
             if (split.getNodeSelectionStrategy() != NodeSelectionStrategy.NO_PREFERENCE) {
-                List<InternalNode> candidateNodes = selectExactNodes(nodeMap, split.getAddresses(), includeCoordinator);
+                List<InternalNode> candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(sortedCandidates), includeCoordinator);
                 if (candidateNodes.isEmpty()) {
                     log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getNodesByHost().keys());
                     throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
@@ -154,7 +155,7 @@ public class TopologyAwareNodeSelector
             int depth = networkLocationSegmentNames.size();
             int chosenDepth = 0;
             Set<NetworkLocation> locations = new HashSet<>();
-            for (HostAddress host : split.getAddresses()) {
+            for (HostAddress host : split.getPreferredNodes(sortedCandidates)) {
                 locations.add(networkLocationCache.get(host));
             }
             if (locations.isEmpty()) {
