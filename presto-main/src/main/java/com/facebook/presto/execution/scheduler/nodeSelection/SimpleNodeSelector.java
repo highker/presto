@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -119,12 +120,16 @@ public class SimpleNodeSelector
         List<HostAddress> sortedCandidates = NodeSelector.sortedNodes(nodeMap);
         for (Split split : splits) {
             List<InternalNode> candidateNodes;
-            if (split.getNodeSelectionStrategy() != NodeSelectionStrategy.NO_PREFERENCE) {
-                candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(sortedCandidates), includeCoordinator);
+            switch (split.getNodeSelectionStrategy()) {
+                case HARD_AFFINITY:
+                    candidateNodes = selectExactNodes(nodeMap, split.getPreferredNodes(sortedCandidates), includeCoordinator);
+                    break;
+                case SOFT_AFFINITY:
+                    candidateNodes = convertToInternalNode(nodeMap, split.getPreferredNodes(sortedCandidates));
+                    break;
+                default: candidateNodes = randomNodeSelection.pickNodes(split);
             }
-            else {
-                candidateNodes = randomNodeSelection.pickNodes(split);
-            }
+
             if (candidateNodes.isEmpty()) {
                 log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getNodesByHost().keys());
                 throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
@@ -179,5 +184,12 @@ public class SimpleNodeSelector
     public SplitPlacementResult computeAssignments(Set<Split> splits, List<RemoteTask> existingTasks, BucketNodeMap bucketNodeMap)
     {
         return selectDistributionNodes(nodeMap.get().get(), nodeTaskMap, maxSplitsPerNode, maxPendingSplitsPerTask, splits, existingTasks, bucketNodeMap);
+    }
+
+    private List<InternalNode> convertToInternalNode(NodeMap nodeMap, List<HostAddress> preferredNodes)
+    {
+        List<InternalNode> internalNodes = new ArrayList<>();
+        preferredNodes.stream().forEach(node -> internalNodes.addAll(nodeMap.getNodesByHostAndPort().get(node)));
+        return ImmutableList.copyOf(internalNodes);
     }
 }
