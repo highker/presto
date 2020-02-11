@@ -17,6 +17,7 @@ import com.facebook.presto.execution.Lifespan;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.ConnectorSplit;
 import com.facebook.presto.spi.HostAddress;
+import com.facebook.presto.spi.SplitContext;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -33,11 +34,12 @@ public final class Split
     private final ConnectorTransactionHandle transactionHandle;
     private final ConnectorSplit connectorSplit;
     private final Lifespan lifespan;
+    private final SplitContext splitContext;
 
     // TODO: inline
-    public Split(ConnectorId connectorId, ConnectorTransactionHandle transactionHandle, ConnectorSplit connectorSplit)
+    public Split(ConnectorId connectorId, ConnectorTransactionHandle transactionHandle, ConnectorSplit connectorSplit, SplitContext splitContext)
     {
-        this(connectorId, transactionHandle, connectorSplit, Lifespan.taskWide());
+        this(connectorId, transactionHandle, connectorSplit, Lifespan.taskWide(), splitContext);
     }
 
     @JsonCreator
@@ -45,12 +47,14 @@ public final class Split
             @JsonProperty("connectorId") ConnectorId connectorId,
             @JsonProperty("transactionHandle") ConnectorTransactionHandle transactionHandle,
             @JsonProperty("connectorSplit") ConnectorSplit connectorSplit,
-            @JsonProperty("lifespan") Lifespan lifespan)
+            @JsonProperty("lifespan") Lifespan lifespan,
+            SplitContext splitContext)
     {
         this.connectorId = requireNonNull(connectorId, "connectorId is null");
         this.transactionHandle = requireNonNull(transactionHandle, "transactionHandle is null");
         this.connectorSplit = requireNonNull(connectorSplit, "connectorSplit is null");
         this.lifespan = requireNonNull(lifespan, "lifespan is null");
+        this.splitContext = requireNonNull(splitContext, "splitContext is null");
     }
 
     @JsonProperty
@@ -75,6 +79,11 @@ public final class Split
     public Lifespan getLifespan()
     {
         return lifespan;
+    }
+
+    public SplitContext getSplitContext()
+    {
+        return splitContext;
     }
 
     public Object getInfo()

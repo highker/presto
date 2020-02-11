@@ -25,6 +25,7 @@ import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.metadata.Split;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.SplitContext;
 import com.facebook.presto.spi.schedule.NodeSelectionStrategy;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
@@ -124,6 +125,7 @@ public class SimpleNodeSelector
         List<HostAddress> sortedCandidates = NodeSelector.sortedNodes(nodeMap);
 
         OptionalInt preferredNodeCount = OptionalInt.empty();
+        boolean shouldCache = false;
 
 
         for (Split split : splits) {
@@ -154,6 +156,7 @@ public class SimpleNodeSelector
                 int totalSplitCount = assignmentStats.getTotalSplitCount(node);
                 if (preferredNodeCount.isPresent() && i < preferredNodeCount.getAsInt() && totalSplitCount < maxPendingSplitsPerTask) {
                     chosenNode = node;
+                    shouldCache = true;
                     break;
                 }
                 if (totalSplitCount < min && totalSplitCount < maxSplitsPerNode) {
@@ -173,6 +176,11 @@ public class SimpleNodeSelector
                 }
             }
             if (chosenNode != null) {
+
+                if (shouldCache) {
+                    split = new Split(split.getConnectorId(), split.getTransactionHandle(), split.getConnectorSplit(), split.getLifespan(), new SplitContext(true));
+                }
+
                 assignment.put(chosenNode, split);
                 assignmentStats.addAssignedSplit(chosenNode);
             }
