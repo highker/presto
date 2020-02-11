@@ -29,8 +29,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+import static com.facebook.presto.spi.schedule.NodeSelectionStrategy.SOFT_AFFINITY;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.lang.Math.abs;
 import static java.util.Objects.requireNonNull;
 
 public class HiveSplit
@@ -179,6 +181,9 @@ public class HiveSplit
     @Override
     public List<HostAddress> getPreferredNodes(List<HostAddress> sortedCandidates)
     {
+        if (getNodeSelectionStrategy() == SOFT_AFFINITY) {
+            return ImmutableList.of(sortedCandidates.get(abs(path.hashCode() % sortedCandidates.size())));
+        }
         return addresses;
     }
 
