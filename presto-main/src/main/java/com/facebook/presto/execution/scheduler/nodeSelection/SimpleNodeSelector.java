@@ -33,9 +33,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import javax.swing.text.html.Option;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -118,6 +122,10 @@ public class SimpleNodeSelector
         Set<InternalNode> blockedExactNodes = new HashSet<>();
         boolean splitWaitingForAnyNode = false;
         List<HostAddress> sortedCandidates = NodeSelector.sortedNodes(nodeMap);
+
+        OptionalInt preferredNodeCount = OptionalInt.empty();
+
+
         for (Split split : splits) {
             List<InternalNode> candidateNodes;
             switch (split.getNodeSelectionStrategy()) {
@@ -126,6 +134,9 @@ public class SimpleNodeSelector
                     break;
                 case SOFT_AFFINITY:
                     candidateNodes = convertToInternalNode(nodeMap, split.getPreferredNodes(sortedCandidates));
+                    preferredNodeCount = OptionalInt.of(candidateNodes.size());
+                    // ...
+                    candidateNodes = ImmutableList.<InternalNode>builder().addAll(candidateNodes).addAll(randomNodeSelection.pickNodes(split)).build();
                     break;
                 default: candidateNodes = randomNodeSelection.pickNodes(split);
             }
@@ -138,13 +149,19 @@ public class SimpleNodeSelector
             InternalNode chosenNode = null;
             int min = Integer.MAX_VALUE;
 
-            for (InternalNode node : candidateNodes) {
+            for (int i = 0; i < candidateNodes.size(); i++) {
+                InternalNode node = candidateNodes.get(i);
                 int totalSplitCount = assignmentStats.getTotalSplitCount(node);
+                if (preferredNodeCount.isPresent() && i < preferredNodeCount.getAsInt() && totalSplitCount < maxPendingSplitsPerTask) {
+                    chosenNode = node;
+                    break;
+                }
                 if (totalSplitCount < min && totalSplitCount < maxSplitsPerNode) {
                     chosenNode = node;
                     min = totalSplitCount;
                 }
             }
+
             if (chosenNode == null) {
                 // min is guaranteed to be MAX_VALUE at this line
                 for (InternalNode node : candidateNodes) {
@@ -186,10 +203,10 @@ public class SimpleNodeSelector
         return selectDistributionNodes(nodeMap.get().get(), nodeTaskMap, maxSplitsPerNode, maxPendingSplitsPerTask, splits, existingTasks, bucketNodeMap);
     }
 
-    private List<InternalNode> convertToInternalNode(NodeMap nodeMap, List<HostAddress> preferredNodes)
+    private static List<InternalNode> convertToInternalNode(NodeMap nodeMap, List<HostAddress> preferredNodes)
     {
         List<InternalNode> internalNodes = new ArrayList<>();
-        preferredNodes.stream().forEach(node -> internalNodes.addAll(nodeMap.getNodesByHostAndPort().get(node)));
+        preferredNodes.forEach(node -> internalNodes.addAll(nodeMap.getNodesByHostAndPort().get(node)));
         return ImmutableList.copyOf(internalNodes);
     }
 }
