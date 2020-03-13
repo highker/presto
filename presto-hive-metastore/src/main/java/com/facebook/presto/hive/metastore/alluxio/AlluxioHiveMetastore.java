@@ -303,8 +303,8 @@ public class AlluxioHiveMetastore
      * contained which the {@code parts} argument
      *
      * @param databaseName database name
-     * @param tableName    table name
-     * @param parts        list of values which returned partitions should contain
+     * @param tableName table name
+     * @param parts list of values which returned partitions should contain
      * @return optionally, a list of strings where each entry is in the form of {key}={value}
      */
     public Optional<List<String>> getPartitionNamesByParts(String databaseName, String tableName, List<String> parts)

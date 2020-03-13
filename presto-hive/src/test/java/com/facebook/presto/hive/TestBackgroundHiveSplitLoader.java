@@ -17,9 +17,12 @@ import com.facebook.airlift.stats.CounterStat;
 import com.facebook.presto.hive.HiveBucketing.HiveBucketFilter;
 import com.facebook.presto.hive.HiveColumnHandle.ColumnType;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
+import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.StorageFormat;
 import com.facebook.presto.hive.metastore.Table;
+import com.facebook.presto.hive.util.DirectoryLister;
+import com.facebook.presto.hive.util.HadoopDirectoryLister;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.predicate.Domain;
@@ -35,7 +38,6 @@ import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -204,7 +206,11 @@ public class TestBackgroundHiveSplitLoader
     public void testCachedDirectoryLister()
             throws Exception
     {
-        CachingDirectoryLister cachingDirectoryLister = new CachingDirectoryLister(new HadoopDirectoryLister(), new Duration(5, TimeUnit.MINUTES), 1000, ImmutableSet.of(new SchemaTableName("test_dbname", "test_table")));
+        CachingDirectoryLister cachingDirectoryLister = new CachingDirectoryLister(
+                new HadoopDirectoryLister(),
+                new Duration(5, TimeUnit.MINUTES),
+                1000,
+                ImmutableSet.of(new SchemaTableName("test_dbname", "test_table")));
         assertEquals(cachingDirectoryLister.getRequestCount(), 0);
 
         int totalCount = 1000;
@@ -309,10 +315,10 @@ public class TestBackgroundHiveSplitLoader
     private static BackgroundHiveSplitLoader backgroundHiveSplitLoader(List<LocatedFileStatus> files, DirectoryLister directoryLister)
     {
         List<HivePartitionMetadata> hivePartitionMetadatas = ImmutableList.of(
-                        new HivePartitionMetadata(
-                                new HivePartition(new SchemaTableName("testSchema", "table_name")),
-                                Optional.empty(),
-                                ImmutableMap.of()));
+                new HivePartitionMetadata(
+                        new HivePartition(new SchemaTableName("testSchema", "table_name")),
+                        Optional.empty(),
+                        ImmutableMap.of()));
 
         ConnectorSession connectorSession = new TestingConnectorSession(
                 new HiveSessionProperties(new HiveClientConfig().setMaxSplitSize(new DataSize(1.0, GIGABYTE)), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
@@ -469,14 +475,14 @@ public class TestBackgroundHiveSplitLoader
         }
 
         @Override
-        public FileSystem getFileSystem(String user, Path path, Configuration configuration)
+        public ExtendedFileSystem getFileSystem(String user, Path path, Configuration configuration)
         {
             return new TestingHdfsFileSystem(files);
         }
     }
 
     private static class TestingHdfsFileSystem
-            extends FileSystem
+            extends ExtendedFileSystem
     {
         private final List<LocatedFileStatus> files;
 
@@ -577,6 +583,24 @@ public class TestBackgroundHiveSplitLoader
 
         @Override
         public URI getUri()
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public RemoteIterator<LocatedFileStatus> listDirectory(Path path)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public RemoteIterator<HiveFileInfo> listFiles(Path path)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public FSDataInputStream openFile(Path path, HiveFileContext hiveFileContext)
         {
             throw new UnsupportedOperationException();
         }

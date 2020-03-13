@@ -13,7 +13,10 @@
  */
 package com.facebook.presto.hive;
 
+import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
 import com.facebook.presto.hive.metastore.Table;
+import com.facebook.presto.hive.util.DirectoryLister;
+import com.facebook.presto.hive.util.ForCachingDirectoryLister;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -21,7 +24,6 @@ import com.google.common.cache.Weigher;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.units.Duration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.weakref.jmx.Managed;
@@ -35,7 +37,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static com.facebook.presto.hive.util.HiveFileIterator.NestedDirectoryPolicy;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
@@ -79,7 +80,13 @@ public class CachingDirectoryLister
     }
 
     @Override
-    public Iterator<HiveFileInfo> list(FileSystem fileSystem, Table table, Path path, NamenodeStats namenodeStats, NestedDirectoryPolicy nestedDirectoryPolicy, PathFilter pathFilter)
+    public Iterator<HiveFileInfo> list(
+            ExtendedFileSystem fileSystem,
+            Table table,
+            Path path,
+            NamenodeStats namenodeStats,
+            NestedDirectoryPolicy nestedDirectoryPolicy,
+            PathFilter pathFilter)
     {
         SchemaTableName schemaTableName = new SchemaTableName(table.getDatabaseName(), table.getTableName());
 

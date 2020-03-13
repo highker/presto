@@ -31,6 +31,9 @@ import com.facebook.presto.hive.parquet.ParquetPageSourceFactory;
 import com.facebook.presto.hive.rcfile.RcFilePageSourceFactory;
 import com.facebook.presto.hive.rule.HivePlanOptimizerProvider;
 import com.facebook.presto.hive.s3.PrestoS3ClientFactory;
+import com.facebook.presto.hive.util.DirectoryLister;
+import com.facebook.presto.hive.util.ForCachingDirectoryLister;
+import com.facebook.presto.hive.util.HadoopDirectoryLister;
 import com.facebook.presto.orc.CacheStatsMBean;
 import com.facebook.presto.orc.CachingStripeMetadataSource;
 import com.facebook.presto.orc.OrcDataSourceId;
@@ -159,9 +162,6 @@ public class HiveClientModule
         binder.bind(CacheStats.class).in(Scopes.SINGLETON);
         newExporter(binder).export(CacheStats.class).withGeneratedName();
         configBinder(binder).bindConfig(CacheConfig.class);
-
-        binder.bind(FileOpener.class).to(CachingFileOpener.class).in(Scopes.SINGLETON);
-        binder.bind(FileOpener.class).annotatedWith(ForCachingFileOpener.class).to(HadoopFileOpener.class).in(Scopes.SINGLETON);
 
         Multibinder<HiveSelectivePageSourceFactory> selectivePageSourceFactoryBinder = newSetBinder(binder, HiveSelectivePageSourceFactory.class);
         selectivePageSourceFactoryBinder.addBinding().to(OrcSelectivePageSourceFactory.class).in(Scopes.SINGLETON);

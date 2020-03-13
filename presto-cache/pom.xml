@@ -65,6 +65,11 @@
         </dependency>
 
         <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-hive-common</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>slice</artifactId>
             <scope>provided</scope>
@@ -82,6 +87,16 @@
             <scope>provided</scope>
         </dependency>
 
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.facebook.airlift</groupId>
+            <artifactId>concurrent</artifactId>
+        </dependency>
+
         <!-- used by tests but also needed transitively -->
         <dependency>
             <groupId>com.facebook.airlift</groupId>
@@ -96,10 +111,5 @@
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>com.facebook.airlift</groupId>
-            <artifactId>concurrent</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 </project>
