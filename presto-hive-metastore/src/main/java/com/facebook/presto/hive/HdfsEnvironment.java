@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 public class HdfsEnvironment
@@ -60,19 +61,21 @@ public class HdfsEnvironment
         return hdfsConfiguration.getConfiguration(context, path.toUri());
     }
 
-    public FileSystem getFileSystem(HdfsContext context, Path path)
+    public ExtendedFileSystem getFileSystem(HdfsContext context, Path path)
             throws IOException
     {
         return getFileSystem(context.getIdentity().getUser(), path, getConfiguration(context, path));
     }
 
-    public FileSystem getFileSystem(String user, Path path, Configuration configuration)
+    public ExtendedFileSystem getFileSystem(String user, Path path, Configuration configuration)
             throws IOException
     {
         return hdfsAuthentication.doAs(user, () -> {
             FileSystem fileSystem = path.getFileSystem(configuration);
             fileSystem.setVerifyChecksum(verifyChecksum);
-            return fileSystem;
+
+            checkState(fileSystem instanceof ExtendedFileSystem);
+            return (ExtendedFileSystem) fileSystem;
         });
     }
 

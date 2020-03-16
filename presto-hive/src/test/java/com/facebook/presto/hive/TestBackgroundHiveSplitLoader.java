@@ -469,7 +469,7 @@ public class TestBackgroundHiveSplitLoader
         }
 
         @Override
-        public FileSystem getFileSystem(String user, Path path, Configuration configuration)
+        public ExtendedFileSystem getFileSystem(String user, Path path, Configuration configuration)
         {
             return new TestingHdfsFileSystem(files);
         }

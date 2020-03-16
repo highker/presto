@@ -27,6 +27,7 @@ import java.io.IOException;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
+// TODO: nuke this class
 public class CachingFileOpener
         implements FileOpener
 {

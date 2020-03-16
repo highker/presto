@@ -17,11 +17,9 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-import java.io.IOException;
-
-// TODO: nuke this class
-public interface FileOpener
+public abstract class ExtendedFileSystem
+        extends FileSystem
 {
-    FSDataInputStream open(FileSystem fileSystem, Path path, HiveFileContext hiveFileContext)
-            throws IOException;
+    public abstract FSDataInputStream openFileByDescriptor(Path path, HiveFileContext hiveFileContext)
+            throws Exception;
 }

@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.parquet;
 
+import com.facebook.presto.hive.ExtendedFileSystem;
 import com.facebook.presto.hive.FileFormatDataSourceStats;
 import com.facebook.presto.hive.FileOpener;
 import com.facebook.presto.hive.HdfsEnvironment;
@@ -42,7 +43,6 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.units.DataSize;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
@@ -156,8 +156,8 @@ public class ParquetPageSourceFactory
                 typeManager,
                 effectivePredicate,
                 stats,
-                hiveFileContext,
-                fileOpener));
+                hiveFileContext
+        ));
     }
 
     public static ParquetPageSource createParquetPageSource(
@@ -175,15 +175,14 @@ public class ParquetPageSourceFactory
             TypeManager typeManager,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             FileFormatDataSourceStats stats,
-            HiveFileContext hiveFileContext,
-            FileOpener fileOpener)
+            HiveFileContext hiveFileContext)
     {
         AggregatedMemoryContext systemMemoryContext = newSimpleAggregatedMemoryContext();
 
         ParquetDataSource dataSource = null;
         try {
-            FileSystem fileSystem = hdfsEnvironment.getFileSystem(user, path, configuration);
-            FSDataInputStream inputStream = fileOpener.open(fileSystem, path, hiveFileContext);
+            ExtendedFileSystem fileSystem = hdfsEnvironment.getFileSystem(user, path, configuration);
+            FSDataInputStream inputStream = fileSystem.openFileByDescriptor(path, hiveFileContext);
             ParquetMetadata parquetMetadata = MetadataReader.readFooter(inputStream, path, fileSize);
             FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
             MessageType fileSchema = fileMetaData.getSchema();

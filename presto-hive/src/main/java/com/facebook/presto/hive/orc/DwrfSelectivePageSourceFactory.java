@@ -143,7 +143,6 @@ public class DwrfSelectivePageSourceFactory
                 orcFileTailSource,
                 stripeMetadataSource,
                 hiveFileContext,
-                fileOpener,
                 tupleDomainFilterCache));
     }
 }

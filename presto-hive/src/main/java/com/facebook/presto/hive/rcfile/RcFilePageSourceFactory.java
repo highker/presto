@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.rcfile;
 
+import com.facebook.presto.hive.ExtendedFileSystem;
 import com.facebook.presto.hive.FileFormatDataSourceStats;
 import com.facebook.presto.hive.FileOpener;
 import com.facebook.presto.hive.HdfsEnvironment;
@@ -40,7 +41,6 @@ import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe;
@@ -127,8 +127,8 @@ public class RcFilePageSourceFactory
 
         FSDataInputStream inputStream;
         try {
-            FileSystem fileSystem = hdfsEnvironment.getFileSystem(session.getUser(), path, configuration);
-            inputStream = fileOpener.open(fileSystem, path, hiveFileContext);
+            ExtendedFileSystem fileSystem = hdfsEnvironment.getFileSystem(session.getUser(), path, configuration);
+            inputStream = fileSystem.openFileByDescriptor(path, hiveFileContext);
         }
         catch (Exception e) {
             if (nullToEmpty(e.getMessage()).trim().equals("Filesystem closed") ||

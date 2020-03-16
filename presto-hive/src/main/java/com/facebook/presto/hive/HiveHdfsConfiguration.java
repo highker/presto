@@ -13,17 +13,25 @@
  */
 package com.facebook.presto.hive;
 
+import com.facebook.presto.hadoop.FileSystemFactory;
 import com.facebook.presto.hive.HdfsEnvironment.HdfsContext;
+import com.facebook.presto.spi.PrestoException;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.JobConf;
 
 import javax.inject.Inject;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.Set;
+import java.util.function.BiFunction;
 
 import static com.facebook.presto.hive.util.ConfigurationUtils.copy;
 import static com.facebook.presto.hive.util.ConfigurationUtils.getInitialConfiguration;
+import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static java.util.Objects.requireNonNull;
 
 public class HiveHdfsConfiguration
@@ -57,16 +65,40 @@ public class HiveHdfsConfiguration
     @Override
     public Configuration getConfiguration(HdfsContext context, URI uri)
     {
-        if (dynamicProviders.isEmpty()) {
-            // use the same configuration for everything
-            return hadoopConfiguration.get();
-        }
+        @SuppressWarnings("resource")
+        Configuration config = new HiveHdfsConfiguration.HadoopJobConf((factoryConfig, factoryUri) -> {
+            try {
+                return new HadoopFileSystem(factoryUri, (new Path(uri)).getFileSystem(hadoopConfiguration.get()));
+            }
+            catch (IOException e) {
+                throw new PrestoException(GENERIC_INTERNAL_ERROR, "cannot create caching file system", e);
+            }
+        });
 
-        Configuration config = new Configuration(false);
         copy(hadoopConfiguration.get(), config);
         for (DynamicConfigurationProvider provider : dynamicProviders) {
             provider.updateConfiguration(config, context, uri);
         }
+
         return config;
+    }
+
+    private static class HadoopJobConf
+            extends JobConf
+            implements FileSystemFactory
+    {
+        private final BiFunction<Configuration, URI, FileSystem> factory;
+
+        private HadoopJobConf(BiFunction<Configuration, URI, FileSystem> factory)
+        {
+            super(false);
+            this.factory = requireNonNull(factory, "factory is null");
+        }
+
+        @Override
+        public FileSystem createFileSystem(URI uri)
+        {
+            return factory.apply(this, uri);
+        }
     }
 }

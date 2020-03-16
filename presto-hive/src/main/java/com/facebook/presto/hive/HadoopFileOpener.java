@@ -19,6 +19,7 @@ import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 
+// TODO: nuke this class
 public class HadoopFileOpener
         implements FileOpener
 {

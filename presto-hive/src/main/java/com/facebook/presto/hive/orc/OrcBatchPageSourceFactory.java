@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.orc;
 
+import com.facebook.presto.hive.ExtendedFileSystem;
 import com.facebook.presto.hive.FileFormatDataSourceStats;
 import com.facebook.presto.hive.FileOpener;
 import com.facebook.presto.hive.HdfsEnvironment;
@@ -45,7 +46,6 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.units.DataSize;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
 import org.joda.time.DateTimeZone;
@@ -216,8 +216,9 @@ public class OrcBatchPageSourceFactory
 
         OrcDataSource orcDataSource;
         try {
-            FileSystem fileSystem = hdfsEnvironment.getFileSystem(sessionUser, path, configuration);
-            FSDataInputStream inputStream = fileOpener.open(fileSystem, path, hiveFileContext);
+            ExtendedFileSystem fileSystem = hdfsEnvironment.getFileSystem(sessionUser, path, configuration);
+            // this is the key change; OMG, I'm so smart :D
+            FSDataInputStream inputStream = fileSystem.openFileByDescriptor(path, hiveFileContext);
             orcDataSource = new HdfsOrcDataSource(
                     new OrcDataSourceId(path.toString()),
                     fileSize,
