@@ -13,12 +13,26 @@
  */
 package org.apache.hadoop.fs;
 
+import com.facebook.presto.hive.util.DirectoryLister;
+import com.facebook.presto.hive.util.HadoopDirectoryLister;
+
+import java.util.Optional;
+
+import static java.util.Objects.requireNonNull;
+
 public class PrestoExtendedFileSystemCache
         extends PrestoFileSystemCache
 {
+    private Optional<DirectoryLister> directoryLister = Optional.empty();
+
+    public synchronized void setDirectoryLister(DirectoryLister directoryLister)
+    {
+        this.directoryLister = Optional.of(requireNonNull(directoryLister, "directoryLister is null"));
+    }
+
     @Override
     protected FileSystem createPrestoFileSystemWrapper(FileSystem original)
     {
-        return new HadoopExtendedFileSystemWrapper(original);
+        return new HadoopExtendedFileSystemWrapper(original, directoryLister.orElse(new HadoopDirectoryLister()));
     }
 }

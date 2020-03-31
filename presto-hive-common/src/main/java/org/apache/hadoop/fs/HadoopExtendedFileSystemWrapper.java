@@ -14,7 +14,12 @@
 package org.apache.hadoop.fs;
 
 import com.facebook.presto.hive.HiveFileContext;
+import com.facebook.presto.hive.HiveFileInfo;
+import com.facebook.presto.hive.NamenodeStats;
+import com.facebook.presto.hive.NestedDirectoryPolicy;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
+import com.facebook.presto.hive.metastore.Table;
+import com.facebook.presto.hive.util.DirectoryLister;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclStatus;
@@ -26,6 +31,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -33,11 +39,13 @@ public class HadoopExtendedFileSystemWrapper
         extends ExtendedFileSystem
 {
     private FileSystem fs;
+    private final DirectoryLister directoryLister;
     private String swapScheme;
 
-    public HadoopExtendedFileSystemWrapper(FileSystem fs)
+    public HadoopExtendedFileSystemWrapper(FileSystem fs, DirectoryLister directoryLister)
     {
         this.fs = fs;
+        this.directoryLister = directoryLister;
         this.statistics = fs.statistics;
     }
 
@@ -616,10 +624,26 @@ public class HadoopExtendedFileSystemWrapper
         throw new UnsupportedOperationException();
     }
 
+    public RemoteIterator<HiveFileInfo> listFiles(Path path)
+    {
+        throw new UnsupportedOperationException();
+    }
+
     @Override
     public FSDataInputStream openFile(Path path, HiveFileContext hiveFileContext)
             throws Exception
     {
         return fs.open(path);
+    }
+
+    @Override
+    public Iterator<HiveFileInfo> list(
+            Table table,
+            Path path,
+            NamenodeStats namenodeStats,
+            NestedDirectoryPolicy nestedDirectoryPolicy,
+            PathFilter pathFilter)
+    {
+        return directoryLister.list(this, table, path, namenodeStats, nestedDirectoryPolicy, pathFilter);
     }
 }

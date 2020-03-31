@@ -15,7 +15,11 @@ package com.facebook.presto.cache;
 
 import com.facebook.presto.hive.HiveFileContext;
 import com.facebook.presto.hive.HiveFileInfo;
+import com.facebook.presto.hive.NamenodeStats;
+import com.facebook.presto.hive.NestedDirectoryPolicy;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
+import com.facebook.presto.hive.metastore.Table;
+import com.facebook.presto.hive.util.DirectoryLister;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.ContentSummary;
@@ -29,6 +33,7 @@ import org.apache.hadoop.fs.FsStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.XAttrSetFlag;
 import org.apache.hadoop.fs.permission.AclEntry;
@@ -42,6 +47,7 @@ import org.apache.hadoop.util.Progressable;
 import java.io.IOException;
 import java.net.URI;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -53,6 +59,7 @@ public final class CachingFileSystem
     private final URI uri;
     private final CacheManager cacheManager;
     private final ExtendedFileSystem dataTier;
+    private final DirectoryLister directoryLister;
     private final boolean cacheValidationEnabled;
 
     public CachingFileSystem(
@@ -60,12 +67,14 @@ public final class CachingFileSystem
             Configuration configuration,
             CacheManager cacheManager,
             ExtendedFileSystem dataTier,
+            DirectoryLister directoryLister,
             boolean cacheValidationEnabled)
     {
         requireNonNull(configuration, "configuration is null");
         this.uri = requireNonNull(uri, "uri is null");
         this.cacheManager = requireNonNull(cacheManager, "cacheManager is null");
         this.dataTier = requireNonNull(dataTier, "dataTier is null");
+        this.directoryLister = requireNonNull(directoryLister, "directoryLister is null");
         this.cacheValidationEnabled = cacheValidationEnabled;
 
         setConf(configuration);
@@ -521,5 +530,16 @@ public final class CachingFileSystem
             throws Exception
     {
         return new CachingInputStream(dataTier.openFile(path, hiveFileContext), cacheManager, path, cacheValidationEnabled);
+    }
+
+    @Override
+    public Iterator<HiveFileInfo> list(
+            Table table,
+            Path path,
+            NamenodeStats namenodeStats,
+            NestedDirectoryPolicy nestedDirectoryPolicy,
+            PathFilter pathFilter)
+    {
+        return directoryLister.list(dataTier, table, path, namenodeStats, nestedDirectoryPolicy, pathFilter);
     }
 }

@@ -13,6 +13,8 @@
  */
 package org.apache.hadoop.fs;
 
+import com.facebook.presto.hive.util.DirectoryLister;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
@@ -26,6 +28,13 @@ public class HadoopExtendedFileSystemCache
     {
         if (cache == null) {
             cache = setFinalStatic(FileSystem.class, "CACHE", new PrestoExtendedFileSystemCache());
+        }
+    }
+
+    public static synchronized void setDirectoryLister(DirectoryLister diretorLister)
+    {
+        if (cache != null) {
+            cache.setDirectoryLister(diretorLister);
         }
     }
 

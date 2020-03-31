@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.util.Progressable;
@@ -601,6 +602,17 @@ public class TestBackgroundHiveSplitLoader
 
         @Override
         public FSDataInputStream openFile(Path path, HiveFileContext hiveFileContext)
+        {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Iterator<HiveFileInfo> list(
+                Table table,
+                Path path,
+                NamenodeStats namenodeStats,
+                NestedDirectoryPolicy nestedDirectoryPolicy,
+                PathFilter pathFilter)
         {
             throw new UnsupportedOperationException();
         }

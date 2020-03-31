@@ -17,6 +17,7 @@ import com.facebook.presto.hadoop.HadoopNative;
 import com.facebook.presto.hive.authentication.GenericExceptionAction;
 import com.facebook.presto.hive.authentication.HdfsAuthentication;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
+import com.facebook.presto.hive.util.DirectoryLister;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.security.ConnectorIdentity;
 import org.apache.hadoop.conf.Configuration;
@@ -47,7 +48,8 @@ public class HdfsEnvironment
     public HdfsEnvironment(
             @ForMetastoreHdfsEnvironment HdfsConfiguration hdfsConfiguration,
             MetastoreClientConfig config,
-            HdfsAuthentication hdfsAuthentication)
+            HdfsAuthentication hdfsAuthentication,
+            DirectoryLister directoryLister)
     {
         this.hdfsConfiguration = requireNonNull(hdfsConfiguration, "hdfsConfiguration is null");
         this.verifyChecksum = requireNonNull(config, "config is null").isVerifyChecksum();
@@ -55,6 +57,7 @@ public class HdfsEnvironment
         if (config.isRequireHadoopNative()) {
             HadoopNative.requireHadoopNative();
         }
+        HadoopExtendedFileSystemCache.setDirectoryLister(directoryLister);
     }
 
     public Configuration getConfiguration(HdfsContext context, Path path)

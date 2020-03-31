@@ -20,6 +20,7 @@ import com.facebook.presto.cache.ForCachingFileSystem;
 import com.facebook.presto.hadoop.FileSystemFactory;
 import com.facebook.presto.hive.HdfsEnvironment.HdfsContext;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
+import com.facebook.presto.hive.util.DirectoryLister;
 import com.facebook.presto.spi.PrestoException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -42,16 +43,19 @@ public class HiveCachingHdfsConfiguration
 {
     private final HdfsConfiguration hiveHdfsConfiguration;
     private final CacheManager cacheManager;
+    private final DirectoryLister directoryLister;
     private final boolean cacheValidationEnabled;
 
     @Inject
     public HiveCachingHdfsConfiguration(
             @ForCachingFileSystem HdfsConfiguration hdfsConfiguration,
             CacheConfig cacheConfig,
-            CacheManager cacheManager)
+            CacheManager cacheManager,
+            DirectoryLister directoryLister)
     {
         this.hiveHdfsConfiguration = requireNonNull(hdfsConfiguration, "hiveHdfsConfiguration is null");
         this.cacheManager = requireNonNull(cacheManager, "CacheManager is null");
+        this.directoryLister = requireNonNull(directoryLister, "directoryLister is null");
         this.cacheValidationEnabled = requireNonNull(cacheConfig, "cacheConfig is null").isValidationEnabled();
     }
 
@@ -68,6 +72,7 @@ public class HiveCachingHdfsConfiguration
                         factoryConfig,
                         cacheManager,
                         (ExtendedFileSystem) fileSystem,
+                        directoryLister,
                         cacheValidationEnabled);
             }
             catch (IOException e) {

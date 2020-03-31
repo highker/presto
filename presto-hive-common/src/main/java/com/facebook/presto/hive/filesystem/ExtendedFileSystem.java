@@ -18,7 +18,6 @@ import com.facebook.presto.hive.HiveFileInfo;
 import com.facebook.presto.hive.NamenodeStats;
 import com.facebook.presto.hive.NestedDirectoryPolicy;
 import com.facebook.presto.hive.metastore.Table;
-import com.facebook.presto.hive.util.DirectoryLister;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
@@ -32,38 +31,18 @@ import java.util.Iterator;
 public abstract class ExtendedFileSystem
         extends FileSystem
 {
-    public FSDataInputStream openFile(Path path, HiveFileContext hiveFileContext)
-            throws Exception
-    {
-        return open(path);
-    }
+    abstract public FSDataInputStream openFile(Path path, HiveFileContext hiveFileContext) throws Exception;
 
-    public Iterator<HiveFileInfo> list(
-            DirectoryLister directoryLister,
+    abstract public Iterator<HiveFileInfo> list(
             Table table,
             Path path,
             NamenodeStats namenodeStats,
             NestedDirectoryPolicy nestedDirectoryPolicy,
-            PathFilter pathFilter)
-    {
-        return directoryLister.list(this, table, path, namenodeStats, nestedDirectoryPolicy, pathFilter);
-    }
+            PathFilter pathFilter);
 
-    public RemoteIterator<LocatedFileStatus> listDirectory(Path path)
-            throws IOException
-    {
-        throw new UnsupportedOperationException();
-    }
+    abstract public RemoteIterator<LocatedFileStatus> listDirectory(Path path)
+            throws IOException;
 
-    public RemoteIterator<HiveFileInfo> listFiles(Path path)
-            throws IOException
-    {
-        throw new UnsupportedOperationException();
-    }
-
-    public RemoteIterator<LocatedFileStatus> listByPrefix(Path path)
-            throws IOException
-    {
-        throw new UnsupportedOperationException();
-    }
+    abstract public RemoteIterator<HiveFileInfo> listFiles(Path path)
+            throws IOException;
 }
