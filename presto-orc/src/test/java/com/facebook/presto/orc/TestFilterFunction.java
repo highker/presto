@@ -37,7 +37,7 @@ public class TestFilterFunction
     public void testFilter()
     {
         ConnectorSession session = new TestingConnectorSession(ImmutableList.of());
-        FilterFunction filter = new FilterFunction(session, true, new IsOddPredicate());
+        FilterFunction filter = new FilterFunction(true, new IsOddPredicate());
 
         Block numbers = makeNumbers(0, 1000);
         int[] allPositions = makePositions(0, 1000, 1);
@@ -129,7 +129,7 @@ public class TestFilterFunction
         }
 
         @Override
-        public boolean evaluate(ConnectorSession session, Page page, int position)
+        public boolean evaluate(Page page, int position)
         {
             long number = page.getBlock(0).getLong(position);
             if (number == UNLUCKY) {

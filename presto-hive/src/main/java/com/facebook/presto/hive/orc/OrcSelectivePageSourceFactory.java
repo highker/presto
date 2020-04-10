@@ -594,7 +594,7 @@ public class OrcSelectivePageSourceFactory
     {
         ImmutableList.Builder<FilterFunction> filterFunctions = ImmutableList.builder();
 
-        bucketAdapter.map(predicate -> new FilterFunction(session, true, predicate))
+        bucketAdapter.map(predicate -> new FilterFunction(true, predicate))
                 .ifPresent(filterFunctions::add);
 
         if (TRUE_CONSTANT.equals(filter)) {
@@ -602,13 +602,13 @@ public class OrcSelectivePageSourceFactory
         }
 
         if (!isAdaptiveFilterReorderingEnabled(session)) {
-            filterFunctions.add(new FilterFunction(session, determinismEvaluator.isDeterministic(filter), predicateCompiler.compilePredicate(session.getSqlFunctionProperties(), filter).get()));
+            filterFunctions.add(new FilterFunction(determinismEvaluator.isDeterministic(filter), predicateCompiler.compilePredicate(session.getSqlFunctionProperties(), filter).get()));
             return filterFunctions.build();
         }
 
         List<RowExpression> conjuncts = extractConjuncts(filter);
         if (conjuncts.size() == 1) {
-            filterFunctions.add(new FilterFunction(session, determinismEvaluator.isDeterministic(filter), predicateCompiler.compilePredicate(session.getSqlFunctionProperties(), filter).get()));
+            filterFunctions.add(new FilterFunction(determinismEvaluator.isDeterministic(filter), predicateCompiler.compilePredicate(session.getSqlFunctionProperties(), filter).get()));
             return filterFunctions.build();
         }
 
@@ -620,7 +620,7 @@ public class OrcSelectivePageSourceFactory
 
         inputsToConjuncts.values().stream()
                 .map(expressions -> binaryExpression(AND, expressions))
-                .map(predicate -> new FilterFunction(session, determinismEvaluator.isDeterministic(predicate), predicateCompiler.compilePredicate(session.getSqlFunctionProperties(), predicate).get()))
+                .map(predicate -> new FilterFunction(determinismEvaluator.isDeterministic(predicate), predicateCompiler.compilePredicate(session.getSqlFunctionProperties(), predicate).get()))
                 .forEach(filterFunctions::add);
 
         return filterFunctions.build();
@@ -676,7 +676,7 @@ public class OrcSelectivePageSourceFactory
         }
 
         @Override
-        public boolean evaluate(ConnectorSession session, Page page, int position)
+        public boolean evaluate(Page page, int position)
         {
             int bucket = getHiveBucket(tableBucketCount, typeInfoList, page, position);
             if ((bucket - bucketToKeep) % partitionBucketCount != 0) {

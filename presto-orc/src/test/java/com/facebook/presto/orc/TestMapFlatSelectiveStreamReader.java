@@ -14,7 +14,6 @@
 package com.facebook.presto.orc;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.Subfield;
 import com.facebook.presto.spi.block.Block;
@@ -626,7 +625,7 @@ public class TestMapFlatSelectiveStreamReader
 
         public TestingFilterFunction(final Type mapType)
         {
-            super(TEST_SESSION.toConnectorSession(), true, new Predicate() {
+            super(true, new Predicate() {
                 @Override
                 public int[] getInputChannels()
                 {
@@ -634,13 +633,13 @@ public class TestMapFlatSelectiveStreamReader
                 }
 
                 @Override
-                public boolean evaluate(ConnectorSession session, Page page, int position)
+                public boolean evaluate(Page page, int position)
                 {
                     Block mapBlock = page.getBlock(0);
                     if (mapBlock.isNull(position)) {
                         return false;
                     }
-                    Map map = (Map) mapType.getObjectValue(session, mapBlock, position);
+                    Map map = (Map) mapType.getObjectValue(TEST_SESSION.toConnectorSession(), mapBlock, position);
                     return map.containsKey(1);
                 }
             });

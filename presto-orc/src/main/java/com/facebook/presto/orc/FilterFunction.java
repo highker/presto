@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.orc;
 
-import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.DictionaryBlock;
@@ -31,7 +30,6 @@ public class FilterFunction
     private static final byte FILTER_PASSED = 1;
     private static final byte FILTER_FAILED = 2;
 
-    private final ConnectorSession session;
     private final Predicate predicate;
     private final boolean deterministic;
     private final int[] inputChannels;
@@ -42,9 +40,8 @@ public class FilterFunction
     private Block previousDictionary;
     private Page dictionaryPage;
 
-    public FilterFunction(ConnectorSession session, boolean deterministic, Predicate predicate)
+    public FilterFunction(boolean deterministic, Predicate predicate)
     {
-        this.session = requireNonNull(session, "session is null");
         this.predicate = requireNonNull(predicate, "predicate is null");
         this.deterministic = deterministic;
         this.inputChannels = requireNonNull(predicate.getInputChannels(), "inputChannels is null");
@@ -76,7 +73,7 @@ public class FilterFunction
         for (int i = 0; i < positionCount; i++) {
             int position = positions[i];
             try {
-                if (predicate.evaluate(session, page, position)) {
+                if (predicate.evaluate(page, position)) {
                     positions[outputCount] = position;
                     errors[outputCount] = errors[i];
                     outputCount++;
@@ -118,7 +115,7 @@ public class FilterFunction
                     continue;
                 case FILTER_NOT_EVALUATED:
                     try {
-                        if (predicate.evaluate(session, dictionaryPage, dictionaryPosition)) {
+                        if (predicate.evaluate(dictionaryPage, dictionaryPosition)) {
                             positions[outputCount] = position;
                             errors[outputCount] = errors[i];
                             outputCount++;

@@ -13,12 +13,11 @@
  */
 package com.facebook.presto.spi.relation;
 
-import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.Page;
 
 public interface Predicate
 {
     int[] getInputChannels();
 
-    boolean evaluate(ConnectorSession session, Page page, int position);
+    boolean evaluate(Page page, int position);
 }
