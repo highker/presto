@@ -30,6 +30,7 @@ import com.facebook.presto.spi.function.BlockPosition;
 import com.facebook.presto.spi.function.IsNull;
 import com.facebook.presto.spi.function.LongVariableConstraint;
 import com.facebook.presto.spi.function.Signature;
+import com.facebook.presto.spi.function.SqlFunctionProperties;
 import com.facebook.presto.spi.function.SqlNullable;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.function.TypeParameter;
@@ -534,7 +535,7 @@ public class ParametricScalarImplementation
                 Class<?> parameterType = parameter.getType();
 
                 // Skip injected parameters
-                if (parameterType == ConnectorSession.class) {
+                if (parameterType == SqlFunctionProperties.class) {
                     checkCondition(!hasConnectorSession, FUNCTION_IMPLEMENTATION_ERROR, "Method [%s] has more than 1 ConnectorSession in the parameter list", method);
                     hasConnectorSession = true;
                     i++;

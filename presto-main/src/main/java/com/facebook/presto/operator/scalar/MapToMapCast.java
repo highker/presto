@@ -19,10 +19,10 @@ import com.facebook.presto.metadata.CastType;
 import com.facebook.presto.metadata.FunctionManager;
 import com.facebook.presto.metadata.SqlOperator;
 import com.facebook.presto.operator.aggregation.TypedSet;
-import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.function.SqlFunctionProperties;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
@@ -60,7 +60,7 @@ public final class MapToMapCast
             MethodHandle.class,
             MethodHandle.class,
             Type.class,
-            ConnectorSession.class,
+            SqlFunctionProperties.class,
             Block.class);
 
     private static final MethodHandle CHECK_LONG_IS_NOT_NULL = methodHandle(MapToMapCast.class, "checkLongIsNotNull", Long.class);
@@ -109,8 +109,8 @@ public final class MapToMapCast
         // Adapt cast that takes ([ConnectorSession,] ?) to one that takes (?, ConnectorSession), where ? is the return type of getter.
         BuiltInScalarFunctionImplementation castImplementation = functionManager.getBuiltInScalarFunctionImplementation(functionManager.lookupCast(CastType.CAST, fromType.getTypeSignature(), toType.getTypeSignature()));
         MethodHandle cast = castImplementation.getMethodHandle();
-        if (cast.type().parameterArray()[0] != ConnectorSession.class) {
-            cast = MethodHandles.dropArguments(cast, 0, ConnectorSession.class);
+        if (cast.type().parameterArray()[0] != SqlFunctionProperties.class) {
+            cast = MethodHandles.dropArguments(cast, 0, SqlFunctionProperties.class);
         }
         cast = permuteArguments(cast, methodType(cast.type().returnType(), cast.type().parameterArray()[1], cast.type().parameterArray()[0]), 1, 0);
         MethodHandle target = compose(cast, getter);
@@ -210,7 +210,7 @@ public final class MapToMapCast
             MethodHandle keyProcessFunction,
             MethodHandle valueProcessFunction,
             Type toMapType,
-            ConnectorSession session,
+            SqlFunctionProperties properties,
             Block fromMap)
     {
         checkState(toMapType.getTypeParameters().size() == 2, "Expect two type parameters for toMapType");
@@ -219,7 +219,7 @@ public final class MapToMapCast
         BlockBuilder keyBlockBuilder = toKeyType.createBlockBuilder(null, fromMap.getPositionCount() / 2);
         for (int i = 0; i < fromMap.getPositionCount(); i += 2) {
             try {
-                keyProcessFunction.invokeExact(fromMap, i, session, keyBlockBuilder);
+                keyProcessFunction.invokeExact(fromMap, i, properties, keyBlockBuilder);
             }
             catch (Throwable t) {
                 throw internalError(t);
@@ -239,7 +239,7 @@ public final class MapToMapCast
                 }
 
                 try {
-                    valueProcessFunction.invokeExact(fromMap, i + 1, session, blockBuilder);
+                    valueProcessFunction.invokeExact(fromMap, i + 1, properties, blockBuilder);
                 }
                 catch (Throwable t) {
                     throw internalError(t);

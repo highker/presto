@@ -13,8 +13,8 @@
  */
 package com.facebook.presto.operator.scalar;
 
-import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.function.ScalarFunctionImplementation;
+import com.facebook.presto.spi.function.SqlFunctionProperties;
 import com.google.common.collect.ImmutableList;
 
 import java.lang.invoke.MethodHandle;
@@ -131,13 +131,13 @@ public final class BuiltInScalarFunctionImplementation
 
             List<Class<?>> parameterList = methodHandle.type().parameterList();
             boolean hasSession = false;
-            if (parameterList.contains(ConnectorSession.class)) {
-                checkArgument(parameterList.stream().filter(ConnectorSession.class::equals).count() == 1, "function implementation should have exactly one ConnectorSession parameter");
+            if (parameterList.contains(SqlFunctionProperties.class)) {
+                checkArgument(parameterList.stream().filter(SqlFunctionProperties.class::equals).count() == 1, "function implementation should have exactly one ConnectorSession parameter");
                 if (!instanceFactory.isPresent()) {
-                    checkArgument(parameterList.get(0) == ConnectorSession.class, "ConnectorSession must be the first argument when instanceFactory is not present");
+                    checkArgument(parameterList.get(0) == SqlFunctionProperties.class, "ConnectorSession must be the first argument when instanceFactory is not present");
                 }
                 else {
-                    checkArgument(parameterList.get(1) == ConnectorSession.class, "ConnectorSession must be the second argument when instanceFactory is present");
+                    checkArgument(parameterList.get(1) == SqlFunctionProperties.class, "ConnectorSession must be the second argument when instanceFactory is present");
                 }
                 hasSession = true;
             }
