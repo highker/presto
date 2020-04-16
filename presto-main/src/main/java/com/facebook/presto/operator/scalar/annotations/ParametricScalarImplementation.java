@@ -226,7 +226,7 @@ public class ParametricScalarImplementation
             methodHandleParameterTypes.add(Object.class);
         }
         if (choice.hasConnectorSession()) {
-            methodHandleParameterTypes.add(ConnectorSession.class);
+            methodHandleParameterTypes.add(SqlFunctionProperties.class);
         }
 
         List<ArgumentProperty> argumentProperties = choice.getArgumentProperties();
