@@ -79,7 +79,7 @@ public class LocalDynamicFilter
 
     public ListenableFuture<Map<String, Domain>> getNodeLocalDynamicFilterForVariable()
     {
-        return Futures.transform(resultFuture, this::convertTupleDomainForLocalFilters, directExecutor());
+        return Futures.transform(resultFuture, this::convertTupleDomain, directExecutor());
     }
 
     private synchronized void addPartition(TupleDomain<String> tupleDomain)
@@ -112,14 +112,7 @@ public class LocalDynamicFilter
 
         // Convert the predicate to use probe symbols (instead dynamic filter IDs).
         // Note that in case of a probe-side union, a single dynamic filter may match multiple probe symbols.
-        for (Map.Entry<VariableReferenceExpression, Domain> entry : result.getDomains().get().entrySet()) {
-            Domain domain = entry.getValue();
-            // Store all matching symbols for each build channel index.
-            for (VariableReferenceExpression probeVariable : probeVariables.get(entry.getKey().getName())) {
-                builder.put(probeVariable.getName(), domain);
-            }
-        }
-        return builder.build();
+        return convertTupleDomain(result);
     }
 
     private Map<String, Domain> convertTupleDomain(TupleDomain<VariableReferenceExpression> result)

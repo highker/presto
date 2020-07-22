@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive;
 
+import com.facebook.airlift.log.Logger;
 import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.hive.HiveBucketing.HiveBucketFilter;
@@ -102,6 +103,7 @@ import static org.apache.hadoop.hive.common.FileUtils.HIDDEN_FILES_PATH_FILTER;
 public class BackgroundHiveSplitLoader
         implements HiveSplitLoader
 {
+    private static final Logger log = Logger.get(BackgroundHiveSplitLoader.class);
     private static final ListenableFuture<?> COMPLETED_FUTURE = immediateFuture(null);
 
     private final Table table;
@@ -272,12 +274,14 @@ public class BackgroundHiveSplitLoader
             if (partition == null) {
                 return COMPLETED_FUTURE;
             }
+            log.info("james load partition !!!! " + session.getQueryId() + " ----- " + dynamicFilterSupplier.get());
             return loadPartition(partition);
         }
 
         while (splits.hasNext() && !stopped) {
             ListenableFuture<?> future = hiveSplitSource.addToQueue(splits.next());
             if (!future.isDone()) {
+                log.info("james iterator !!!! " + session.getQueryId() + " ----- " + dynamicFilterSupplier.get());
                 fileIterators.addFirst(splits);
                 return future;
             }
@@ -302,8 +306,6 @@ public class BackgroundHiveSplitLoader
         InputFormat<?, ?> inputFormat = getInputFormat(configuration, inputFormatName, false);
         ExtendedFileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext, path);
         boolean s3SelectPushdownEnabled = shouldEnablePushdownForTable(session, table, path.toString(), partition.getPartition());
-
-        System.out.println("james !!!!" + dynamicFilterSupplier.get());
 
         if (inputFormat instanceof SymlinkTextInputFormat) {
             if (tableBucketInfo.isPresent()) {

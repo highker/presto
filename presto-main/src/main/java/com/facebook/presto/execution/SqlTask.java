@@ -292,6 +292,7 @@ public class SqlTask
         }
 
         // Compact TupleDomain before reporting dynamic filters to coordinator to avoid bloating QueryInfo
+        // TODO: james: with simplify(), there is no way to do bucket pruning
         Map<String, Domain> compactDynamicTupleDomains = dynamicTupleDomains.entrySet().stream()
                 .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().simplify()));
 
