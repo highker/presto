@@ -17,6 +17,7 @@ import com.facebook.airlift.concurrent.SetThreadName;
 import com.facebook.airlift.log.Logger;
 import com.facebook.airlift.stats.CounterStat;
 import com.facebook.presto.Session;
+import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.execution.buffer.BufferResult;
 import com.facebook.presto.execution.buffer.LazyOutputBuffer;
@@ -35,6 +36,7 @@ import com.facebook.presto.spi.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.PlanFragment;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -46,6 +48,7 @@ import javax.annotation.Nullable;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -59,6 +62,7 @@ import static com.facebook.presto.execution.TaskState.FAILED;
 import static com.facebook.presto.util.Failures.toFailures;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.airlift.units.DataSize.Unit.BYTE;
@@ -256,8 +260,10 @@ public class SqlTask
         Set<Lifespan> completedDriverGroups = ImmutableSet.of();
         long fullGcCount = 0;
         Duration fullGcTime = new Duration(0, MILLISECONDS);
+        Map<String, Domain> dynamicTupleDomains = ImmutableMap.of();
         if (taskHolder.getFinalTaskInfo() != null) {
-            TaskStats taskStats = taskHolder.getFinalTaskInfo().getStats();
+            TaskInfo taskInfo = taskHolder.getFinalTaskInfo();
+            TaskStats taskStats = taskInfo.getStats();
             queuedPartitionedDrivers = taskStats.getQueuedPartitionedDrivers();
             runningPartitionedDrivers = taskStats.getRunningPartitionedDrivers();
             physicalWrittenDataSize = taskStats.getPhysicalWrittenDataSize();
@@ -265,6 +271,7 @@ public class SqlTask
             systemMemoryReservation = taskStats.getSystemMemoryReservation();
             fullGcCount = taskStats.getFullGcCount();
             fullGcTime = taskStats.getFullGcTime();
+            dynamicTupleDomains = taskInfo.getTaskStatus().getDynamicFilterDomains();
         }
         else if (taskHolder.getTaskExecution() != null) {
             long physicalWrittenBytes = 0;
@@ -281,7 +288,12 @@ public class SqlTask
             completedDriverGroups = taskContext.getCompletedDriverGroups();
             fullGcCount = taskContext.getFullGcCount();
             fullGcTime = taskContext.getFullGcTime();
+            dynamicTupleDomains = taskContext.getDynamicTupleDomains();
         }
+
+        // Compact TupleDomain before reporting dynamic filters to coordinator to avoid bloating QueryInfo
+        Map<String, Domain> compactDynamicTupleDomains = dynamicTupleDomains.entrySet().stream()
+                .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().simplify()));
 
         return new TaskStatus(
                 taskInstanceId.getUuidLeastSignificantBits(),
@@ -299,7 +311,8 @@ public class SqlTask
                 userMemoryReservation.toBytes(),
                 systemMemoryReservation.toBytes(),
                 fullGcCount,
-                fullGcTime.toMillis());
+                fullGcTime.toMillis(),
+                compactDynamicTupleDomains);
     }
 
     private TaskStats getTaskStats(TaskHolder taskHolder)

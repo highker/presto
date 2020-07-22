@@ -13,13 +13,16 @@
  */
 package com.facebook.presto.execution;
 
+import com.facebook.presto.common.predicate.Domain;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.facebook.presto.execution.TaskState.PLANNED;
@@ -69,6 +72,8 @@ public class TaskStatus
 
     private final List<ExecutionFailureInfo> failures;
 
+    private final Map<String, Domain> dynamicFilterDomains;
+
     @JsonCreator
     public TaskStatus(
             @JsonProperty("taskInstanceIdLeastSignificantBits") long taskInstanceIdLeastSignificantBits,
@@ -86,7 +91,8 @@ public class TaskStatus
             @JsonProperty("memoryReservationInBytes") long memoryReservationInBytes,
             @JsonProperty("systemMemoryReservationInBytes") long systemMemoryReservationInBytes,
             @JsonProperty("fullGcCount") long fullGcCount,
-            @JsonProperty("fullGcTimeInMillis") long fullGcTimeInMillis)
+            @JsonProperty("fullGcTimeInMillis") long fullGcTimeInMillis,
+            @JsonProperty("dynamicFilterDomains") Map<String, Domain> dynamicFilterDomains)
     {
         this.taskInstanceIdLeastSignificantBits = taskInstanceIdLeastSignificantBits;
         this.taskInstanceIdMostSignificantBits = taskInstanceIdMostSignificantBits;
@@ -114,6 +120,7 @@ public class TaskStatus
         checkArgument(fullGcCount >= 0, "fullGcCount is negative");
         this.fullGcCount = fullGcCount;
         this.fullGcTimeInMillis = fullGcTimeInMillis;
+        this.dynamicFilterDomains = dynamicFilterDomains;
     }
 
     @JsonProperty
@@ -156,6 +163,12 @@ public class TaskStatus
     public List<ExecutionFailureInfo> getFailures()
     {
         return failures;
+    }
+
+    @JsonProperty
+    public Map<String, Domain> getDynamicFilterDomains()
+    {
+        return dynamicFilterDomains;
     }
 
     @JsonProperty
@@ -238,7 +251,8 @@ public class TaskStatus
                 0,
                 0,
                 0,
-                0);
+                0,
+                ImmutableMap.of());
     }
 
     public static TaskStatus failWith(TaskStatus taskStatus, TaskState state, List<ExecutionFailureInfo> exceptions)
@@ -259,6 +273,7 @@ public class TaskStatus
                 taskStatus.getMemoryReservationInBytes(),
                 taskStatus.getSystemMemoryReservationInBytes(),
                 taskStatus.getFullGcCount(),
-                taskStatus.getFullGcTimeInMillis());
+                taskStatus.getFullGcTimeInMillis(),
+                taskStatus.getDynamicFilterDomains());
     }
 }

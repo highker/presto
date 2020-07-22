@@ -23,6 +23,7 @@ import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.SemiTransactionalHiveMetastore;
 import com.facebook.presto.hive.metastore.Table;
+import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplitSource;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
@@ -52,6 +53,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Supplier;
 
 import static com.facebook.presto.hive.BackgroundHiveSplitLoader.BucketSplitInfo.createBucketSplitInfo;
 import static com.facebook.presto.hive.HiveColumnHandle.isPathColumnHandle;
@@ -174,6 +176,17 @@ public class HiveSplitManager
             ConnectorTableLayoutHandle layoutHandle,
             SplitSchedulingContext splitSchedulingContext)
     {
+        return getSplits(transaction, session, layoutHandle, splitSchedulingContext, TupleDomain::all);
+    }
+
+    @Override
+    public ConnectorSplitSource getSplits(
+            ConnectorTransactionHandle transaction,
+            ConnectorSession session,
+            ConnectorTableLayoutHandle layoutHandle,
+            SplitSchedulingContext splitSchedulingContext,
+            Supplier<TupleDomain<ColumnHandle>> dynamicFilter)
+    {
         HiveTableLayoutHandle layout = (HiveTableLayoutHandle) layoutHandle;
         SchemaTableName tableName = layout.getSchemaTableName();
 
@@ -235,6 +248,7 @@ public class HiveSplitManager
                 namenodeStats,
                 directoryLister,
                 executor,
+                dynamicFilter,
                 splitLoaderConcurrency,
                 recursiveDfsWalkerEnabled,
                 splitSchedulingContext.schedulerUsesHostAddresses());

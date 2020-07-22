@@ -55,6 +55,7 @@ import com.facebook.presto.testing.TestingSplit;
 import com.facebook.presto.testing.TestingTransactionHandle;
 import com.facebook.presto.type.TypeDeserializer;
 import com.facebook.presto.type.TypeRegistry;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Binder;
@@ -515,7 +516,8 @@ public class TestHttpRemoteTask
                     initialTaskStatus.getMemoryReservationInBytes(),
                     initialTaskStatus.getSystemMemoryReservationInBytes(),
                     initialTaskStatus.getFullGcCount(),
-                    initialTaskStatus.getFullGcTimeInMillis());
+                    initialTaskStatus.getFullGcTimeInMillis(),
+                    ImmutableMap.of());
         }
     }
 }

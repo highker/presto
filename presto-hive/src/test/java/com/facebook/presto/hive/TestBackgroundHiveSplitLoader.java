@@ -15,6 +15,7 @@ package com.facebook.presto.hive;
 
 import com.facebook.airlift.stats.CounterStat;
 import com.facebook.presto.common.predicate.Domain;
+import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.hive.HiveBucketing.HiveBucketFilter;
 import com.facebook.presto.hive.HiveColumnHandle.ColumnType;
 import com.facebook.presto.hive.authentication.NoHdfsAuthentication;
@@ -350,6 +351,7 @@ public class TestBackgroundHiveSplitLoader
                 new NamenodeStats(),
                 new CachingDirectoryLister(new HadoopDirectoryLister(), new HiveClientConfig()),
                 EXECUTOR,
+                TupleDomain::all,
                 2,
                 false,
                 false);
@@ -382,6 +384,7 @@ public class TestBackgroundHiveSplitLoader
                 new NamenodeStats(),
                 directoryLister,
                 EXECUTOR,
+                TupleDomain::all,
                 2,
                 false,
                 false);
@@ -402,6 +405,7 @@ public class TestBackgroundHiveSplitLoader
                 new NamenodeStats(),
                 new CachingDirectoryLister(new HadoopDirectoryLister(), new HiveClientConfig()),
                 directExecutor(),
+                TupleDomain::all,
                 2,
                 false,
                 false);

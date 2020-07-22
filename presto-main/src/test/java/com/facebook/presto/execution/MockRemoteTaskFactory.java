@@ -263,7 +263,8 @@ public class MockRemoteTaskFactory
                             0,
                             0,
                             0,
-                            0),
+                            0,
+                            ImmutableMap.of()),
                     DateTime.now(),
                     outputBuffer.getInfo(),
                     ImmutableSet.of(),
@@ -297,7 +298,8 @@ public class MockRemoteTaskFactory
                     stats.getUserMemoryReservation().toBytes(),
                     stats.getSystemMemoryReservation().toBytes(),
                     0,
-                    0);
+                    0,
+                    ImmutableMap.of());
         }
 
         private synchronized void updateSplitQueueSpace()

@@ -14,6 +14,7 @@
 package com.facebook.presto.hive;
 
 import com.facebook.presto.common.predicate.Domain;
+import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.hive.HiveBucketing.HiveBucketFilter;
 import com.facebook.presto.hive.HiveSplit.BucketConversion;
 import com.facebook.presto.hive.filesystem.ExtendedFileSystem;
@@ -25,6 +26,7 @@ import com.facebook.presto.hive.util.HiveFileIterator.NestedDirectoryNotAllowedE
 import com.facebook.presto.hive.util.InternalHiveSplitFactory;
 import com.facebook.presto.hive.util.ResumableTask;
 import com.facebook.presto.hive.util.ResumableTasks;
+import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
@@ -117,6 +119,7 @@ public class BackgroundHiveSplitLoader
     private final Deque<Iterator<InternalHiveSplit>> fileIterators = new ConcurrentLinkedDeque<>();
     private final boolean schedulerUsesHostAddresses;
     private final Supplier<HoodieROTablePathFilter> hoodiePathFilterSupplier;
+    private final Supplier<TupleDomain<ColumnHandle>> dynamicFilterSupplier;
 
     // Purpose of this lock:
     // * Write lock: when you need a consistent view across partitions, fileIterators, and hiveSplitSource.
@@ -148,6 +151,7 @@ public class BackgroundHiveSplitLoader
             NamenodeStats namenodeStats,
             DirectoryLister directoryLister,
             Executor executor,
+            Supplier<TupleDomain<ColumnHandle>> dynamicFilterSupplier,
             int loaderConcurrency,
             boolean recursiveDirWalkerEnabled,
             boolean schedulerUsesHostAddresses)
@@ -166,6 +170,7 @@ public class BackgroundHiveSplitLoader
         this.hdfsContext = new HdfsContext(session, table.getDatabaseName(), table.getTableName());
         this.schedulerUsesHostAddresses = schedulerUsesHostAddresses;
         this.hoodiePathFilterSupplier = Suppliers.memoize(HoodieROTablePathFilter::new)::get;
+        this.dynamicFilterSupplier = dynamicFilterSupplier;
     }
 
     @Override
@@ -297,6 +302,8 @@ public class BackgroundHiveSplitLoader
         InputFormat<?, ?> inputFormat = getInputFormat(configuration, inputFormatName, false);
         ExtendedFileSystem fs = hdfsEnvironment.getFileSystem(hdfsContext, path);
         boolean s3SelectPushdownEnabled = shouldEnablePushdownForTable(session, table, path.toString(), partition.getPartition());
+
+        System.out.println("james !!!!" + dynamicFilterSupplier.get());
 
         if (inputFormat instanceof SymlinkTextInputFormat) {
             if (tableBucketInfo.isPresent()) {

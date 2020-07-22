@@ -13,9 +13,13 @@
  */
 package com.facebook.presto.spi.connector;
 
+import com.facebook.presto.common.predicate.TupleDomain;
+import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorSplitSource;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
+
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -26,6 +30,16 @@ public interface ConnectorSplitManager
             ConnectorSession session,
             ConnectorTableLayoutHandle layout,
             SplitSchedulingContext splitSchedulingContext);
+
+    default ConnectorSplitSource getSplits(
+            ConnectorTransactionHandle transactionHandle,
+            ConnectorSession session,
+            ConnectorTableLayoutHandle layout,
+            SplitSchedulingContext splitSchedulingContext,
+            Supplier<TupleDomain<ColumnHandle>> dynamicFilter)
+    {
+        return getSplits(transactionHandle, session, layout, splitSchedulingContext);
+    }
 
     enum SplitSchedulingStrategy
     {

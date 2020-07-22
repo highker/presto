@@ -15,6 +15,7 @@ package com.facebook.presto.spark.planner;
 
 import com.facebook.airlift.json.JsonCodec;
 import com.facebook.presto.Session;
+import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.execution.Lifespan;
 import com.facebook.presto.execution.ScheduledSplit;
 import com.facebook.presto.execution.TaskSource;
@@ -358,7 +359,7 @@ public class PrestoSparkRddFactory
     private List<ScheduledSplit> getSplits(Session session, TableScanNode tableScan)
     {
         List<ScheduledSplit> splits = new ArrayList<>();
-        SplitSource splitSource = splitManager.getSplits(session, tableScan.getTable(), UNGROUPED_SCHEDULING);
+        SplitSource splitSource = splitManager.getSplits(session, tableScan.getTable(), UNGROUPED_SCHEDULING, TupleDomain::all);
         long sequenceId = 0;
         while (!splitSource.isFinished()) {
             List<Split> splitBatch = getFutureValue(splitSource.getNextBatch(NOT_PARTITIONED, Lifespan.taskWide(), 1000)).getSplits();

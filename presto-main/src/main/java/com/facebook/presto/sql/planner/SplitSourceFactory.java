@@ -15,9 +15,13 @@ package com.facebook.presto.sql.planner;
 
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
+import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.execution.scheduler.TableWriteInfo;
 import com.facebook.presto.execution.scheduler.TableWriteInfo.DeleteScanInfo;
+import com.facebook.presto.expressions.DynamicFilters;
 import com.facebook.presto.operator.StageExecutionDescriptor;
+import com.facebook.presto.server.DynamicFilterService;
+import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy;
 import com.facebook.presto.spi.plan.AggregationNode;
@@ -78,10 +82,12 @@ public class SplitSourceFactory
     private static final Logger log = Logger.get(SplitSourceFactory.class);
 
     private final SplitSourceProvider splitSourceProvider;
+    private final DynamicFilterService dynamicFilterService;
 
-    public SplitSourceFactory(SplitSourceProvider splitSourceProvider)
+    public SplitSourceFactory(SplitSourceProvider splitSourceProvider, DynamicFilterService dynamicFilterService)
     {
         this.splitSourceProvider = requireNonNull(splitSourceProvider, "splitSourceProvider is null");
+        this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
     }
 
     public Map<PlanNodeId, SplitSource> createSplitSources(PlanFragment fragment, Session session, TableWriteInfo tableWriteInfo)
@@ -140,6 +146,25 @@ public class SplitSourceFactory
         @Override
         public Map<PlanNodeId, SplitSource> visitTableScan(TableScanNode node, Context context)
         {
+            return visitTableScanFilter(node, context, Optional.empty());
+        }
+
+        public Map<PlanNodeId, SplitSource> visitTableScanFilter(TableScanNode node, Context context, Optional<FilterNode> filter)
+        {
+            List<DynamicFilters.DynamicFilterPlaceholder> dynamicFilters = filter
+                    .map(FilterNode::getPredicate)
+                    .map(DynamicFilters::extractDynamicFilters)
+                    .map(DynamicFilters.DynamicFilterExtractResult::getDynamicConjuncts)
+                    .orElse(ImmutableList.of());
+
+            Supplier<TupleDomain<ColumnHandle>> dynamicFilter;
+            if (!dynamicFilters.isEmpty()) {
+                dynamicFilter = dynamicFilterService.createDynamicFilterSupplier(session.getQueryId(), dynamicFilters, node.getAssignments());
+            }
+            else {
+                dynamicFilter = TupleDomain::all;
+            }
+
             // get dataSource for table
             TableHandle table;
             Optional<DeleteScanInfo> deleteScanInfo = context.getTableWriteInfo().getDeleteScanInfo();
@@ -152,7 +177,8 @@ public class SplitSourceFactory
             Supplier<SplitSource> splitSourceSupplier = () -> splitSourceProvider.getSplits(
                     session,
                     table,
-                    getSplitSchedulingStrategy(stageExecutionDescriptor, node.getId()));
+                    getSplitSchedulingStrategy(stageExecutionDescriptor, node.getId()),
+                    dynamicFilter);
 
             SplitSource splitSource = new LazySplitSource(splitSourceSupplier);
 
@@ -217,6 +243,10 @@ public class SplitSourceFactory
         @Override
         public Map<PlanNodeId, SplitSource> visitFilter(FilterNode node, Context context)
         {
+            if (node.getSource() instanceof TableScanNode) {
+                TableScanNode scan = (TableScanNode) node.getSource();
+                return visitTableScanFilter(scan, context, Optional.of(node));
+            }
             return node.getSource().accept(this, context);
         }
 

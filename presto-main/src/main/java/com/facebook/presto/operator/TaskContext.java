@@ -16,6 +16,7 @@ package com.facebook.presto.operator;
 import com.facebook.airlift.stats.CounterStat;
 import com.facebook.airlift.stats.GcMonitor;
 import com.facebook.presto.Session;
+import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.execution.Lifespan;
 import com.facebook.presto.execution.TaskId;
 import com.facebook.presto.execution.TaskState;
@@ -27,6 +28,7 @@ import com.facebook.presto.memory.context.LocalMemoryContext;
 import com.facebook.presto.memory.context.MemoryTrackingContext;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AtomicDouble;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -37,7 +39,9 @@ import org.joda.time.DateTime;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
@@ -105,6 +109,9 @@ public class TaskContext
     private long lastTaskStatCallNanos;
 
     private final MemoryTrackingContext taskMemoryContext;
+
+    @GuardedBy("this")
+    private Map<String, Domain> dynamicTupleDomains = new HashMap<>();
 
     public static TaskContext createTaskContext(
             QueryContext queryContext,
@@ -399,6 +406,18 @@ public class TaskContext
             endFullGcCount = gcMonitor.getMajorGcCount();
         }
         return toIntExact(max(0, endFullGcCount - startFullGcCount));
+    }
+
+    public synchronized void collectDynamicTupleDomain(Map<String, Domain> dynamicFilterDomains)
+    {
+        for (Map.Entry<String, Domain> entry : dynamicFilterDomains.entrySet()) {
+            dynamicTupleDomains.merge(entry.getKey(), entry.getValue(), Domain::intersect);
+        }
+    }
+
+    public synchronized Map<String, Domain> getDynamicTupleDomains()
+    {
+        return ImmutableMap.copyOf(dynamicTupleDomains);
     }
 
     public TaskStats getTaskStats()

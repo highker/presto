@@ -23,6 +23,7 @@ import com.facebook.presto.common.block.SortOrder;
 import com.facebook.presto.common.function.OperatorType;
 import com.facebook.presto.common.function.QualifiedFunctionName;
 import com.facebook.presto.common.function.SqlFunctionProperties;
+import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.predicate.TupleDomain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.common.type.TypeSignature;
@@ -667,6 +668,11 @@ public class LocalExecutionPlanner
         public StageExecutionId getStageExecutionId()
         {
             return taskContext.getTaskId().getStageExecutionId();
+        }
+
+        private void addDynamicFilter(Map<String, Domain> dynamicTupleDomain)
+        {
+            taskContext.collectDynamicTupleDomain(dynamicTupleDomain);
         }
 
         public Optional<IndexSourceContext> getIndexSourceContext()
@@ -2234,14 +2240,15 @@ public class LocalExecutionPlanner
                 return Optional.empty();
             }
             LocalDynamicFiltersCollector collector = context.getDynamicFiltersCollector();
-            return LocalDynamicFilter
-                    .create(node, partitionCount)
-                    .map(filter -> {
-                        // Intersect dynamic filters' predicates when they become ready,
-                        // in order to support multiple join nodes in the same plan fragment.
-                        addSuccessCallback(filter.getResultFuture(), collector::intersect);
-                        return filter;
-                    });
+            Optional<LocalDynamicFilter> filter = LocalDynamicFilter.create(node, partitionCount);
+            if (!filter.isPresent()) {
+                return Optional.empty();
+            }
+            // Intersect dynamic filters' predicates when they become ready,
+            // in order to support multiple join nodes in the same plan fragment.
+            addSuccessCallback(filter.get().getResultFuture(), collector::intersect);
+            addSuccessCallback(filter.get().getResultFuture(), context::addDynamicFilter);
+            return filter;
         }
 
         private JoinFilterFunctionFactory compileJoinFilterFunction(

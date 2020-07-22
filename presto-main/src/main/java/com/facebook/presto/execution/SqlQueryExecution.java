@@ -34,6 +34,7 @@ import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.server.BasicQueryInfo;
+import com.facebook.presto.server.DynamicFilterService;
 import com.facebook.presto.spi.ConnectorId;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.QueryId;
@@ -60,6 +61,7 @@ import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.plan.OutputNode;
 import com.facebook.presto.sql.planner.sanity.PlanChecker;
 import com.facebook.presto.sql.tree.Explain;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
@@ -78,6 +80,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static com.facebook.presto.SystemSessionProperties.isUseLegacyScheduler;
+import static com.facebook.presto.execution.QueryState.STARTING;
 import static com.facebook.presto.execution.buffer.OutputBuffers.BROADCAST_PARTITION_ID;
 import static com.facebook.presto.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -115,6 +118,7 @@ public class SqlQueryExecution
     private final Analysis analysis;
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
+    private final DynamicFilterService dynamicFilterService;
     private final PlanChecker planChecker;
     private final PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
     private final AtomicReference<PlanVariableAllocator> variableAllocator = new AtomicReference<>();
@@ -140,6 +144,7 @@ public class SqlQueryExecution
             SplitSchedulerStats schedulerStats,
             StatsCalculator statsCalculator,
             CostCalculator costCalculator,
+            DynamicFilterService dynamicFilterService,
             WarningCollector warningCollector,
             PlanChecker planChecker)
     {
@@ -159,6 +164,7 @@ public class SqlQueryExecution
             this.schedulerStats = requireNonNull(schedulerStats, "schedulerStats is null");
             this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
             this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
+            this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
             this.stateMachine = requireNonNull(stateMachine, "stateMachine is null");
             this.planChecker = requireNonNull(planChecker, "planChecker is null");
 
@@ -180,6 +186,15 @@ public class SqlQueryExecution
                 stateMachine.transitionToFailed(e);
                 throw e;
             }
+
+            stateMachine.addStateChangeListener(state -> {
+                if (state == STARTING) {
+                    // we cannot register query here; it might be too late
+                }
+                else if (state.isDone()) {
+                    dynamicFilterService.removeQuery(stateMachine.getQueryId());
+                }
+            });
 
             stateMachine.setUpdateType(analysis.getUpdateType());
 
@@ -321,6 +336,8 @@ public class SqlQueryExecution
 
                 metadata.beginQuery(getSession(), plan.getConnectors());
 
+                dynamicFilterService.registerQuery(this);
+
                 // plan distribution of query
                 planDistribution(plan);
 
@@ -446,7 +463,7 @@ public class SqlQueryExecution
                 .withBuffer(OUTPUT_BUFFER_ID, BROADCAST_PARTITION_ID)
                 .withNoMoreBufferIds();
 
-        SplitSourceFactory splitSourceFactory = new SplitSourceFactory(splitSourceProvider);
+        SplitSourceFactory splitSourceFactory = new SplitSourceFactory(splitSourceProvider, dynamicFilterService);
         // build the stage execution objects (this doesn't schedule execution)
         SqlQuerySchedulerInterface scheduler = isUseLegacyScheduler(getSession()) ?
                 LegacySqlQueryScheduler.createSqlQueryScheduler(
@@ -578,6 +595,15 @@ public class SqlQueryExecution
         }
     }
 
+    public List<StageInfo> getAllStages()
+    {
+        SqlQuerySchedulerInterface scheduler = queryScheduler.get();
+        if (scheduler != null) {
+            return StageInfo.getAllStages(Optional.of(scheduler.getStageInfo()));
+        }
+        return ImmutableList.of();
+    }
+
     @Override
     public QueryState getState()
     {
@@ -655,6 +681,7 @@ public class SqlQueryExecution
         private final Map<String, ExecutionPolicy> executionPolicies;
         private final StatsCalculator statsCalculator;
         private final CostCalculator costCalculator;
+        private final DynamicFilterService dynamicFilterService;
         private final PlanChecker planChecker;
 
         @Inject
@@ -675,6 +702,7 @@ public class SqlQueryExecution
                 SplitSchedulerStats schedulerStats,
                 StatsCalculator statsCalculator,
                 CostCalculator costCalculator,
+                DynamicFilterService dynamicFilterService,
                 PlanChecker planChecker)
         {
             requireNonNull(config, "config is null");
@@ -696,6 +724,7 @@ public class SqlQueryExecution
             this.runtimePlanOptimizers = planOptimizers.getRuntimeOptimizers();
             this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
             this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
+            this.dynamicFilterService = requireNonNull(dynamicFilterService, "dynamicFilterService is null");
             this.planChecker = requireNonNull(planChecker, "planChecker is null");
         }
 
@@ -732,6 +761,7 @@ public class SqlQueryExecution
                     schedulerStats,
                     statsCalculator,
                     costCalculator,
+                    dynamicFilterService,
                     warningCollector,
                     planChecker);
 

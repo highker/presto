@@ -15,6 +15,8 @@ package com.facebook.presto.split;
 
 import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
+import com.facebook.presto.common.predicate.TupleDomain;
+import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy;
 
@@ -23,6 +25,7 @@ import javax.annotation.concurrent.GuardedBy;
 import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
@@ -45,10 +48,10 @@ public class CloseableSplitSourceProvider
     }
 
     @Override
-    public synchronized SplitSource getSplits(Session session, TableHandle tableHandle, SplitSchedulingStrategy splitSchedulingStrategy)
+    public synchronized SplitSource getSplits(Session session, TableHandle tableHandle, SplitSchedulingStrategy splitSchedulingStrategy, Supplier<TupleDomain<ColumnHandle>> dynamicFilter)
     {
         checkState(!closed, "split source provider is closed");
-        SplitSource splitSource = delegate.getSplits(session, tableHandle, splitSchedulingStrategy);
+        SplitSource splitSource = delegate.getSplits(session, tableHandle, splitSchedulingStrategy, dynamicFilter);
         splitSources.add(splitSource);
         return splitSource;
     }
