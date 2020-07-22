@@ -193,7 +193,7 @@ public class RemoveUnsupportedDynamicFilters
                     .filter(conjunct ->
                             getPlaceholder(conjunct)
                                     .map(placeholder -> {
-                                        if (allowedDynamicFilterIds.contains(placeholder.getId())) {
+                                        if (placeholder.getInput() instanceof VariableReferenceExpression && allowedDynamicFilterIds.contains(placeholder.getId())) {
                                             consumedDynamicFilterIds.add(placeholder.getId());
                                             return true;
                                         }

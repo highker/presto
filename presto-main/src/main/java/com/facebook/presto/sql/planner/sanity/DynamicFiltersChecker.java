@@ -23,6 +23,7 @@ import com.facebook.presto.spi.plan.FilterNode;
 import com.facebook.presto.spi.plan.PlanNode;
 import com.facebook.presto.spi.plan.TableScanNode;
 import com.facebook.presto.spi.relation.RowExpression;
+import com.facebook.presto.spi.relation.VariableReferenceExpression;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.TypeProvider;
 import com.facebook.presto.sql.planner.plan.InternalPlanVisitor;
@@ -93,9 +94,10 @@ public class DynamicFiltersChecker
             public Set<String> visitFilter(FilterNode node, Void context)
             {
                 ImmutableSet.Builder<String> consumed = ImmutableSet.builder();
-                extractDynamicPredicates(node.getPredicate()).stream()
-                        .map(DynamicFilterPlaceholder::getId)
-                        .forEach(consumed::add);
+                extractDynamicPredicates(node.getPredicate()).forEach(placeholder -> {
+                    verify(placeholder.getInput() instanceof VariableReferenceExpression, "Dynamic filter expression must be a VariableReferenceExpression");
+                    consumed.add(placeholder.getId());
+                });
                 consumed.addAll(node.getSource().accept(this, context));
                 return consumed.build();
             }
@@ -109,9 +111,10 @@ public class DynamicFiltersChecker
                 }
 
                 ImmutableSet.Builder<String> consumed = ImmutableSet.builder();
-                extractDynamicPredicates(handle.get().getRemainingPredicate()).stream()
-                        .map(DynamicFilterPlaceholder::getId)
-                        .forEach(consumed::add);
+                extractDynamicPredicates(handle.get().getRemainingPredicate()).forEach(placeholder -> {
+                    verify(placeholder.getInput() instanceof VariableReferenceExpression, "Dynamic filter expression must be a VariableReferenceExpression");
+                    consumed.add(placeholder.getId());
+                });
                 return consumed.build();
             }
         }, null);
