@@ -2247,7 +2247,7 @@ public class LocalExecutionPlanner
             // Intersect dynamic filters' predicates when they become ready,
             // in order to support multiple join nodes in the same plan fragment.
             addSuccessCallback(filter.get().getResultFuture(), collector::intersect);
-            addSuccessCallback(filter.get().getResultFuture(), context::addDynamicFilter);
+            addSuccessCallback(filter.get().getNodeLocalDynamicFilterForVariable(), context::addDynamicFilter);
             return filter;
         }
 

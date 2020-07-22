@@ -26,6 +26,7 @@ import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 
@@ -38,6 +39,8 @@ import java.util.function.Consumer;
 import static com.facebook.presto.expressions.DynamicFilters.extractDynamicFilters;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 
@@ -69,6 +72,16 @@ public class LocalDynamicFilter
         this.partitionsLeft = partitionCount;
     }
 
+    public ListenableFuture<Map<String, Domain>> getDynamicFilterDomains()
+    {
+        return Futures.transform(resultFuture, this::convertTupleDomain, directExecutor());
+    }
+
+    public ListenableFuture<Map<String, Domain>> getNodeLocalDynamicFilterForVariable()
+    {
+        return Futures.transform(resultFuture, this::convertTupleDomainForLocalFilters, directExecutor());
+    }
+
     private synchronized void addPartition(TupleDomain<String> tupleDomain)
     {
         // Called concurrently by each DynamicFilterSourceOperator instance (when collection is over).
@@ -79,17 +92,53 @@ public class LocalDynamicFilter
         result = TupleDomain.columnWiseUnion(result, tupleDomain);
         if (partitionsLeft == 0) {
             // No more partitions are left to be processed.
-            verify(resultFuture.set(convertTupleDomain(result)), "dynamic filter result is provided more than once");
+            verify(resultFuture.set(convertTupleDomainOld(result)), "dynamic filter result is provided more than once");
         }
     }
 
-    private TupleDomain<VariableReferenceExpression> convertTupleDomain(TupleDomain<String> result)
+    private Map<String, Domain> convertTupleDomainForLocalFilters(TupleDomain<VariableReferenceExpression> result)
+    {
+        ImmutableMap.Builder<String, Domain> builder = ImmutableMap.builder();
+
+        if (result.isNone()) {
+            for (Map.Entry<VariableReferenceExpression, Domain> entry : result.getDomains().get().entrySet()) {
+                // Store `none` domain explicitly for each probe symbol
+                for (VariableReferenceExpression probeVariable : probeVariables.get(entry.getKey().getName())) {
+                    builder.put(probeVariable.getName(), Domain.none(entry.getKey().getType()));
+                }
+            }
+            return builder.build();
+        }
+
+        // Convert the predicate to use probe symbols (instead dynamic filter IDs).
+        // Note that in case of a probe-side union, a single dynamic filter may match multiple probe symbols.
+        for (Map.Entry<VariableReferenceExpression, Domain> entry : result.getDomains().get().entrySet()) {
+            Domain domain = entry.getValue();
+            // Store all matching symbols for each build channel index.
+            for (VariableReferenceExpression probeVariable : probeVariables.get(entry.getKey().getName())) {
+                builder.put(probeVariable.getName(), domain);
+            }
+        }
+        return builder.build();
+    }
+
+    private Map<String, Domain> convertTupleDomain(TupleDomain<VariableReferenceExpression> result)
+    {
+        if (result.isNone()) {
+            // One of the join build symbols has no non-null values, therefore no filters can match predicate
+            return result.getDomains().get().entrySet().stream().collect(toImmutableMap(x -> x.getKey().getName(), x -> Domain.none(x.getKey().getType())));
+        }
+        return result.getDomains().get().entrySet().stream().collect(toImmutableMap(x -> x.getKey().getName(), Map.Entry::getValue));
+    }
+
+    private TupleDomain<VariableReferenceExpression> convertTupleDomainOld(TupleDomain<String> result)
     {
         if (result.isNone()) {
             return TupleDomain.none();
         }
-        // Convert the predicate to use probe variables (instead dynamic filter IDs).
-        // Note that in case of a probe-side union, a single dynamic filter may match multiple probe variables.
+
+       // Convert the predicate to use probe variables (instead dynamic filter IDs).
+       // Note that in case of a probe-side union, a single dynamic filter may match multiple probe variables.
         ImmutableMap.Builder<VariableReferenceExpression, Domain> builder = ImmutableMap.builder();
         for (Map.Entry<String, Domain> entry : result.getDomains().get().entrySet()) {
             Domain domain = entry.getValue();
