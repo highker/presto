@@ -64,7 +64,7 @@ public class TaskManagerConfig
     private Duration clientTimeout = new Duration(2, TimeUnit.MINUTES);
     private Duration infoMaxAge = new Duration(15, TimeUnit.MINUTES);
 
-    private Duration statusRefreshMaxWait = new Duration(1, TimeUnit.SECONDS);
+    private Duration statusRefreshMaxWait = new Duration(4, TimeUnit.MILLISECONDS);
     private Duration infoRefreshMaxWait = new Duration(0, TimeUnit.SECONDS);
 
     private Duration infoUpdateInterval = new Duration(3, TimeUnit.SECONDS);

@@ -296,6 +296,10 @@ public class SqlTask
         Map<String, Domain> compactDynamicTupleDomains = dynamicTupleDomains.entrySet().stream()
                 .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().simplify()));
 
+        if (!compactDynamicTupleDomains.isEmpty()) {
+            System.out.println("james filter collected");
+        }
+
         return new TaskStatus(
                 taskInstanceId.getUuidLeastSignificantBits(),
                 taskInstanceId.getUuidMostSignificantBits(),

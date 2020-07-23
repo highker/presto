@@ -104,6 +104,7 @@ public class DynamicFilterService
     public synchronized void collectDynamicFilters()
     {
         for (Map.Entry<QueryId, Supplier<List<StageInfo>>> entry : queries.entrySet()) {
+            System.out.println("james try to collectDynamicFilters");
             QueryId queryId = entry.getKey();
             for (StageInfo stageInfo : entry.getValue().get()) {
                 StageExecutionState stageState = stageInfo.getLatestAttemptExecutionInfo().getState();
@@ -120,15 +121,19 @@ public class DynamicFilterService
                 stageDynamicFilterDomains.entrySet().stream()
                         // check if all tasks of a dynamic filter source have reported dynamic filter summary
                         .filter(stageDomains -> stageDomains.getValue().size() == tasks.size())
-                        .forEach(stageDomains -> dynamicFilterSummaries.put(
+                        .forEach(stageDomains -> {
+                            dynamicFilterSummaries.put(
                                 SourceDescriptor.of(queryId, stageDomains.getKey()),
-                                Domain.union(stageDomains.getValue())));
+                                Domain.union(stageDomains.getValue()));
+                            System.out.println("james collectDynamicFilters");
+                        });
             }
         }
     }
 
     public Supplier<TupleDomain<ColumnHandle>> createDynamicFilterSupplier(QueryId queryId, List<DynamicFilterPlaceholder> dynamicFilters, Map<VariableReferenceExpression, ColumnHandle> columnHandles)
     {
+        System.out.println("james createDynamicFilterSupplier");
         Map<String, ColumnHandle> sourceColumnHandles = extractSourceColumnHandles(dynamicFilters, columnHandles);
 
         return () -> dynamicFilters.stream()
