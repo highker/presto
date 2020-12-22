@@ -170,7 +170,8 @@ public class MockHiveMetastoreClient
     @Override
     public Map<String, List<ColumnStatisticsObj>> getPartitionColumnStatistics(String databaseName, String tableName, List<String> partitionNames, List<String> columnNames)
     {
-        throw new UnsupportedOperationException();
+        accessCount.incrementAndGet();
+        return ImmutableMap.of();
     }
 
     @Override

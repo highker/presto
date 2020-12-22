@@ -89,6 +89,8 @@ public interface ExtendedHiveMetastore
 
     Map<String, Optional<Partition>> getPartitionsByNames(String databaseName, String tableName, List<String> partitionNames);
 
+    Map<String, Optional<PartitionWithStatistics>> getPartitionsWithStatisticsByNames(String databaseName, String tableName, List<String> partitionNames);
+
     void addPartitions(String databaseName, String tableName, List<PartitionWithStatistics> partitions);
 
     void dropPartition(String databaseName, String tableName, List<String> parts, boolean deleteData);

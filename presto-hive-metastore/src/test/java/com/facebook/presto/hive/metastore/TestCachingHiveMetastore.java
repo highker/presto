@@ -258,6 +258,38 @@ public class TestCachingHiveMetastore
     }
 
     @Test
+    public void testGetPartitionsWithStatisticsByNames()
+    {
+        assertEquals(mockClient.getAccessCount(), 0);
+        metastore.getTable(TEST_DATABASE, TEST_TABLE);
+        assertEquals(mockClient.getAccessCount(), 1);
+
+        // One getPartitionsWithStatisticsByNames to ThriftHiveMetastore would incur three calls: getTable, getPartitionsByNames and getPartitionColumnStatistics
+        // So the access count would increase by 3
+
+        // Select half of the available partitions and load them into the cache
+        assertEquals(metastore.getPartitionsWithStatisticsByNames(TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1)).size(), 1);
+        assertEquals(mockClient.getAccessCount(), 4);
+
+        // Now select all of the partitions
+        assertEquals(metastore.getPartitionsWithStatisticsByNames(TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        // There should be one more access to fetch the remaining partition
+        assertEquals(mockClient.getAccessCount(), 7);
+
+        // Now if we fetch any or both of them, they should not hit the client
+        assertEquals(metastore.getPartitionsWithStatisticsByNames(TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1)).size(), 1);
+        assertEquals(metastore.getPartitionsWithStatisticsByNames(TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION2)).size(), 1);
+        assertEquals(metastore.getPartitionsWithStatisticsByNames(TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        assertEquals(mockClient.getAccessCount(), 7);
+
+        metastore.flushCache();
+
+        // Fetching both should only result in one batched access
+        assertEquals(metastore.getPartitionsWithStatisticsByNames(TEST_DATABASE, TEST_TABLE, ImmutableList.of(TEST_PARTITION1, TEST_PARTITION2)).size(), 2);
+        assertEquals(mockClient.getAccessCount(), 10);
+    }
+
+    @Test
     public void testListRoles()
             throws Exception
     {

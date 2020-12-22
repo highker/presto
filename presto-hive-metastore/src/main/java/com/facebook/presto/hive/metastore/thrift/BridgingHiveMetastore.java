@@ -21,6 +21,7 @@ import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.hive.metastore.HivePrivilegeInfo;
+import com.facebook.presto.hive.metastore.MetastoreApiPartitionWithStatistics;
 import com.facebook.presto.hive.metastore.MetastoreUtil;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.PartitionNameWithVersion;
@@ -57,6 +58,7 @@ import static com.facebook.presto.hive.metastore.thrift.ThriftMetastoreUtil.toMe
 import static com.facebook.presto.hive.metastore.thrift.ThriftMetastoreUtil.toMetastoreApiTable;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.UnaryOperator.identity;
 
@@ -295,6 +297,27 @@ public class BridgingHiveMetastore
             resultBuilder.put(entry.getKey(), Optional.ofNullable(partition));
         }
         return resultBuilder.build();
+    }
+
+    @Override
+    public Map<String, Optional<PartitionWithStatistics>> getPartitionsWithStatisticsByNames(String databaseName, String tableName, List<String> partitionNames)
+    {
+        requireNonNull(partitionNames, "partitionNames is null");
+        if (partitionNames.isEmpty()) {
+            return ImmutableMap.of();
+        }
+        Map<String, PartitionWithStatistics> partitionNameToPartitionWithStatisticsMap = delegate.getPartitionsWithStatisticsByNames(databaseName, tableName, partitionNames).stream()
+                .collect(toImmutableMap(
+                        MetastoreApiPartitionWithStatistics::getPartitionName,
+                        partitionWithStatistics -> new PartitionWithStatistics(
+                                fromMetastoreApiPartition(partitionWithStatistics.getPartition(), partitionMutator),
+                                partitionWithStatistics.getPartitionName(),
+                                partitionWithStatistics.getStatistics())));
+
+        return partitionNames.stream()
+                .collect(toImmutableMap(
+                        identity(),
+                        partitionName -> Optional.of(partitionNameToPartitionWithStatisticsMap.get(partitionName))));
     }
 
     @Override

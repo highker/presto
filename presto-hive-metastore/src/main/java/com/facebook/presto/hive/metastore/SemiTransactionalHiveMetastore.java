@@ -679,6 +679,54 @@ public class SemiTransactionalHiveMetastore
         }
     }
 
+    public synchronized Map<String, Optional<PartitionWithStatistics>> getPartitionsWithStatisticsByNames(String databaseName, String tableName, List<String> partitionNames)
+    {
+        checkReadable();
+        TableSource tableSource = getTableSource(databaseName, tableName);
+        Map<List<String>, Action<PartitionAndMore>> partitionActionsOfTable = partitionActions.computeIfAbsent(new SchemaTableName(databaseName, tableName), k -> new HashMap<>());
+        ImmutableList.Builder<String> partitionNamesToQuery = ImmutableList.builder();
+        ImmutableMap.Builder<String, Optional<PartitionWithStatistics>> resultBuilder = ImmutableMap.builder();
+        for (String partitionName : partitionNames) {
+            List<String> partitionValues = toPartitionValues(partitionName);
+            Action<PartitionAndMore> partitionAction = partitionActionsOfTable.get(partitionValues);
+            if (partitionAction == null) {
+                switch (tableSource) {
+                    case PRE_EXISTING_TABLE:
+                        partitionNamesToQuery.add(partitionName);
+                        break;
+                    case CREATED_IN_THIS_TRANSACTION:
+                        resultBuilder.put(partitionName, Optional.empty());
+                        break;
+                    default:
+                        throw new UnsupportedOperationException("unknown table source");
+                }
+            }
+            else {
+                resultBuilder.put(partitionName, getPartitionWithStatisticsFromPartitionAction(partitionAction, partitionName));
+            }
+        }
+        Map<String, Optional<PartitionWithStatistics>> delegateResult = delegate.getPartitionsWithStatisticsByNames(databaseName, tableName, partitionNamesToQuery.build());
+        resultBuilder.putAll(delegateResult);
+        return resultBuilder.build();
+    }
+
+    private static Optional<PartitionWithStatistics> getPartitionWithStatisticsFromPartitionAction(Action<PartitionAndMore> partitionAction, String partitionName)
+    {
+        switch (partitionAction.getType()) {
+            case ADD:
+            case ALTER:
+            case INSERT_EXISTING:
+                return Optional.of(new PartitionWithStatistics(
+                        partitionAction.getData().getAugmentedPartitionForInTransactionRead(),
+                        partitionName,
+                        partitionAction.getData().getStatistics()));
+            case DROP:
+                return Optional.empty();
+            default:
+                throw new IllegalStateException("Unknown action type");
+        }
+    }
+
     public synchronized void addPartition(
             ConnectorSession session,
             String databaseName,

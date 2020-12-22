@@ -946,6 +946,22 @@ public class FileHiveMetastore
     }
 
     @Override
+    public Map<String, Optional<PartitionWithStatistics>> getPartitionsWithStatisticsByNames(String databaseName, String tableName, List<String> partitionNames)
+    {
+        Map<String, PartitionStatistics> statistics = getPartitionStatistics(databaseName, tableName, ImmutableSet.copyOf(partitionNames));
+
+        ImmutableMap.Builder<String, Optional<PartitionWithStatistics>> builder = ImmutableMap.builder();
+        for (String partitionName : partitionNames) {
+            List<String> partitionValues = toPartitionValues(partitionName);
+            builder.put(
+                    partitionName,
+                    getPartition(databaseName, tableName, partitionValues)
+                            .map(partition -> new PartitionWithStatistics(partition, partitionName, statistics.getOrDefault(partitionName, PartitionStatistics.empty()))));
+        }
+        return builder.build();
+    }
+
+    @Override
     public synchronized Set<HivePrivilegeInfo> listTablePrivileges(String databaseName, String tableName, PrestoPrincipal principal)
     {
         ImmutableSet.Builder<HivePrivilegeInfo> result = ImmutableSet.builder();

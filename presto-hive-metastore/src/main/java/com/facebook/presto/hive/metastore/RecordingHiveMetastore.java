@@ -73,6 +73,7 @@ public class RecordingHiveMetastore
     private final Cache<HiveTableName, Optional<List<String>>> partitionNamesCache;
     private final Cache<String, List<String>> partitionNamesByFilterCache;
     private final Cache<Set<HivePartitionName>, Map<String, Optional<Partition>>> partitionsByNamesCache;
+    private final Cache<Set<HivePartitionName>, Map<String, Optional<PartitionWithStatistics>>> partitionWithStatisticsByNamesCache;
     private final Cache<UserTableKey, Set<HivePrivilegeInfo>> tablePrivilegesCache;
     private final Cache<PrestoPrincipal, Set<RoleGrant>> roleGrantsCache;
 
@@ -96,6 +97,7 @@ public class RecordingHiveMetastore
         partitionNamesCache = createCache(metastoreClientConfig);
         partitionNamesByFilterCache = createCache(metastoreClientConfig);
         partitionsByNamesCache = createCache(metastoreClientConfig);
+        partitionWithStatisticsByNamesCache = createCache(metastoreClientConfig);
         tablePrivilegesCache = createCache(metastoreClientConfig);
         roleGrantsCache = createCache(metastoreClientConfig);
 
@@ -123,6 +125,7 @@ public class RecordingHiveMetastore
         partitionNamesCache.putAll(toMap(recording.getPartitionNames()));
         partitionNamesByFilterCache.putAll(toMap(recording.getPartitionNamesByFilter()));
         partitionsByNamesCache.putAll(toMap(recording.getPartitionsByNames()));
+
         tablePrivilegesCache.putAll(toMap(recording.getTablePrivileges()));
         roleGrantsCache.putAll(toMap(recording.getRoleGrants()));
     }
@@ -371,6 +374,15 @@ public class RecordingHiveMetastore
                 partitionsByNamesCache,
                 getHivePartitionNames(databaseName, tableName, ImmutableSet.copyOf(partitionNames)),
                 () -> delegate.getPartitionsByNames(databaseName, tableName, partitionNames));
+    }
+
+    @Override
+    public Map<String, Optional<PartitionWithStatistics>> getPartitionsWithStatisticsByNames(String databaseName, String tableName, List<String> partitionNames)
+    {
+        return loadValue(
+                partitionWithStatisticsByNamesCache,
+                getHivePartitionNames(databaseName, tableName, ImmutableSet.copyOf(partitionNames)),
+                () -> delegate.getPartitionsWithStatisticsByNames(databaseName, tableName, partitionNames));
     }
 
     @Override

@@ -186,6 +186,12 @@ class UnimplementedHiveMetastore
     }
 
     @Override
+    public Map<String, Optional<PartitionWithStatistics>> getPartitionsWithStatisticsByNames(String databaseName, String tableName, List<String> partitionNames)
+    {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void addPartitions(String databaseName, String tableName, List<PartitionWithStatistics> partitions)
     {
         throw new UnsupportedOperationException();

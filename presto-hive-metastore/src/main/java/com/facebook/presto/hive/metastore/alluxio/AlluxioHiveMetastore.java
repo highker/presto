@@ -143,45 +143,9 @@ public class AlluxioHiveMetastore
     @Override
     public Map<String, PartitionStatistics> getPartitionStatistics(String databaseName, String tableName, Set<String> partitionNames)
     {
-        Table table = getTable(databaseName, tableName).orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
-
-        Map<String, HiveBasicStatistics> partitionBasicStatistics = getPartitionsByNames(databaseName, tableName, ImmutableList.copyOf(partitionNames)).entrySet().stream()
-                .filter(entry -> entry.getValue().isPresent())
-                .collect(toImmutableMap(
-                        entry -> MetastoreUtil.makePartName(table.getPartitionColumns(), entry.getValue().get().getValues()),
-                        entry -> getHiveBasicStatistics(entry.getValue().get().getParameters())));
-
-        Map<String, OptionalLong> partitionRowCounts = partitionBasicStatistics.entrySet().stream()
-                .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().getRowCount()));
-
-        List<String> dataColumns = table.getDataColumns().stream()
-                .map(Column::getName)
-                .collect(toImmutableList());
-        Map<String, List<ColumnStatisticsInfo>> columnStatisticss;
-        try {
-            columnStatisticss = client.getPartitionColumnStatistics(
-                    table.getDatabaseName(),
-                    table.getTableName(),
-                    partitionBasicStatistics.keySet().stream().collect(toImmutableList()),
-                    dataColumns);
-        }
-        catch (AlluxioStatusException e) {
-            throw new PrestoException(HIVE_METASTORE_ERROR, e);
-        }
-
-        Map<String, Map<String, HiveColumnStatistics>> partitionColumnStatistics = columnStatisticss.entrySet().stream()
-                .filter(entry -> !entry.getValue().isEmpty())
-                .collect(toImmutableMap(
-                        Map.Entry::getKey,
-                        entry -> groupStatisticsByColumn(entry.getValue(), partitionRowCounts.getOrDefault(entry.getKey(), OptionalLong.empty()))));
-
-        ImmutableMap.Builder<String, PartitionStatistics> result = ImmutableMap.builder();
-        for (String partitionName : partitionBasicStatistics.keySet()) {
-            HiveBasicStatistics basicStatistics = partitionBasicStatistics.get(partitionName);
-            Map<String, HiveColumnStatistics> columnStatistics = partitionColumnStatistics.getOrDefault(partitionName, ImmutableMap.of());
-            result.put(partitionName, new PartitionStatistics(basicStatistics, columnStatistics));
-        }
-        return result.build();
+        return getPartitionStatistics(
+                getTable(databaseName, tableName).orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName))),
+                getPartitionsByNames(databaseName, tableName, ImmutableList.copyOf(partitionNames)));
     }
 
     @Override
@@ -367,6 +331,59 @@ public class AlluxioHiveMetastore
         catch (AlluxioStatusException e) {
             throw new PrestoException(HIVE_METASTORE_ERROR, e);
         }
+    }
+
+    @Override
+    public Map<String, Optional<PartitionWithStatistics>> getPartitionsWithStatisticsByNames(String databaseName, String tableName, List<String> partitionNames)
+    {
+        Table table = getTable(databaseName, tableName).orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
+        Map<String, Optional<Partition>> partitionNamesToPartitions = getPartitionsByNames(databaseName, tableName, ImmutableList.copyOf(partitionNames));
+        Map<String, PartitionStatistics> partitionNamesToStatistics = getPartitionStatistics(table, partitionNamesToPartitions);
+        return partitionNamesToStatistics.entrySet().stream()
+                .collect(toImmutableMap(
+                        Map.Entry::getKey,
+                        entry -> Optional.of(new PartitionWithStatistics(partitionNamesToPartitions.get(entry.getKey()).get(), entry.getKey(), entry.getValue()))));
+    }
+
+    private Map<String, PartitionStatistics> getPartitionStatistics(Table table, Map<String, Optional<Partition>> partitionNamesToPartitions)
+    {
+        Map<String, HiveBasicStatistics> partitionBasicStatistics = partitionNamesToPartitions.entrySet().stream()
+                .filter(entry -> entry.getValue().isPresent())
+                .collect(toImmutableMap(
+                        entry -> MetastoreUtil.makePartName(table.getPartitionColumns(), entry.getValue().get().getValues()),
+                        entry -> getHiveBasicStatistics(entry.getValue().get().getParameters())));
+
+        Map<String, OptionalLong> partitionRowCounts = partitionBasicStatistics.entrySet().stream()
+                .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().getRowCount()));
+
+        List<String> dataColumns = table.getDataColumns().stream()
+                .map(Column::getName)
+                .collect(toImmutableList());
+        Map<String, List<ColumnStatisticsInfo>> columnStatisticss;
+        try {
+            columnStatisticss = client.getPartitionColumnStatistics(
+                    table.getDatabaseName(),
+                    table.getTableName(),
+                    partitionBasicStatistics.keySet().stream().collect(toImmutableList()),
+                    dataColumns);
+        }
+        catch (AlluxioStatusException e) {
+            throw new PrestoException(HIVE_METASTORE_ERROR, e);
+        }
+
+        Map<String, Map<String, HiveColumnStatistics>> partitionColumnStatistics = columnStatisticss.entrySet().stream()
+                .filter(entry -> !entry.getValue().isEmpty())
+                .collect(toImmutableMap(
+                        Map.Entry::getKey,
+                        entry -> groupStatisticsByColumn(entry.getValue(), partitionRowCounts.getOrDefault(entry.getKey(), OptionalLong.empty()))));
+
+        ImmutableMap.Builder<String, PartitionStatistics> result = ImmutableMap.builder();
+        for (String partitionName : partitionBasicStatistics.keySet()) {
+            HiveBasicStatistics basicStatistics = partitionBasicStatistics.get(partitionName);
+            Map<String, HiveColumnStatistics> columnStatistics = partitionColumnStatistics.getOrDefault(partitionName, ImmutableMap.of());
+            result.put(partitionName, new PartitionStatistics(basicStatistics, columnStatistics));
+        }
+        return result.build();
     }
 
     @Override
