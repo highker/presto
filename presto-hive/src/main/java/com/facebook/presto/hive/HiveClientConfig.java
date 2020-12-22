@@ -150,6 +150,7 @@ public class HiveClientConfig
     private int partitionStatisticsSampleSize = 100;
     private boolean ignoreCorruptedStatistics;
     private boolean collectColumnStatisticsOnWrite;
+    private boolean partitionStatsBasedOptimizationEnabled;
 
     private boolean s3SelectPushdownEnabled;
     private int s3SelectPushdownMaxConnections = 500;
@@ -1278,6 +1279,19 @@ public class HiveClientConfig
     public HiveClientConfig setCollectColumnStatisticsOnWrite(boolean collectColumnStatisticsOnWrite)
     {
         this.collectColumnStatisticsOnWrite = collectColumnStatisticsOnWrite;
+        return this;
+    }
+
+    public boolean isPartitionStatsBasedOptimizationEnabled()
+    {
+        return partitionStatsBasedOptimizationEnabled;
+    }
+
+    @Config("hive.partition-stats-based-optimization-enabled")
+    @ConfigDescription("Enables partition stats based optimization, including partition pruning and predicate stripping")
+    public HiveClientConfig setPartitionStatsBasedOptimizationEnabled(boolean partitionStatsBasedOptimizationEnabled)
+    {
+        this.partitionStatsBasedOptimizationEnabled = partitionStatsBasedOptimizationEnabled;
         return this;
     }
 
