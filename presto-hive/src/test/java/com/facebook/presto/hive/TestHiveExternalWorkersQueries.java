@@ -47,19 +47,15 @@ public class TestHiveExternalWorkersQueries
     private static QueryRunner createQueryRunner()
             throws Exception
     {
-        String prestoServerPath = System.getenv("PRESTO_SERVER");
-        String baseDataDir = System.getenv("DATA_DIR");
+        String prestoServerPath = "/Users/jamessun/presto/presto_cpp/cmake-build-debug/presto_cpp/main/presto_server";
+        String baseDataDir = "/Users/jamessun/Desktop";
 
         return createQueryRunner(Optional.ofNullable(prestoServerPath), Optional.ofNullable(baseDataDir).map(Paths::get));
     }
 
-    private static QueryRunner createQueryRunner(Optional<String> prestoServerPath, Optional<Path> baseDataDir)
+    public static DistributedQueryRunner createQueryRunner(Optional<String> prestoServerPath, Optional<Path> baseDataDir)
             throws Exception
     {
-        if (prestoServerPath.isPresent()) {
-            checkArgument(baseDataDir.isPresent(), "Path to data files must be specified when testing external workers");
-        }
-
         DistributedQueryRunner defaultQueryRunner = HiveQueryRunner.createQueryRunner(
                 ImmutableList.of(NATION),
                 ImmutableMap.of(),
@@ -71,20 +67,18 @@ public class TestHiveExternalWorkersQueries
         createLineitem(defaultQueryRunner);
         createOrders(defaultQueryRunner);
 
-        if (!prestoServerPath.isPresent()) {
-            return defaultQueryRunner;
-        }
-
         defaultQueryRunner.close();
 
         // Make query runner with external workers for tests
         DistributedQueryRunner queryRunner = HiveQueryRunner.createQueryRunner(ImmutableList.of(),
-                ImmutableMap.of("optimizer.optimize-hash-generation", "false",
+                ImmutableMap.of(
+                        "http-server.http.port", "8080",
+                        "optimizer.optimize-hash-generation", "false",
                         "parse-decimal-literals-as-double", "true"),
                 ImmutableMap.of(),
                 "sql-standard",
                 ImmutableMap.of(),
-                Optional.of(1),
+                Optional.of(0),
                 baseDataDir,
                 Optional.of((workerIndex, discoveryUri) -> {
                     try {

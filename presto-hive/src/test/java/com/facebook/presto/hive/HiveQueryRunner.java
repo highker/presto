@@ -50,6 +50,7 @@ import static com.facebook.presto.SystemSessionProperties.EXCHANGE_MATERIALIZATI
 import static com.facebook.presto.SystemSessionProperties.GROUPED_EXECUTION;
 import static com.facebook.presto.SystemSessionProperties.HASH_PARTITION_COUNT;
 import static com.facebook.presto.SystemSessionProperties.PARTITIONING_PROVIDER_CATALOG;
+import static com.facebook.presto.SystemSessionProperties.isAllowWindowOrderByLiterals;
 import static com.facebook.presto.spi.security.SelectedRole.Type.ROLE;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static com.facebook.presto.tests.QueryAssertions.copyTpchTables;
@@ -136,7 +137,7 @@ public final class HiveQueryRunner
 
         DistributedQueryRunner queryRunner =
                 DistributedQueryRunner.builder(createSession(Optional.of(new SelectedRole(ROLE, Optional.of("admin")))))
-                        .setNodeCount(workerCount.orElse(4))
+                        .setNodeCount(workerCount.orElse(1))
                         .setExtraProperties(systemProperties)
                         .setCoordinatorProperties(extraCoordinatorProperties)
                         .setBaseDataDir(baseDataDir)
@@ -171,8 +172,7 @@ public final class HiveQueryRunner
                     ImmutableMap.copyOf(hiveProperties) :
                     ImmutableMap.<String, String>builder()
                             .putAll(hiveProperties)
-                            .put("hive.storage-format", "TEXTFILE")
-                            .put("hive.compression-codec", "NONE")
+                            .put("hive.storage-format", "DWRF")
                             .build();
 
             Map<String, String> hiveBucketedProperties = ImmutableMap.<String, String>builder()
@@ -181,7 +181,6 @@ public final class HiveQueryRunner
                     .put("hive.max-split-size", "10kB") // so that each bucket has multiple splits
                     .build();
             queryRunner.createCatalog(HIVE_CATALOG, HIVE_CATALOG, hiveProperties);
-            queryRunner.createCatalog(HIVE_BUCKETED_CATALOG, HIVE_CATALOG, hiveBucketedProperties);
 
             if (!metastore.getDatabase(TPCH_SCHEMA).isPresent()) {
                 metastore.createDatabase(createDatabaseMetastoreObject(TPCH_SCHEMA));
@@ -190,7 +189,6 @@ public final class HiveQueryRunner
 
             if (!metastore.getDatabase(TPCH_BUCKETED_SCHEMA).isPresent()) {
                 metastore.createDatabase(createDatabaseMetastoreObject(TPCH_BUCKETED_SCHEMA));
-                copyTpchTablesBucketed(queryRunner, "tpch", TINY_SCHEMA_NAME, createBucketedSession(Optional.empty()), tables);
             }
 
             if (!metastore.getDatabase(TEMPORARY_TABLE_SCHEMA).isPresent()) {
@@ -397,7 +395,9 @@ public final class HiveQueryRunner
             baseDataDir = Optional.of(baseDataDirFile.toPath());
         }
 
-        DistributedQueryRunner queryRunner = createQueryRunner(TpchTable.getTables(), ImmutableMap.of("http-server.http.port", "8080"), baseDataDir);
+        String prestoServerPath = "/Users/jamessun/presto/presto_cpp/cmake-build-debug/presto_cpp/main/presto_server";
+
+        DistributedQueryRunner queryRunner = TestHiveExternalWorkersQueries.createQueryRunner(Optional.ofNullable(prestoServerPath), Optional.ofNullable("/Users/jamessun/Desktop").map(Paths::get));
         Thread.sleep(10);
         Logger log = Logger.get(DistributedQueryRunner.class);
         log.info("======== SERVER STARTED ========");
