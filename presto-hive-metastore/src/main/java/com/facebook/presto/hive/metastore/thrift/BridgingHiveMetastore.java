@@ -21,7 +21,6 @@ import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.Database;
 import com.facebook.presto.hive.metastore.ExtendedHiveMetastore;
 import com.facebook.presto.hive.metastore.HivePrivilegeInfo;
-import com.facebook.presto.hive.metastore.MetastoreApiPartitionWithStatistics;
 import com.facebook.presto.hive.metastore.MetastoreUtil;
 import com.facebook.presto.hive.metastore.Partition;
 import com.facebook.presto.hive.metastore.PartitionNameWithVersion;
@@ -37,6 +36,7 @@ import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.RoleGrant;
 import com.facebook.presto.spi.statistics.ColumnStatisticType;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 import javax.inject.Inject;
@@ -306,18 +306,17 @@ public class BridgingHiveMetastore
         if (partitionNames.isEmpty()) {
             return ImmutableMap.of();
         }
-        Map<String, PartitionWithStatistics> partitionNameToPartitionWithStatisticsMap = delegate.getPartitionsWithStatisticsByNames(databaseName, tableName, partitionNames).stream()
-                .collect(toImmutableMap(
-                        MetastoreApiPartitionWithStatistics::getPartitionName,
-                        partitionWithStatistics -> new PartitionWithStatistics(
-                                fromMetastoreApiPartition(partitionWithStatistics.getPartition(), partitionMutator),
-                                partitionWithStatistics.getPartitionName(),
-                                partitionWithStatistics.getStatistics())));
 
-        return partitionNames.stream()
+        // be aware of caching, `getPartitionsByNames` will called multiple times. We need to fix it.
+        Map<String, Optional<Partition>> partitions = getPartitionsByNames(databaseName, tableName, partitionNames);
+
+        return delegate.getPartitionStatistics(databaseName, tableName, ImmutableSet.copyOf(partitionNames)).entrySet().stream()
                 .collect(toImmutableMap(
-                        identity(),
-                        partitionName -> Optional.of(partitionNameToPartitionWithStatisticsMap.get(partitionName))));
+                        Map.Entry::getKey,
+                        entry -> Optional.of(new PartitionWithStatistics(
+                                partitions.get(entry.getKey()).get(),
+                                entry.getKey(),
+                                entry.getValue()))));
     }
 
     @Override

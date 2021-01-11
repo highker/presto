@@ -25,7 +25,6 @@ import com.facebook.presto.hive.TableAlreadyExistsException;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.HivePrivilegeInfo;
-import com.facebook.presto.hive.metastore.MetastoreApiPartitionWithStatistics;
 import com.facebook.presto.hive.metastore.MetastoreUtil;
 import com.facebook.presto.hive.metastore.PartitionStatistics;
 import com.facebook.presto.hive.metastore.PartitionWithStatistics;
@@ -1162,45 +1161,6 @@ public class ThriftHiveMetastore
         catch (Exception e) {
             throw propagate(e);
         }
-    }
-
-    @Override
-    public List<MetastoreApiPartitionWithStatistics> getPartitionsWithStatisticsByNames(String databaseName, String tableName, List<String> partitionNames)
-    {
-        Table table = getTable(databaseName, tableName)
-                .orElseThrow(() -> new TableNotFoundException(new SchemaTableName(databaseName, tableName)));
-        List<String> dataColumns = table.getSd().getCols().stream()
-                .map(FieldSchema::getName)
-                .collect(toImmutableList());
-        List<String> partitionColumns = table.getPartitionKeys().stream()
-                .map(FieldSchema::getName)
-                .collect(toImmutableList());
-
-        List<Partition> partitions = getPartitionsByNames(databaseName, tableName, partitionNames);
-        Map<String, Partition> partitionNamesToPartitions = partitions.stream()
-                .collect(toImmutableMap(
-                        partition -> makePartName(partitionColumns, partition.getValues()),
-                        identity()));
-        Map<String, HiveBasicStatistics> partitionBasicStatistics = partitions.stream()
-                .collect(toImmutableMap(
-                        partition -> makePartName(partitionColumns, partition.getValues()),
-                        partition -> getHiveBasicStatistics(partition.getParameters())));
-        Map<String, OptionalLong> partitionRowCounts = partitionBasicStatistics.entrySet().stream()
-                .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().getRowCount()));
-        Map<String, Map<String, HiveColumnStatistics>> partitionColumnStatistics = getPartitionColumnStatistics(
-                databaseName,
-                tableName,
-                ImmutableSet.copyOf(partitionNames),
-                dataColumns,
-                partitionRowCounts);
-        ImmutableList.Builder<MetastoreApiPartitionWithStatistics> result = ImmutableList.builder();
-        for (String partitionName : partitionNames) {
-            HiveBasicStatistics basicStatistics = partitionBasicStatistics.getOrDefault(partitionName, createEmptyStatistics());
-            Map<String, HiveColumnStatistics> columnStatistics = partitionColumnStatistics.getOrDefault(partitionName, ImmutableMap.of());
-            result.add(new MetastoreApiPartitionWithStatistics(partitionNamesToPartitions.get(partitionName), partitionName, new PartitionStatistics(basicStatistics, columnStatistics)));
-        }
-
-        return result.build();
     }
 
     @Override

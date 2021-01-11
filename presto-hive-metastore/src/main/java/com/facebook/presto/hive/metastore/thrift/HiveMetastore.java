@@ -17,7 +17,6 @@ import com.facebook.presto.common.predicate.Domain;
 import com.facebook.presto.common.type.Type;
 import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.HivePrivilegeInfo;
-import com.facebook.presto.hive.metastore.MetastoreApiPartitionWithStatistics;
 import com.facebook.presto.hive.metastore.PartitionNameWithVersion;
 import com.facebook.presto.hive.metastore.PartitionStatistics;
 import com.facebook.presto.hive.metastore.PartitionWithStatistics;
@@ -82,11 +81,6 @@ public interface HiveMetastore
     Optional<Partition> getPartition(String databaseName, String tableName, List<String> partitionValues);
 
     List<Partition> getPartitionsByNames(String databaseName, String tableName, List<String> partitionNames);
-
-    default List<MetastoreApiPartitionWithStatistics> getPartitionsWithStatisticsByNames(String databaseName, String tableName, List<String> partitionNames)
-    {
-        throw new UnsupportedOperationException("getPartitionsWithStatisticsByNames is not supported");
-    }
 
     Optional<Table> getTable(String databaseName, String tableName);
 
