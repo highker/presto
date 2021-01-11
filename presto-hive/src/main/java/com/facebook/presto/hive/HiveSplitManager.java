@@ -27,6 +27,7 @@ import com.facebook.presto.hive.metastore.Column;
 import com.facebook.presto.hive.metastore.HiveColumnStatistics;
 import com.facebook.presto.hive.metastore.IntegerStatistics;
 import com.facebook.presto.hive.metastore.Partition;
+import com.facebook.presto.hive.metastore.PartitionStatistics;
 import com.facebook.presto.hive.metastore.PartitionWithStatistics;
 import com.facebook.presto.hive.metastore.SemiTransactionalHiveMetastore;
 import com.facebook.presto.hive.metastore.Table;
@@ -66,6 +67,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static com.facebook.presto.common.type.BigintType.BIGINT;
@@ -91,12 +93,14 @@ import static com.facebook.presto.hive.StoragePartitionLoader.BucketSplitInfo.cr
 import static com.facebook.presto.hive.metastore.MetastoreUtil.getProtectMode;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.makePartName;
 import static com.facebook.presto.hive.metastore.MetastoreUtil.verifyOnline;
+import static com.facebook.presto.hive.statistics.MetastoreHiveStatisticsProvider.getPartitionsStatistics;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static com.facebook.presto.spi.StandardErrorCode.SERVER_SHUTTING_DOWN;
 import static com.facebook.presto.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.GROUPED_SCHEDULING;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -104,6 +108,7 @@ import static com.google.common.collect.Iterables.transform;
 import static java.lang.Math.min;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
+import static java.util.function.UnaryOperator.identity;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.reducing;
 
@@ -515,10 +520,14 @@ public class HiveSplitManager
             Optional<Map<Subfield, Domain>> domains)
     {
         if (isPartitionStatsBasedOptimizationEnabled(session) && domains.isPresent()) {
-            Map<String, Optional<PartitionWithStatistics>> batch = metastore.getPartitionsWithStatisticsByNames(
+            Map<String, PartitionStatistics> stats = getPartitionsStatistics(metastore, tableName, partitionBatch);
+            // getPartitionsByNames will fetch from cache directly
+            Map<String, Optional<PartitionWithStatistics>> batch = metastore.getPartitionsByNames(
                     tableName.getSchemaName(),
                     tableName.getTableName(),
-                    Lists.transform(partitionBatch, HivePartition::getPartitionId));
+                    Lists.transform(partitionBatch, HivePartition::getPartitionId)).entrySet().stream()
+                    .collect(toImmutableMap(Map.Entry::getKey, entry -> Optional.of(new PartitionWithStatistics(entry.getValue().get(), entry.getKey(), stats.get(entry.getKey())))));
+
             ImmutableSet.Builder<String> prunedPartitionNamesBuilder = ImmutableSet.builder();
             ImmutableMap.Builder<String, Partition> partitionBuilder = ImmutableMap.builder();
             for (Map.Entry<String, Optional<PartitionWithStatistics>> entry : batch.entrySet()) {
