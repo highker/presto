@@ -16,12 +16,15 @@ package com.facebook.presto.orc;
 import com.facebook.presto.orc.StripeReader.StripeId;
 import com.facebook.presto.orc.StripeReader.StripeStreamId;
 import com.facebook.presto.orc.metadata.Stream.StreamKind;
+import com.facebook.presto.orc.metadata.StripeFooter;
 import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.slice.BasicSliceInput;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import io.airlift.units.Duration;
 
 import java.io.IOException;
 import java.util.Map;
@@ -33,12 +36,17 @@ import static com.facebook.presto.orc.metadata.Stream.StreamKind.ROW_INDEX;
 import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class CachingStripeMetadataSource
         implements StripeMetadataSource
 {
+    private static final Duration EXPIRE_AFTER_ACCESS = new Duration(100, MINUTES);
+
     private final StripeMetadataSource delegate;
     private final Cache<StripeId, Slice> footerSliceCache;
+    private final Cache<StripeId, StripeFooter> footerCache;
     private final Cache<StripeStreamId, Slice> stripeStreamCache;
 
     public CachingStripeMetadataSource(StripeMetadataSource delegate, Cache<StripeId, Slice> footerSliceCache, Cache<StripeStreamId, Slice> stripeStreamCache)
@@ -46,6 +54,15 @@ public class CachingStripeMetadataSource
         this.delegate = requireNonNull(delegate, "delegate is null");
         this.footerSliceCache = requireNonNull(footerSliceCache, "footerSliceCache is null");
         this.stripeStreamCache = requireNonNull(stripeStreamCache, "rowIndexSliceCache is null");
+        this.footerCache = CacheBuilder.newBuilder()
+                .expireAfterAccess(EXPIRE_AFTER_ACCESS.toMillis(), MILLISECONDS)
+                .maximumSize(1_000_000)
+                .build();
+    }
+
+    public Cache<StripeId, StripeFooter> getFooterCache()
+    {
+        return footerCache;
     }
 
     @Override

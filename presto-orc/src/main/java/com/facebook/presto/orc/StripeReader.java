@@ -45,6 +45,7 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.slice.Slice;
 
 import java.io.IOException;
@@ -59,6 +60,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.concurrent.ExecutionException;
 
 import static com.facebook.presto.orc.NoopOrcLocalMemoryContext.NOOP_ORC_LOCAL_MEMORY_CONTEXT;
 import static com.facebook.presto.orc.checkpoint.Checkpoints.getDictionaryStreamCheckpoint;
@@ -78,6 +80,7 @@ import static com.facebook.presto.orc.stream.CheckpointInputStreamSource.createC
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
@@ -485,7 +488,14 @@ public class StripeReader
                 Optional.empty(),
                 systemMemoryUsage,
                 footerLength)) {
+            if (stripeMetadataSource instanceof CachingStripeMetadataSource) {
+                return ((CachingStripeMetadataSource) stripeMetadataSource).getFooterCache().get(stripeId, () -> metadataReader.readStripeFooter(types, inputStream));
+            }
             return metadataReader.readStripeFooter(types, inputStream);
+        }
+        catch (ExecutionException | UncheckedExecutionException e) {
+            throwIfInstanceOf(e.getCause(), IOException.class);
+            throw new IOException("Unexpected error in stripe footer reading after footerSliceCache miss", e.getCause());
         }
     }
 
