@@ -16,6 +16,7 @@ package com.facebook.presto.orc;
 import com.facebook.presto.common.Subfield;
 import com.facebook.presto.common.block.Block;
 import com.facebook.presto.common.type.Type;
+import com.facebook.presto.orc.cache.CachingOrcFileTailSource;
 import com.facebook.presto.orc.cache.OrcFileTailSource;
 import com.facebook.presto.orc.cache.StorageOrcFileTailSource;
 import com.facebook.presto.orc.metadata.CompressionKind;
@@ -32,6 +33,7 @@ import com.facebook.presto.orc.stream.OrcInputStream;
 import com.facebook.presto.orc.stream.SharedBuffer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
 import org.joda.time.DateTimeZone;
@@ -41,6 +43,7 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -48,6 +51,7 @@ import static com.facebook.presto.orc.DwrfEncryptionInfo.createNodeToGroupMap;
 import static com.facebook.presto.orc.NoopOrcAggregatedMemoryContext.NOOP_ORC_AGGREGATED_MEMORY_CONTEXT;
 import static com.facebook.presto.orc.NoopOrcLocalMemoryContext.NOOP_ORC_LOCAL_MEMORY_CONTEXT;
 import static com.facebook.presto.orc.OrcDecompressor.createOrcDecompressor;
+import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
@@ -141,8 +145,18 @@ public class OrcReader
                 Optional.empty(),
                 aggregatedMemoryContext,
                 orcFileTail.getFooterSize())) {
-            this.footer = metadataReader.readFooter(hiveWriterVersion, footerInputStream, dwrfEncryptionProvider, dwrfKeyProvider, orcDataSource, decompressor);
+            if (orcFileTailSource instanceof CachingOrcFileTailSource) {
+                this.footer = ((CachingOrcFileTailSource) orcFileTailSource).getFooterCache().get(orcDataSource.getId(), () -> metadataReader.readFooter(hiveWriterVersion, footerInputStream, dwrfEncryptionProvider, dwrfKeyProvider, this.orcDataSource, decompressor));
+            }
+            else {
+                this.footer = metadataReader.readFooter(hiveWriterVersion, footerInputStream, dwrfEncryptionProvider, dwrfKeyProvider, orcDataSource, decompressor);
+            }
         }
+        catch (ExecutionException | UncheckedExecutionException e) {
+            throwIfInstanceOf(e.getCause(), IOException.class);
+            throw new IOException("Unexpected error in orc file tail reading after cache miss", e.getCause());
+        }
+
         if (this.footer.getTypes().size() == 0) {
             throw new OrcCorruptionException(orcDataSource.getId(), "File has no columns");
         }

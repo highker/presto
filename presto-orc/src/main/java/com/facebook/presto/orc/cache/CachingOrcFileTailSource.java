@@ -16,10 +16,13 @@ package com.facebook.presto.orc.cache;
 import com.facebook.presto.orc.OrcDataSource;
 import com.facebook.presto.orc.OrcDataSourceId;
 import com.facebook.presto.orc.OrcWriteValidation;
+import com.facebook.presto.orc.metadata.Footer;
 import com.facebook.presto.orc.metadata.MetadataReader;
 import com.facebook.presto.orc.metadata.OrcFileTail;
 import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import io.airlift.units.Duration;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -27,17 +30,31 @@ import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
 
 public class CachingOrcFileTailSource
         implements OrcFileTailSource
 {
+    private static final Duration EXPIRE_AFTER_ACCESS = new Duration(100, MINUTES);
+
     private final Cache<OrcDataSourceId, OrcFileTail> cache;
+    private final Cache<OrcDataSourceId, Footer> footerCache;
     private final OrcFileTailSource delegate;
 
     public CachingOrcFileTailSource(OrcFileTailSource delegate, Cache<OrcDataSourceId, OrcFileTail> cache)
     {
         this.cache = requireNonNull(cache, "cache is null");
         this.delegate = requireNonNull(delegate, "delegate is null");
+        this.footerCache = CacheBuilder.newBuilder()
+                .expireAfterAccess(EXPIRE_AFTER_ACCESS.toMillis(), MILLISECONDS)
+                .maximumSize(1_000_000)
+                .build();
+    }
+
+    public Cache<OrcDataSourceId, Footer> getFooterCache()
+    {
+        return footerCache;
     }
 
     @Override
