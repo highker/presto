@@ -48,7 +48,7 @@ public class CachingOrcFileTailSource
         this.delegate = requireNonNull(delegate, "delegate is null");
         this.footerCache = CacheBuilder.newBuilder()
                 .expireAfterAccess(EXPIRE_AFTER_ACCESS.toMillis(), MILLISECONDS)
-                .maximumSize(1_000_000)
+                .maximumSize(1_000)
                 .build();
     }
 

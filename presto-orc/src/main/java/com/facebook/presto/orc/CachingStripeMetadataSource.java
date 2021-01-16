@@ -56,7 +56,7 @@ public class CachingStripeMetadataSource
         this.stripeStreamCache = requireNonNull(stripeStreamCache, "rowIndexSliceCache is null");
         this.footerCache = CacheBuilder.newBuilder()
                 .expireAfterAccess(EXPIRE_AFTER_ACCESS.toMillis(), MILLISECONDS)
-                .maximumSize(1_000_000)
+                .maximumSize(20_000)
                 .build();
     }
 
