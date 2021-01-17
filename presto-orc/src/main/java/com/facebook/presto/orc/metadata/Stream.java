@@ -22,19 +22,64 @@ public class Stream
 {
     public enum StreamKind
     {
-        PRESENT,
-        DATA,
-        LENGTH,
-        DICTIONARY_DATA,
-        DICTIONARY_COUNT,
-        SECONDARY,
-        ROW_INDEX,
-        BLOOM_FILTER,
-        BLOOM_FILTER_UTF8,
-        IN_DICTIONARY,
-        ROW_GROUP_DICTIONARY,
-        ROW_GROUP_DICTIONARY_LENGTH,
-        IN_MAP,
+        PRESENT((byte) 0),
+        DATA((byte) 1),
+        LENGTH((byte) 2),
+        DICTIONARY_DATA((byte) 3),
+        DICTIONARY_COUNT((byte) 4),
+        SECONDARY((byte) 5),
+        ROW_INDEX((byte) 6),
+        BLOOM_FILTER((byte) 7),
+        BLOOM_FILTER_UTF8((byte) 8),
+        IN_DICTIONARY((byte) 9),
+        ROW_GROUP_DICTIONARY((byte) 10),
+        ROW_GROUP_DICTIONARY_LENGTH((byte) 11),
+        IN_MAP((byte) 12);
+
+        private final byte value;
+
+        StreamKind(byte value)
+        {
+            this.value = value;
+        }
+
+        public byte getValue()
+        {
+            return value;
+        }
+
+        public static Stream.StreamKind createStreamKind(byte value)
+        {
+            switch (value) {
+                case 0:
+                    return PRESENT;
+                case 1:
+                    return DATA;
+                case 2:
+                    return LENGTH;
+                case 3:
+                    return DICTIONARY_DATA;
+                case 4:
+                    return DICTIONARY_COUNT;
+                case 5:
+                    return SECONDARY;
+                case 6:
+                    return ROW_INDEX;
+                case 7:
+                    return BLOOM_FILTER;
+                case 8:
+                    return BLOOM_FILTER_UTF8;
+                case 9:
+                    return IN_DICTIONARY;
+                case 10:
+                    return ROW_GROUP_DICTIONARY;
+                case 11:
+                    return ROW_GROUP_DICTIONARY_LENGTH;
+                case 12:
+                    return IN_MAP;
+            }
+            throw new RuntimeException();
+        }
     }
 
     private final int column;

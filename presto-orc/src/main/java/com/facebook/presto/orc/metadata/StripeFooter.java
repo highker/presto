@@ -19,7 +19,6 @@ import io.airlift.slice.Slice;
 import it.unimi.dsi.fastutil.ints.Int2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,7 +32,14 @@ import static java.util.Objects.requireNonNull;
 
 public class StripeFooter
 {
-    private final List<Stream> streams;
+    private final int[] columns;
+    private final byte[] streamKinds;
+    private final int[] lengths;
+    private final boolean[] useVInts;
+    private final int[] sequences;
+    private final long[] offsets;
+    private final boolean[] hasOffsets;
+
     private final Map<Integer, Integer> columnEncodingsForDictionary;
     private final Map<Integer, Byte> columnEncodingsForKind;
     private final Map<Integer, SortedMap<Integer, DwrfSequenceEncoding>> columnEncodingsForAdditional;
@@ -43,7 +49,24 @@ public class StripeFooter
 
     public StripeFooter(List<Stream> streams, Map<Integer, ColumnEncoding> columnEncodings, List<Slice> stripeEncryptionGroups)
     {
-        this.streams = new ObjectArrayList<>(requireNonNull(streams, "streams is null"));
+        requireNonNull(streams, "streams is null");
+        this.columns = new int[streams.size()];
+        this.streamKinds = new byte[streams.size()];
+        this.lengths = new int[streams.size()];
+        this.useVInts = new boolean[streams.size()];
+        this.sequences = new int[streams.size()];
+        this.offsets = new long[streams.size()];
+        this.hasOffsets = new boolean[streams.size()];
+        for (int i = 0; i < streams.size(); i++) {
+            columns[i] = streams.get(i).getColumn();
+            streamKinds[i] = streams.get(i).getStreamKind().getValue();
+            lengths[i] = streams.get(i).getLength();
+            useVInts[i] = streams.get(i).isUseVInts();
+            sequences[i] = streams.get(i).getSequence();
+            offsets[i] = streams.get(i).getOffset().orElse(0L);
+            hasOffsets[i] = streams.get(i).getOffset().isPresent();
+        }
+
         requireNonNull(columnEncodings, "columnEncodings is null");
         this.columnEncodingsForDictionary = new Int2IntOpenHashMap(Maps.transformValues(columnEncodings, ColumnEncoding::getDictionarySize));
         this.columnEncodingsForKind = new Int2ByteOpenHashMap(Maps.transformValues(columnEncodings, v -> v.getColumnEncodingKind().getValue()));
@@ -78,18 +101,34 @@ public class StripeFooter
     public List<Stream> getStreams(Set<Integer> includedOrcColumns)
     {
         List<Stream> result = new ArrayList<>(includedOrcColumns.size() * 2);
-        for (Stream stream : streams) {
-            if (!includedOrcColumns.contains(stream.getColumn())) {
+        for (int i = 0; i < columns.length; i++) {
+            if (!includedOrcColumns.contains(columns[i])) {
                 continue;
             }
-            result.add(stream);
+            result.add(new Stream(
+                    columns[i],
+                    Stream.StreamKind.createStreamKind(streamKinds[i]),
+                    lengths[i],
+                    useVInts[i],
+                    sequences[i],
+                    hasOffsets[i] ? Optional.of(offsets[i]) : Optional.empty()));
         }
         return result;
     }
 
     public List<Stream> getStreams()
     {
-        return streams;
+        List<Stream> result = new ArrayList<>();
+        for (int i = 0; i < columns.length; i++) {
+            result.add(new Stream(
+                    columns[i],
+                    Stream.StreamKind.createStreamKind(streamKinds[i]),
+                    lengths[i],
+                    useVInts[i],
+                    sequences[i],
+                    hasOffsets[i] ? Optional.of(offsets[i]) : Optional.empty()));
+        }
+        return result;
     }
 
     public List<Slice> getStripeEncryptionGroups()
