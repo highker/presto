@@ -38,12 +38,10 @@ import com.facebook.presto.orc.stream.ValueInputStream;
 import com.facebook.presto.orc.stream.ValueInputStreamSource;
 import com.facebook.presto.orc.stream.ValueStreams;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.slice.Slice;
@@ -155,7 +153,6 @@ public class StripeReader
         StripeFooter stripeFooter = readStripeFooter(stripeId, stripe, systemMemoryUsage);
 
         // get streams for selected columns
-        List<Stream> allStreams = stripeFooter.getStreams();
         Map<StreamId, Stream> includedStreams = new HashMap<>();
         boolean hasRowGroupDictionary = addIncludedStreams(stripeFooter.getColumnEncodings(includedOrcColumns), stripeFooter.getStreams(includedOrcColumns), includedStreams);
 
@@ -172,8 +169,7 @@ public class StripeReader
         boolean invalidCheckPoint = false;
         if ((stripe.getNumberOfRows() > rowsInRowGroup) || hasRowGroupDictionary) {
             // determine ranges of the stripe to read
-            Map<StreamId, DiskRange> diskRanges = getDiskRanges(allStreams);
-            diskRanges = Maps.filterKeys(diskRanges, Predicates.in(includedStreams.keySet()));
+            Map<StreamId, DiskRange> diskRanges = getDiskRanges(stripeFooter, includedStreams.keySet());
 
             // read the file regions
             Map<StreamId, OrcInputStream> streamsData = readDiskRanges(stripeId, diskRanges, systemMemoryUsage, decryptors, sharedDecompressionBuffer);
@@ -227,14 +223,7 @@ public class StripeReader
         }
 
         // stripe only has one row group and no dictionary
-        ImmutableMap.Builder<StreamId, DiskRange> diskRangesBuilder = ImmutableMap.builder();
-        for (Entry<StreamId, DiskRange> entry : getDiskRanges(allStreams).entrySet()) {
-            StreamId streamId = entry.getKey();
-            if (includedStreams.keySet().contains(streamId)) {
-                diskRangesBuilder.put(entry);
-            }
-        }
-        ImmutableMap<StreamId, DiskRange> diskRanges = diskRangesBuilder.build();
+        Map<StreamId, DiskRange> diskRanges = getDiskRanges(stripeFooter, includedStreams.keySet());
 
         // read the file regions
         Map<StreamId, OrcInputStream> streamsData = readDiskRanges(stripeId, diskRanges, systemMemoryUsage, decryptors, sharedDecompressionBuffer);
@@ -593,18 +582,23 @@ public class StripeReader
     }
 
     @VisibleForTesting
-    public static Map<StreamId, DiskRange> getDiskRanges(List<Stream> streams)
+    public static Map<StreamId, DiskRange> getDiskRanges(StripeFooter stripeFooter, Set<StreamId> includedStreams)
     {
         ImmutableMap.Builder<StreamId, DiskRange> streamDiskRanges = ImmutableMap.builder();
         long stripeOffset = 0;
-        for (Stream stream : streams) {
-            int streamLength = toIntExact(stream.getLength());
-            if (stream.getOffset().isPresent()) {
-                stripeOffset = stream.getOffset().get();
+        for (int i = 0; i < stripeFooter.getLengths().length; i++) {
+            StreamId streamId = new StreamId(
+                    stripeFooter.getColumns()[i],
+                    stripeFooter.getSequences()[i],
+                    StreamKind.createStreamKind(stripeFooter.getStreamKinds()[i]));
+
+            int streamLength = toIntExact(stripeFooter.getLengths()[i]);
+            if (stripeFooter.getHasOffsets()[i]) {
+                stripeOffset = stripeFooter.getOffsets()[i];
             }
             // ignore zero byte streams
-            if (streamLength > 0) {
-                streamDiskRanges.put(new StreamId(stream), new DiskRange(stripeOffset, streamLength));
+            if (streamLength > 0 && includedStreams.contains(streamId)) {
+                streamDiskRanges.put(streamId, new DiskRange(stripeOffset, streamLength));
             }
             stripeOffset += streamLength;
         }

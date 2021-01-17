@@ -135,4 +135,39 @@ public class StripeFooter
     {
         return stripeEncryptionGroups;
     }
+
+    public int[] getColumns()
+    {
+        return columns;
+    }
+
+    public byte[] getStreamKinds()
+    {
+        return streamKinds;
+    }
+
+    public int[] getLengths()
+    {
+        return lengths;
+    }
+
+    public boolean[] getUseVInts()
+    {
+        return useVInts;
+    }
+
+    public int[] getSequences()
+    {
+        return sequences;
+    }
+
+    public long[] getOffsets()
+    {
+        return offsets;
+    }
+
+    public boolean[] getHasOffsets()
+    {
+        return hasOffsets;
+    }
 }
