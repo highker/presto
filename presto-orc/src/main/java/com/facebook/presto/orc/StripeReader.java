@@ -158,11 +158,11 @@ public class StripeReader
         List<List<Stream>> allStreams = new ArrayList<>();
         allStreams.add(stripeFooter.getStreams());
         Map<StreamId, Stream> includedStreams = new HashMap<>();
-        boolean hasRowGroupDictionary = addIncludedStreams(stripeFooter.getColumnEncodings(), stripeFooter.getStreams(), includedStreams);
+        boolean hasRowGroupDictionary = addIncludedStreams(stripeFooter.getColumnEncodings(includedOrcColumns), stripeFooter.getStreams(includedOrcColumns), includedStreams);
 
         Map<Integer, ColumnEncoding> columnEncodings = new HashMap<>();
 
-        Map<Integer, ColumnEncoding> stripeFooterEncodings = stripeFooter.getColumnEncodings();
+        Map<Integer, ColumnEncoding> stripeFooterEncodings = stripeFooter.getColumnEncodings(includedOrcColumns);
         columnEncodings.putAll(stripeFooterEncodings);
         //  included columns may be encrypted
         if (decryptors.isPresent()) {
