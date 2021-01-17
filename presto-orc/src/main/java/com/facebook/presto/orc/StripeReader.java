@@ -155,8 +155,7 @@ public class StripeReader
         StripeFooter stripeFooter = readStripeFooter(stripeId, stripe, systemMemoryUsage);
 
         // get streams for selected columns
-        List<List<Stream>> allStreams = new ArrayList<>();
-        allStreams.add(stripeFooter.getStreams());
+        List<Stream> allStreams = stripeFooter.getStreams();
         Map<StreamId, Stream> includedStreams = new HashMap<>();
         boolean hasRowGroupDictionary = addIncludedStreams(stripeFooter.getColumnEncodings(includedOrcColumns), stripeFooter.getStreams(includedOrcColumns), includedStreams);
 
@@ -166,14 +165,7 @@ public class StripeReader
         columnEncodings.putAll(stripeFooterEncodings);
         //  included columns may be encrypted
         if (decryptors.isPresent()) {
-            List<Slice> encryptedEncryptionGroups = stripeFooter.getStripeEncryptionGroups();
-            for (Integer groupId : decryptors.get().getEncryptorGroupIds()) {
-                StripeEncryptionGroup stripeEncryptionGroup = getStripeEncryptionGroup(decryptors.get().getEncryptorByGroupId(groupId), encryptedEncryptionGroups.get(groupId), dwrfEncryptionGroupColumns.get(groupId), systemMemoryUsage);
-                allStreams.add(stripeEncryptionGroup.getStreams());
-                columnEncodings.putAll(stripeEncryptionGroup.getColumnEncodings());
-                boolean encryptedHasRowGroupDictionary = addIncludedStreams(stripeEncryptionGroup.getColumnEncodings(), stripeEncryptionGroup.getStreams(), includedStreams);
-                hasRowGroupDictionary = encryptedHasRowGroupDictionary || hasRowGroupDictionary;
-            }
+            throw new RuntimeException();
         }
 
         // handle stripes with more than one row group or a dictionary
@@ -601,22 +593,20 @@ public class StripeReader
     }
 
     @VisibleForTesting
-    public static Map<StreamId, DiskRange> getDiskRanges(List<List<Stream>> streams)
+    public static Map<StreamId, DiskRange> getDiskRanges(List<Stream> streams)
     {
         ImmutableMap.Builder<StreamId, DiskRange> streamDiskRanges = ImmutableMap.builder();
-        for (List<Stream> groupStreams : streams) {
-            long stripeOffset = 0;
-            for (Stream stream : groupStreams) {
-                int streamLength = toIntExact(stream.getLength());
-                if (stream.getOffset().isPresent()) {
-                    stripeOffset = stream.getOffset().get();
-                }
-                // ignore zero byte streams
-                if (streamLength > 0) {
-                    streamDiskRanges.put(new StreamId(stream), new DiskRange(stripeOffset, streamLength));
-                }
-                stripeOffset += streamLength;
+        long stripeOffset = 0;
+        for (Stream stream : streams) {
+            int streamLength = toIntExact(stream.getLength());
+            if (stream.getOffset().isPresent()) {
+                stripeOffset = stream.getOffset().get();
             }
+            // ignore zero byte streams
+            if (streamLength > 0) {
+                streamDiskRanges.put(new StreamId(stream), new DiskRange(stripeOffset, streamLength));
+            }
+            stripeOffset += streamLength;
         }
         return streamDiskRanges.build();
     }
