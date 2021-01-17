@@ -24,12 +24,43 @@ public class ColumnEncoding
 {
     public enum ColumnEncodingKind
     {
-        DIRECT,
-        DICTIONARY,
-        DIRECT_V2,
-        DICTIONARY_V2,
-        DWRF_DIRECT,
-        DWRF_MAP_FLAT,
+        DIRECT((byte) 0),
+        DICTIONARY((byte) 1),
+        DIRECT_V2((byte) 2),
+        DICTIONARY_V2((byte) 3),
+        DWRF_DIRECT((byte) 4),
+        DWRF_MAP_FLAT((byte) 5);
+
+        private final byte value;
+
+        ColumnEncodingKind(byte value)
+        {
+            this.value = value;
+        }
+
+        public byte getValue()
+        {
+            return value;
+        }
+
+        public static ColumnEncodingKind createColumnEncodingKind(byte value)
+        {
+            switch (value) {
+                case 0:
+                    return DIRECT;
+                case 1:
+                    return DICTIONARY;
+                case 2:
+                    return DIRECT_V2;
+                case 3:
+                    return DICTIONARY_V2;
+                case 4:
+                    return DWRF_DIRECT;
+                case 5:
+                    return DWRF_MAP_FLAT;
+            }
+            throw new RuntimeException();
+        }
     }
 
     public static final int DEFAULT_SEQUENCE_ID = 0;
