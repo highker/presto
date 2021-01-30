@@ -304,7 +304,9 @@ public final class SqlStageExecution
     public synchronized void schedulingComplete(PlanNodeId partitionedSource)
     {
         for (RemoteTask task : getAllTasks()) {
-            task.noMoreSplits(partitionedSource);
+            if (task.isSplitAssigned()) {
+                task.noMoreSplits(partitionedSource);
+            }
         }
         completeSources.add(partitionedSource);
     }
@@ -450,13 +452,18 @@ public final class SqlStageExecution
 
     public synchronized Optional<RemoteTask> scheduleTask(InternalNode node, int partition)
     {
+        return scheduleTask(node, partition, false);
+    }
+
+    public synchronized Optional<RemoteTask> scheduleTask(InternalNode node, int partition, boolean lazyStart)
+    {
         requireNonNull(node, "node is null");
 
         if (stateMachine.getState().isDone()) {
             return Optional.empty();
         }
         checkState(!splitsScheduled.get(), "scheduleTask can not be called once splits have been scheduled");
-        return Optional.of(scheduleTask(node, new TaskId(stateMachine.getStageExecutionId(), partition), ImmutableMultimap.of()));
+        return Optional.of(scheduleTask(node, new TaskId(stateMachine.getStageExecutionId(), partition), ImmutableMultimap.of(), lazyStart));
     }
 
     public synchronized Set<RemoteTask> scheduleSplits(InternalNode node, Multimap<PlanNodeId, Split> splits, Multimap<PlanNodeId, Lifespan> noMoreSplitsNotification)
@@ -478,7 +485,7 @@ public final class SqlStageExecution
             // The output buffer depends on the task id starting from 0 and being sequential, since each
             // task is assigned a private buffer based on task id.
             TaskId taskId = new TaskId(stateMachine.getStageExecutionId(), nextTaskId.getAndIncrement());
-            task = scheduleTask(node, taskId, splits);
+            task = scheduleTask(node, taskId, splits, false);
             newTasks.add(task);
         }
         else {
@@ -497,7 +504,7 @@ public final class SqlStageExecution
         return newTasks.build();
     }
 
-    private synchronized RemoteTask scheduleTask(InternalNode node, TaskId taskId, Multimap<PlanNodeId, Split> sourceSplits)
+    private synchronized RemoteTask scheduleTask(InternalNode node, TaskId taskId, Multimap<PlanNodeId, Split> sourceSplits, boolean lazyStart)
     {
         checkArgument(!allTasks.contains(taskId), "A task with id %s already exists", taskId);
 
@@ -535,6 +542,16 @@ public final class SqlStageExecution
 
         task.addStateChangeListener(new StageTaskListener(taskId));
         task.addFinalTaskInfoListener(this::updateFinalTaskInfo);
+
+        if (!lazyStart) {
+            if (!stateMachine.getState().isDone()) {
+                task.start();
+            }
+            else {
+                // stage finished while we were scheduling this task
+                task.abort();
+            }
+        }
 
         return task;
     }

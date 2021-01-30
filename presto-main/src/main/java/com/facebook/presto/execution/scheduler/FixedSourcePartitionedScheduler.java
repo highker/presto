@@ -186,14 +186,11 @@ public class FixedSourcePartitionedScheduler
         if (!scheduledTasks) {
             allTasks = Streams.mapWithIndex(
                     nodes.stream(),
-                    (node, id) -> stage.scheduleTask(node, toIntExact(id)))
+                    (node, id) -> stage.scheduleTask(node, toIntExact(id), true))
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .collect(toImmutableList());
             scheduledTasks = true;
-
-            // notify listeners that we have scheduled all tasks so they can set no more buffers or exchange splits
-            stage.transitionToFinishedTaskScheduling();
         }
 
         boolean allBlocked = true;
@@ -274,6 +271,8 @@ public class FixedSourcePartitionedScheduler
             alreadyScheduledTasks.add(remoteTask.getTaskId());
             newTasks.add(remoteTask);
 
+            log.info("build task " + remoteTask.getTaskId());
+
             if (!stage.getState().isDone()) {
                 remoteTask.start();
             }
@@ -281,6 +280,11 @@ public class FixedSourcePartitionedScheduler
                 // stage finished while we were scheduling this task
                 remoteTask.abort();
             }
+        }
+
+        if (sourceSchedulers.isEmpty()) {
+            // notify listeners that we have scheduled all tasks so they can set no more buffers or exchange splits
+            stage.transitionToFinishedTaskScheduling();
         }
 
         if (allBlocked) {
