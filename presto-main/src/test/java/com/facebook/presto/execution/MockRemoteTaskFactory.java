@@ -379,6 +379,11 @@ public class MockRemoteTaskFactory
         }
 
         @Override
+        public boolean isSplitAssigned() {
+            return true;
+        }
+
+        @Override
         public void start()
         {
             taskStateMachine.addStateChangeListener(newValue -> {

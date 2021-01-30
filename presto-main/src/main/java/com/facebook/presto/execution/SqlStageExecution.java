@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.execution;
 
+import com.facebook.airlift.log.Logger;
 import com.facebook.presto.Session;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.execution.buffer.OutputBuffers;
@@ -22,6 +23,7 @@ import com.facebook.presto.failureDetector.FailureDetector;
 import com.facebook.presto.metadata.InternalNode;
 import com.facebook.presto.metadata.RemoteTransactionHandle;
 import com.facebook.presto.metadata.Split;
+import com.facebook.presto.server.remotetask.HttpRemoteTask;
 import com.facebook.presto.spi.ErrorCode;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.plan.PlanNodeId;
@@ -83,6 +85,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 @ThreadSafe
 public final class SqlStageExecution
 {
+    private static final Logger log = Logger.get(SqlStageExecution.class);
     public static final Set<ErrorCode> RECOVERABLE_ERROR_CODES = ImmutableSet.of(
             TOO_MANY_REQUESTS_FAILED.toErrorCode(),
             PAGE_TRANSPORT_ERROR.toErrorCode(),
@@ -511,12 +514,14 @@ public final class SqlStageExecution
         OutputBuffers outputBuffers = this.outputBuffers.get();
         checkState(outputBuffers != null, "Initial output buffers must be set before a task can be scheduled");
 
+        ImmutableMultimap<PlanNodeId, Split> splits = initialSplits.build();
+        log.info("schedule stage " + taskId + " with " + splits.size() + " initial splits");
         RemoteTask task = remoteTaskFactory.createRemoteTask(
                 session,
                 taskId,
                 node,
                 planFragment,
-                initialSplits.build(),
+                splits,
                 outputBuffers,
                 nodeTaskMap.createTaskStatsTracker(node, taskId),
                 summarizeTaskInfo,
@@ -530,14 +535,6 @@ public final class SqlStageExecution
 
         task.addStateChangeListener(new StageTaskListener(taskId));
         task.addFinalTaskInfoListener(this::updateFinalTaskInfo);
-
-        if (!stateMachine.getState().isDone()) {
-            task.start();
-        }
-        else {
-            // stage finished while we were scheduling this task
-            task.abort();
-        }
 
         return task;
     }

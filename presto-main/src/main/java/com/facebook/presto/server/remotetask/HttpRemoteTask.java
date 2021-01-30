@@ -155,6 +155,8 @@ public final class HttpRemoteTask
     @GuardedBy("this")
     private long currentRequestStartNanos;
 
+    private final AtomicBoolean splitAssigned = new AtomicBoolean();
+
     @GuardedBy("this")
     private final SetMultimap<PlanNodeId, ScheduledSplit> pendingSplits = HashMultimap.create();
     @GuardedBy("this")
@@ -287,6 +289,7 @@ public final class HttpRemoteTask
             for (Entry<PlanNodeId, Split> entry : requireNonNull(initialSplits, "initialSplits is null").entries()) {
                 ScheduledSplit scheduledSplit = new ScheduledSplit(nextSplitId.getAndIncrement(), entry.getKey(), entry.getValue());
                 pendingSplits.put(entry.getKey(), scheduledSplit);
+                splitAssigned.set(true);
             }
             pendingSourceSplitCount = planFragment.getTableScanSchedulingOrder().stream()
                     .filter(initialSplits::containsKey)
@@ -337,6 +340,7 @@ public final class HttpRemoteTask
             taskStatusFetcher.addStateChangeListener(newStatus -> {
                 TaskState state = newStatus.getState();
                 if (state.isDone()) {
+                    log.info("clean up task + " + taskId);
                     cleanUpTask();
                 }
                 else {
@@ -412,6 +416,7 @@ public final class HttpRemoteTask
             for (Split split : splits) {
                 if (pendingSplits.put(sourceId, new ScheduledSplit(nextSplitId.getAndIncrement(), sourceId, split))) {
                     added++;
+                    splitAssigned.set(true);
                 }
             }
             if (tableScanPlanNodeIds.contains(sourceId)) {
@@ -645,6 +650,10 @@ public final class HttpRemoteTask
         updateTaskStats();
     }
 
+    public boolean isSplitAssigned() {
+        return splitAssigned.get();
+    }
+
     private void updateTaskInfo(TaskInfo taskInfo)
     {
         taskStatusFetcher.updateTaskStatus(taskInfo.getTaskStatus());
@@ -677,6 +686,16 @@ public final class HttpRemoteTask
         }
 
         List<TaskSource> sources = getSources();
+
+        if (sources.stream().map(TaskSource::getSplits).mapToInt(Set::size).sum() == 0) {
+            log.info("send empty task update " + taskId);
+        }
+        else {
+            log.info("send meaningful task update " + taskId);
+            for (TaskSource taskSource : sources) {
+                log.info("\tmeaningful task source " + taskSource.getSplits().size() + "; no more split: " + taskSource.isNoMoreSplits());
+            }
+        }
 
         Optional<byte[]> fragment = sendPlan.get() ? Optional.of(planFragment.toBytes(planFragmentCodec)) : Optional.empty();
         Optional<TableWriteInfo> writeInfo = sendPlan.get() ? Optional.of(tableWriteInfo) : Optional.empty();
@@ -719,6 +738,7 @@ public final class HttpRemoteTask
 
         updateErrorTracker.startRequest();
 
+        // log.info("send task update " + taskId + " with " + sources.stream().map(TaskSource::getSplits).mapToInt(Set::size).sum() + " splits");
         ListenableFuture<BaseResponse<TaskInfo>> future = httpClient.executeAsync(request, responseHandler);
         currentRequest = future;
         currentRequestStartNanos = System.nanoTime();

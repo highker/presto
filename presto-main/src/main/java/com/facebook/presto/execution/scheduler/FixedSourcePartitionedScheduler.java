@@ -44,6 +44,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
@@ -65,6 +66,7 @@ public class FixedSourcePartitionedScheduler
 
     private final SqlStageExecution stage;
     private final List<InternalNode> nodes;
+    private final Set<TaskId> alreadyScheduledTasks = ConcurrentHashMap.newKeySet();
 
     private final List<SourceScheduler> sourceSchedulers;
     private final List<ConnectorPartitionHandle> partitionHandles;
@@ -180,9 +182,9 @@ public class FixedSourcePartitionedScheduler
     public ScheduleResult schedule()
     {
         // schedule a task on every node in the distribution
-        List<RemoteTask> newTasks = ImmutableList.of();
+        List<RemoteTask> allTasks = ImmutableList.of();
         if (!scheduledTasks) {
-            newTasks = Streams.mapWithIndex(
+            allTasks = Streams.mapWithIndex(
                     nodes.stream(),
                     (node, id) -> stage.scheduleTask(node, toIntExact(id)))
                     .filter(Optional::isPresent)
@@ -262,11 +264,30 @@ public class FixedSourcePartitionedScheduler
             }
         }
 
+        ImmutableList.Builder<RemoteTask> newTasks = ImmutableList.builder();
+        for (RemoteTask remoteTask : allTasks) {
+            if (alreadyScheduledTasks.contains(remoteTask.getTaskId()) || !remoteTask.isSplitAssigned()) {
+                continue;
+            }
+
+            // it is the first time the current task has been assigned with some splits
+            alreadyScheduledTasks.add(remoteTask.getTaskId());
+            newTasks.add(remoteTask);
+
+            if (!stage.getState().isDone()) {
+                remoteTask.start();
+            }
+            else {
+                // stage finished while we were scheduling this task
+                remoteTask.abort();
+            }
+        }
+
         if (allBlocked) {
-            return ScheduleResult.blocked(sourceSchedulers.isEmpty(), newTasks, whenAnyComplete(blocked), blockedReason, splitsScheduled);
+            return ScheduleResult.blocked(sourceSchedulers.isEmpty(), newTasks.build(), whenAnyComplete(blocked), blockedReason, splitsScheduled);
         }
         else {
-            return ScheduleResult.nonBlocked(sourceSchedulers.isEmpty(), newTasks, splitsScheduled);
+            return ScheduleResult.nonBlocked(sourceSchedulers.isEmpty(), newTasks.build(), splitsScheduled);
         }
     }
 

@@ -15,6 +15,7 @@ package com.facebook.presto.server;
 
 import com.facebook.airlift.concurrent.BoundedExecutor;
 import com.facebook.airlift.json.JsonCodec;
+import com.facebook.airlift.log.Logger;
 import com.facebook.airlift.stats.TimeStat;
 import com.facebook.presto.Session;
 import com.facebook.presto.common.Page;
@@ -97,6 +98,7 @@ import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 @RolesAllowed(INTERNAL)
 public class TaskResource
 {
+    private static final Logger log = Logger.get(TaskResource.class);
     private static final Duration ADDITIONAL_WAIT_TIME = new Duration(5, SECONDS);
 
     private final TaskManager taskManager;

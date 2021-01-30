@@ -168,7 +168,7 @@ public class AccessDeniedException
 
     public static void denySelectTable(String tableName)
     {
-        denySelectTable(tableName, null);
+        // denySelectTable(tableName, null);
     }
 
     public static void denySelectTable(String tableName, String extraInfo)
