@@ -192,7 +192,7 @@ public class SqlStandardAccessControl
     {
         // TODO: Implement column level access control
         if (!checkTablePermission(transaction, identity, tableName, SELECT, false)) {
-            denySelectTable(tableName.toString());
+            // denySelectTable(tableName.toString());
         }
     }
 
@@ -243,7 +243,7 @@ public class SqlStandardAccessControl
     public void checkCanSetCatalogSessionProperty(ConnectorTransactionHandle transaction, ConnectorIdentity identity, AccessControlContext context, String propertyName)
     {
         if (!isAdmin(transaction, identity)) {
-            denySetCatalogSessionProperty(connectorId, propertyName);
+            // denySetCatalogSessionProperty(connectorId, propertyName);
         }
     }
 

@@ -37,6 +37,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import javax.annotation.concurrent.GuardedBy;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -179,21 +180,6 @@ public class FixedSourcePartitionedScheduler
     @Override
     public ScheduleResult schedule()
     {
-        // schedule a task on every node in the distribution
-        List<RemoteTask> newTasks = ImmutableList.of();
-        if (!scheduledTasks) {
-            newTasks = Streams.mapWithIndex(
-                    nodes.stream(),
-                    (node, id) -> stage.scheduleTask(node, toIntExact(id)))
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-                    .collect(toImmutableList());
-            scheduledTasks = true;
-
-            // notify listeners that we have scheduled all tasks so they can set no more buffers or exchange splits
-            stage.transitionToFinishedTaskScheduling();
-        }
-
         boolean allBlocked = true;
         List<ListenableFuture<?>> blocked = new ArrayList<>();
         BlockedReason blockedReason = BlockedReason.NO_ACTIVE_DRIVER_GROUP;
@@ -224,6 +210,7 @@ public class FixedSourcePartitionedScheduler
         int splitsScheduled = 0;
         Iterator<SourceScheduler> schedulerIterator = sourceSchedulers.iterator();
         List<Lifespan> driverGroupsToStart = ImmutableList.of();
+        Set<RemoteTask> tasks = new HashSet<>();
         while (schedulerIterator.hasNext()) {
             synchronized (this) {
                 // if a source scheduler is closed while it is scheduling, we can get an error
@@ -238,6 +225,7 @@ public class FixedSourcePartitionedScheduler
                 }
 
                 ScheduleResult schedule = sourceScheduler.schedule();
+                tasks.addAll(schedule.getNewTasks());
                 if (schedule.getSplitsScheduled() > 0) {
                     stage.transitionToSchedulingSplits();
                 }
@@ -262,11 +250,15 @@ public class FixedSourcePartitionedScheduler
             }
         }
 
+        if (sourceSchedulers.isEmpty()) {
+            stage.transitionToFinishedTaskScheduling();
+        }
+
         if (allBlocked) {
-            return ScheduleResult.blocked(sourceSchedulers.isEmpty(), newTasks, whenAnyComplete(blocked), blockedReason, splitsScheduled);
+            return ScheduleResult.blocked(sourceSchedulers.isEmpty(), tasks, whenAnyComplete(blocked), blockedReason, splitsScheduled);
         }
         else {
-            return ScheduleResult.nonBlocked(sourceSchedulers.isEmpty(), newTasks, splitsScheduled);
+            return ScheduleResult.nonBlocked(sourceSchedulers.isEmpty(), tasks, splitsScheduled);
         }
     }
 
